@@ -1,15 +1,19 @@
 package com.resona.music.data.repository
 
+import com.resona.music.data.extractor.YouTubeStreamExtractor
 import com.resona.music.data.remote.innertube.InnerTubeApi
 import com.resona.music.data.remote.innertube.models.extractSongs
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
-import com.resona.music.domain.repository.PlaybackUnavailableException
-import com.resona.music.domain.repository.StreamCipherRequiredException
+import com.resona.music.domain.repository.StreamSource
 import javax.inject.Inject
 
-class MusicRepositoryImpl @Inject constructor(
-    private val api: InnerTubeApi
+// Constructor is internal, not the class itself -- :app needs the type
+// (RepositoryModule binds it) but never constructs it directly, Hilt's
+// generated factory does that from within :core:data.
+class MusicRepositoryImpl @Inject internal constructor(
+    private val api: InnerTubeApi,
+    private val streamExtractor: YouTubeStreamExtractor,
 ) : MusicRepository {
 
     override suspend fun search(query: String): List<Song> =
@@ -22,29 +26,8 @@ class MusicRepositoryImpl @Inject constructor(
             )
         }
 
-    override suspend fun getStreamUrl(videoId: String): String {
-        val response = api.getPlayerResponse(videoId)
-
-        val status = response.playabilityStatus
-        if (status?.status != "OK") {
-            throw PlaybackUnavailableException(
-                status = status?.status ?: "UNKNOWN",
-                reasonText = status?.reason ?: "No reason given by InnerTube."
-            )
-        }
-
-        val bestAudioFormat = response.streamingData?.adaptiveFormats
-            ?.filter { it.mimeType?.startsWith("audio/") == true }
-            ?.maxByOrNull { it.bitrate ?: 0 }
-            ?: throw PlaybackUnavailableException(
-                status = "NO_AUDIO_FORMAT",
-                reasonText = "InnerTube returned no audio-only adaptive format for this video."
-            )
-
-        return bestAudioFormat.url ?: throw StreamCipherRequiredException(
-            "itag ${bestAudioFormat.itag} is signature-ciphered. Deciphering it requires " +
-                "parsing YouTube's obfuscated player JavaScript, which is not implemented in " +
-                "this minimal client."
-        )
-    }
+    // A single WEB_REMIX request comes back UNPLAYABLE anonymously, so this
+    // tries a chain of client identities instead -- see YouTubeStreamExtractor.
+    override suspend fun getStreamSource(videoId: String): StreamSource =
+        streamExtractor.resolveStreamUrl(videoId)
 }
