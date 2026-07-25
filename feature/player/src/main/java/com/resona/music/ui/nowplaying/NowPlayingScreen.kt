@@ -22,12 +22,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -53,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.resona.music.feature.player.R
 import com.resona.music.domain.model.Song
+import com.resona.music.playback.DownloadState
+import com.resona.music.playback.LyricsState
 import com.resona.music.playback.PlayerUiState
 import com.resona.music.ui.theme.ResonaTheme
 
@@ -66,6 +73,7 @@ fun NowPlayingScreen(
     onQueueClick: () -> Unit,
     onDownloadClick: () -> Unit = {},
     onToggleLike: () -> Unit = {},
+    onLoadLyrics: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -74,7 +82,12 @@ fun NowPlayingScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        NowPlayingTopBar(onBack = onBack, onQueueClick = onQueueClick)
+        NowPlayingTopBar(
+            onBack = onBack,
+            onQueueClick = onQueueClick,
+            downloadState = uiState.downloadState,
+            onDownloadClick = onDownloadClick
+        )
 
         val track = uiState.currentTrack
         if (track == null) {
@@ -140,7 +153,9 @@ fun NowPlayingScreen(
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipNext = onSkipNext,
                     onSkipPrevious = onSkipPrevious,
+                    isLiked = uiState.isLiked,
                     onToggleLike = onToggleLike,
+                    downloadState = uiState.downloadState,
                     onDownloadClick = onDownloadClick
                 )
 
@@ -156,7 +171,83 @@ fun NowPlayingScreen(
                     )
                 }
 
+                val downloadError = (uiState.downloadState as? DownloadState.Failed)?.message
+                if (downloadError != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Download failed: $downloadError",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                LyricsSection(
+                    lyricsState = uiState.lyricsState,
+                    onExpand = onLoadLyrics,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LyricsSection(
+    lyricsState: LyricsState,
+    onExpand: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .clickable {
+                    expanded = !expanded
+                    if (expanded) onExpand()
+                }
+                .padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Lyrics",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse lyrics" else "Expand lyrics",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (expanded) {
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
+                when (lyricsState) {
+                    LyricsState.NotLoaded, LyricsState.Loading -> CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    is LyricsState.Available -> Text(
+                        text = lyricsState.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    LyricsState.Unavailable -> Text(
+                        text = "Lyrics not available for this track",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -166,6 +257,8 @@ fun NowPlayingScreen(
 private fun NowPlayingTopBar(
     onBack: () -> Unit,
     onQueueClick: () -> Unit,
+    downloadState: DownloadState = DownloadState.Idle,
+    onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var overflowExpanded by remember { mutableStateOf(false) }
@@ -211,8 +304,18 @@ private fun NowPlayingTopBar(
                     onClick = { overflowExpanded = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("Download") },
+                    text = {
+                        Text(
+                            when (downloadState) {
+                                DownloadState.Downloading -> "Downloading…"
+                                DownloadState.Downloaded -> "Downloaded"
+                                else -> "Download"
+                            }
+                        )
+                    },
+                    enabled = downloadState !is DownloadState.Downloading && downloadState !is DownloadState.Downloaded,
                     onClick = {
+                        onDownloadClick()
                         overflowExpanded = false
                     }
                 )
@@ -289,7 +392,9 @@ private fun PlaybackControls(
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
+    isLiked: Boolean = false,
     onToggleLike: () -> Unit = {},
+    downloadState: DownloadState = DownloadState.Idle,
     onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -304,8 +409,8 @@ private fun PlaybackControls(
                 modifier = Modifier.size(44.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.FavoriteBorder,
-                    contentDescription = "Like",
+                    imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = if (isLiked) "Unlike" else "Like",
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(26.dp)
                 )
@@ -370,14 +475,34 @@ private fun PlaybackControls(
 
             IconButton(
                 onClick = onDownloadClick,
+                enabled = downloadState !is DownloadState.Downloading && downloadState !is DownloadState.Downloaded,
                 modifier = Modifier.size(44.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Download,
-                    contentDescription = "Download",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(26.dp)
-                )
+                when (downloadState) {
+                    DownloadState.Downloading -> CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    DownloadState.Downloaded -> Icon(
+                        imageVector = Icons.Outlined.DownloadDone,
+                        contentDescription = "Downloaded",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    is DownloadState.Failed -> Icon(
+                        imageVector = Icons.Outlined.Download,
+                        contentDescription = "Download failed, tap to retry",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    DownloadState.Idle -> Icon(
+                        imageVector = Icons.Outlined.Download,
+                        contentDescription = "Download",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
             }
         }
     }
