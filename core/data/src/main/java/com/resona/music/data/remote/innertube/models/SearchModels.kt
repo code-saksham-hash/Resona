@@ -32,11 +32,19 @@ data class InnerTubeSong(
     val videoId: String,
     val title: String,
     val artist: String,
-    val thumbnailUrl: String
+    val thumbnailUrl: String,
+    val duration: String = ""
 )
 
 private const val SONG_TYPE_LABEL = "Song"
-private const val BULLET_SEPARATOR = " • "
+internal const val BULLET_SEPARATOR = " • "
+
+// Matches the "m:ss" / "h:mm:ss" shape InnerTube uses for a song's duration
+// when it appears as a subtitle run (see parseSongRendererOrThrow). Reused by
+// PlaylistModels.kt -- a playlist track row is the same shape minus the
+// leading "Song" type label search rows have (every item in a playlist is
+// already known to be a song, so InnerTube doesn't bother repeating that).
+internal val DURATION_REGEX = Regex("""^\d{1,2}(:\d{2}){1,2}$""")
 
 /**
  * Walks the raw search response looking for musicResponsiveListItemRenderer
@@ -90,7 +98,17 @@ private fun parseSongRendererOrThrow(renderer: JsonElement): InnerTubeSong? {
         .mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull }
         .filter { it != BULLET_SEPARATOR }
     if (subtitleTexts.firstOrNull() != SONG_TYPE_LABEL) return null
-    val artist = subtitleTexts.getOrNull(1) ?: return null
+
+    // Everything after the "Song" label is some mix of artist/album/duration
+    // runs, and which ones are present varies by row -- e.g. a bare ["Song",
+    // "5:38"] (artist omitted because it matched the search query) is
+    // indistinguishable by position from ["Song", "Daft Punk"] (duration
+    // omitted instead). Matching duration by shape instead of by index is
+    // what tells those apart -- verified against a live search response
+    // where both shapes appear side by side for the same query.
+    val rest = subtitleTexts.drop(1)
+    val duration = rest.lastOrNull { DURATION_REGEX.matches(it) } ?: ""
+    val artist = rest.firstOrNull { !DURATION_REGEX.matches(it) } ?: ""
 
     val thumbnailUrl = obj["thumbnail"]
         ?.jsonObject?.get("musicThumbnailRenderer")
@@ -99,10 +117,16 @@ private fun parseSongRendererOrThrow(renderer: JsonElement): InnerTubeSong? {
         ?.jsonArray?.lastOrNull()
         ?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull ?: ""
 
-    return InnerTubeSong(videoId = videoId, title = title, artist = artist, thumbnailUrl = thumbnailUrl)
+    return InnerTubeSong(
+        videoId = videoId,
+        title = title,
+        artist = artist,
+        thumbnailUrl = thumbnailUrl,
+        duration = duration
+    )
 }
 
-private fun JsonElement.flexColumnRuns(): JsonArray? =
+internal fun JsonElement.flexColumnRuns(): JsonArray? =
     jsonObject["musicResponsiveListItemFlexColumnRenderer"]
         ?.jsonObject?.get("text")
         ?.jsonObject?.get("runs")
