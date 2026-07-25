@@ -13,16 +13,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.MoreVert
@@ -32,8 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,7 +53,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.resona.music.ui.theme.MontserratFontFamily
+import com.resona.music.ui.theme.JosefinSansFontFamily
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaTheme
@@ -220,8 +216,6 @@ private fun HomeTopBar(
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var searchText by remember { mutableStateOf("") }
-
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -234,70 +228,22 @@ private fun HomeTopBar(
             painter = ResonaLogoIcon(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(59.dp)
+            modifier = Modifier.size(55.dp)
         )
-        Spacer(modifier = Modifier.width(6.dp))
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(50))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .height(38.dp)
-                .padding(start = 12.dp, end = 4.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                TextField(
-                    value = searchText,
-                    onValueChange = { searchText = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = {
-                        Text(
-                            "Search...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.offset(y = (-1).dp)
-                        )
-                    },
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurface
-                    ),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
-                            if (searchText.isNotBlank()) {
-                                onSearchQuery(searchText)
-                                searchText = ""
-                            }
-                        }
-                    ),
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        cursorColor = MaterialTheme.colorScheme.onSurface,
-                    )
-                )
-            }
+        Spacer(modifier = Modifier.weight(1f))
+        IconButton(onClick = { onSearchQuery("") }) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = "Search",
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(4.dp))
         IconButton(onClick = onProfileClick) {
             Icon(
                 imageVector = Icons.Outlined.AccountCircle,
                 contentDescription = "Profile",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(27.dp)
             )
         }
     }
@@ -350,9 +296,10 @@ private fun RecommendedSection(
         ) {
             Text(
                 text = "Recommended For You",
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = MontserratFontFamily
+                fontFamily = JosefinSansFontFamily,
+                fontWeight = FontWeight.Bold
             )
         }
 
@@ -414,22 +361,20 @@ private fun RecommendedCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(20.dp)
+                    .padding(14.dp)
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.displayMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 14.sp
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     maxLines = 1,
-                    fontSize = 5.sp
                 )
             }
         }
@@ -453,9 +398,10 @@ private fun TrendingSection(
         ) {
             Text(
                 text = "Trending",
-                style = MaterialTheme.typography.displayMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = MontserratFontFamily
+                fontFamily = JosefinSansFontFamily,
+                fontWeight = FontWeight.Bold
             )
         }
 
@@ -554,9 +500,10 @@ private fun TopArtistsSection(
             Column {
                 Text(
                     text = "Your Top Artists",
-                    style = MaterialTheme.typography.displayMedium,
+                    style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    fontFamily = MontserratFontFamily
+                    fontFamily = JosefinSansFontFamily,
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "Based on your listening habits from the last 30 days.",
@@ -633,7 +580,7 @@ private fun NewForYouSection(
                 text = "New for You",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = MontserratFontFamily,
+                fontFamily = JosefinSansFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }

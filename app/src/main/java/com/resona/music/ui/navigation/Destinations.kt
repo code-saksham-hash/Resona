@@ -14,6 +14,7 @@ sealed class ResonaDestination(
     val icon: ImageVector
 ) {
     data object Home : ResonaDestination("home", "Home", Icons.Outlined.Home)
+    data object Explore : ResonaDestination("explore", "Explore", Icons.Outlined.Search)
     data object Search : ResonaDestination("search", "Search", Icons.Outlined.Search)
     data object NowPlaying : ResonaDestination("now_playing", "Now Playing", Icons.Outlined.PlayArrow)
     data object Library : ResonaDestination("library", "Library", Icons.AutoMirrored.Outlined.List)
@@ -21,7 +22,7 @@ sealed class ResonaDestination(
 
 val bottomNavDestinations = listOf(
     ResonaDestination.Home,
-    ResonaDestination.Search,
+    ResonaDestination.Explore,
     ResonaDestination.NowPlaying,
     ResonaDestination.Library
 )
