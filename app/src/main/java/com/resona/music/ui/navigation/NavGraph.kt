@@ -1,5 +1,6 @@
 package com.resona.music.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -15,17 +16,23 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.resona.music.domain.model.Song
 import com.resona.music.playback.PlayerViewModel
+import com.resona.music.ui.home.ArtistDetailScreen
+import com.resona.music.ui.home.ArtistDetailViewModel
 import com.resona.music.ui.home.HomeAlbum
 import com.resona.music.ui.home.HomeArtist
 import com.resona.music.ui.home.HomeScreen
 import com.resona.music.ui.home.HomeTrack
 import com.resona.music.ui.library.LibraryScreen
+import com.resona.music.ui.library.PlaylistDetailScreen
+import com.resona.music.ui.library.PlaylistDetailViewModel
 import com.resona.music.ui.nowplaying.NowPlayingScreen
 import com.resona.music.ui.player.MiniPlayerBar
 import com.resona.music.ui.search.ExploreScreen
@@ -61,7 +68,10 @@ fun ResonaNavGraph() {
                             track = track,
                             isPlaying = playerUiState.isPlaying,
                             onTogglePlayPause = playerViewModel::togglePlayPause,
-                            onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) }
+                            onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) },
+                            isLooping = playerUiState.isLooping,
+                            onToggleRepeat = playerViewModel::toggleRepeat,
+                            onCancel = playerViewModel::stop
                         )
                     }
                 }
@@ -99,22 +109,13 @@ fun ResonaNavGraph() {
                         }
                     },
                     onArtistClick = { artist ->
-                        if (artist.videoId.isNotBlank()) {
-                            playerViewModel.play(
-                                Song(
-                                    videoId = artist.videoId,
-                                    title = artist.name,
-                                    artist = artist.name,
-                                    thumbnailUrl = artist.imageUrl
-                                )
-                            )
-                        }
+                        navController.navigate(artistDetailRoute(artist.name))
                     },
                     onExploreClick = {
                         navController.navigateToTopLevel(ResonaDestination.Explore.route)
                     },
-                    onSearchQuery = {
-                        navController.navigate(ResonaDestination.Search.route)
+                    onSearchQuery = { query ->
+                        navController.navigate(searchRoute(query))
                     },
                 )
             }
@@ -128,8 +129,12 @@ fun ResonaNavGraph() {
                     }
                 )
             }
-            composable(ResonaDestination.Search.route) {
+            composable(
+                route = "${ResonaDestination.Search.route}?query={query}",
+                arguments = listOf(navArgument("query") { type = NavType.StringType; defaultValue = "" })
+            ) { backStackEntry ->
                 SearchPage(
+                    initialQuery = backStackEntry.arguments?.getString("query").orEmpty(),
                     onBack = { navController.popBackStack() },
                     onSongClick = playerViewModel::play,
                 )
@@ -146,20 +151,44 @@ fun ResonaNavGraph() {
                     // once this route is no longer current -- same idiom the
                     // bottom bar itself uses to switch tabs.
                     onQueueClick = {},
-                    onDownloadClick = {
-                        // TODO: wire real download logic here
-                    },
-                    onToggleLike = {
-                        // TODO: wire real like/unlike logic here
-                    },
+                    onDownloadClick = playerViewModel::download,
+                    onToggleLike = playerViewModel::toggleLike,
+                    onLoadLyrics = playerViewModel::loadLyrics,
                     onBack = { navController.popBackStack() }
                 )
             }
             composable(ResonaDestination.Library.route) {
                 LibraryScreen(
+                    onDownloadedSongClick = playerViewModel::play,
+                    onLikedSongClick = playerViewModel::play,
+                    onPlaylistClick = { playlist ->
+                        navController.navigate(playlistDetailRoute(playlist.browseId, playlist.title))
+                    },
                     onSearchClick = {
                         navController.navigate(ResonaDestination.Search.route)
                     },
+                )
+            }
+            composable(
+                route = "${ResonaDestination.PlaylistDetail.route}/{${PlaylistDetailViewModel.ARG_BROWSE_ID}}" +
+                    "?${PlaylistDetailViewModel.ARG_TITLE}={${PlaylistDetailViewModel.ARG_TITLE}}",
+                arguments = listOf(
+                    navArgument(PlaylistDetailViewModel.ARG_BROWSE_ID) { type = NavType.StringType },
+                    navArgument(PlaylistDetailViewModel.ARG_TITLE) { type = NavType.StringType; defaultValue = "" }
+                )
+            ) {
+                PlaylistDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onSongClick = playerViewModel::play,
+                )
+            }
+            composable(
+                route = "${ResonaDestination.ArtistDetail.route}/{${ArtistDetailViewModel.ARG_NAME}}",
+                arguments = listOf(navArgument(ArtistDetailViewModel.ARG_NAME) { type = NavType.StringType })
+            ) {
+                ArtistDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onSongClick = playerViewModel::play,
                 )
             }
         }
@@ -170,10 +199,16 @@ fun ResonaNavGraph() {
 private fun ResonaBottomBar(navController: NavHostController, currentRoute: String?) {
     NavigationBar {
         bottomNavDestinations.forEach { destination ->
+            val selected = currentRoute == destination.route
             NavigationBarItem(
-                selected = currentRoute == destination.route,
+                selected = selected,
                 onClick = { navController.navigateToTopLevel(destination.route) },
-                icon = { Icon(destination.icon, contentDescription = destination.label) },
+                icon = {
+                    Icon(
+                        imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                        contentDescription = destination.label
+                    )
+                },
                 label = { Text(destination.label) }
             )
         }
@@ -194,3 +229,16 @@ private fun NavHostController.navigateToTopLevel(route: String) {
         restoreState = true
     }
 }
+
+/** [ResonaDestination.Search]'s route, optionally pre-filled (e.g. tapping a genre chip on Home). */
+private fun searchRoute(query: String): String =
+    if (query.isBlank()) ResonaDestination.Search.route
+    else "${ResonaDestination.Search.route}?query=${Uri.encode(query)}"
+
+/** [ResonaDestination.PlaylistDetail]'s route for one specific playlist. */
+private fun playlistDetailRoute(browseId: String, title: String): String =
+    "${ResonaDestination.PlaylistDetail.route}/${Uri.encode(browseId)}?title=${Uri.encode(title)}"
+
+/** [ResonaDestination.ArtistDetail]'s route for one specific artist. */
+private fun artistDetailRoute(name: String): String =
+    "${ResonaDestination.ArtistDetail.route}/${Uri.encode(name)}"
