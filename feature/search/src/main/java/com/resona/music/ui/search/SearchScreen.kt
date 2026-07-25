@@ -748,7 +748,7 @@ fun ExploreScreen(
                 painter = ResonaLogoIcon(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(55.dp)
+                modifier = Modifier.size(66.dp)
             )
             Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = onSearchClick) {
@@ -756,6 +756,7 @@ fun ExploreScreen(
                     imageVector = Icons.Outlined.Search,
                     contentDescription = "Search",
                     tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
                 )
             }
             Spacer(modifier = Modifier.width(4.dp))
@@ -764,6 +765,7 @@ fun ExploreScreen(
                     imageVector = Icons.Outlined.AccountCircle,
                     contentDescription = "Profile",
                     tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }

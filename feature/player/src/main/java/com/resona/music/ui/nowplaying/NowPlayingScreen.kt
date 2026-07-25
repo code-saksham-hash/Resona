@@ -18,12 +18,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.SkipNext
+import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -43,7 +47,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -71,7 +74,7 @@ fun NowPlayingScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        NowPlayingTopBar(onBack = onBack, onQueueClick = onQueueClick, onDownloadClick = onDownloadClick)
+        NowPlayingTopBar(onBack = onBack, onQueueClick = onQueueClick)
 
         val track = uiState.currentTrack
         if (track == null) {
@@ -89,41 +92,39 @@ fun NowPlayingScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 27.dp),
+                    .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 AlbumArt(
                     thumbnailUrl = track.thumbnailUrl,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(27.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
                     text = track.title,
-                    style = MaterialTheme.typography.displayMedium,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = track.artist,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(27.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 SeekBar(
                     position = uiState.position,
@@ -132,7 +133,7 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 PlaybackControls(
                     isPlaying = uiState.isPlaying,
@@ -145,7 +146,7 @@ fun NowPlayingScreen(
 
                 val playError = uiState.error
                 if (playError != null) {
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = playError,
                         style = MaterialTheme.typography.bodyMedium,
@@ -155,7 +156,7 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(27.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -165,7 +166,6 @@ fun NowPlayingScreen(
 private fun NowPlayingTopBar(
     onBack: () -> Unit,
     onQueueClick: () -> Unit,
-    onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var overflowExpanded by remember { mutableStateOf(false) }
@@ -173,7 +173,7 @@ private fun NowPlayingTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 3.dp, vertical = 3.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {
@@ -207,10 +207,6 @@ private fun NowPlayingTopBar(
                 onDismissRequest = { overflowExpanded = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("Like") },
-                    onClick = { overflowExpanded = false }
-                )
-                DropdownMenuItem(
                     text = { Text("Add to playlist") },
                     onClick = { overflowExpanded = false }
                 )
@@ -218,8 +214,11 @@ private fun NowPlayingTopBar(
                     text = { Text("Download") },
                     onClick = {
                         overflowExpanded = false
-                        onDownloadClick()
                     }
+                )
+                DropdownMenuItem(
+                    text = { Text("Share") },
+                    onClick = { overflowExpanded = false }
                 )
             }
         }
@@ -236,7 +235,7 @@ private fun AlbumArt(thumbnailUrl: String, modifier: Modifier = Modifier) {
         error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
         modifier = modifier
             .aspectRatio(1f)
-            .clip(MaterialTheme.shapes.large)
+            .clip(RoundedCornerShape(16.dp))
     )
 }
 
@@ -294,78 +293,92 @@ private fun PlaybackControls(
     onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onToggleLike, modifier = Modifier.size(41.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.FavoriteBorder,
-                contentDescription = "Like",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        IconButton(onClick = onSkipPrevious, modifier = Modifier.size(41.dp)) {
-            Icon(
-                painter = painterResource(R.drawable.ic_skip_previous),
-                contentDescription = "Previous",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(20.dp))
-
-        Box(
-            modifier = Modifier
-                .size(61.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .clickable(onClick = onTogglePlayPause),
-            contentAlignment = Alignment.Center
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (isPlaying) {
+            IconButton(
+                onClick = onToggleLike,
+                modifier = Modifier.size(44.dp)
+            ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_pause),
-                    contentDescription = "Pause",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(27.dp)
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Outlined.PlayArrow,
-                    contentDescription = "Play",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(27.dp)
+                    imageVector = Icons.Outlined.FavoriteBorder,
+                    contentDescription = "Like",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(26.dp)
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.width(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-        IconButton(onClick = onSkipNext, modifier = Modifier.size(41.dp)) {
-            Icon(
-                painter = painterResource(R.drawable.ic_skip_next),
-                contentDescription = "Next",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+            IconButton(
+                onClick = onSkipPrevious,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.SkipPrevious,
+                    contentDescription = "Previous",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
 
-        Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-        IconButton(onClick = onDownloadClick, modifier = Modifier.size(41.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.Download,
-                contentDescription = "Download",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable(onClick = onTogglePlayPause),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isPlaying) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_pause),
+                        contentDescription = "Pause",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.PlayArrow,
+                        contentDescription = "Play",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(
+                onClick = onSkipNext,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.SkipNext,
+                    contentDescription = "Next",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            IconButton(
+                onClick = onDownloadClick,
+                modifier = Modifier.size(44.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Download,
+                    contentDescription = "Download",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
         }
     }
 }

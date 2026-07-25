@@ -18,8 +18,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.DownloadDone
-import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,33 +48,43 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.resona.music.ui.theme.JosefinSansFontFamily
 import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaTheme
 
-data class DownloadTrack(
+data class Playlist(
     val id: String,
     val title: String,
-    val artist: String,
-    val album: String,
-    val duration: String,
-    val imageUrl: String
+    val subtitle: String,
+    val imageUrl: String,
+    val trackCount: Int = 0
 )
 
-private val mockTracks = listOf(
-    DownloadTrack("1", "Ether Drift", "Vanish In Dust", "Monolith", "3:42", "https://picsum.photos/seed/dltrack1/400/400"),
-    DownloadTrack("2", "Monolith IV", "Structural Integrity", "Breakdown", "5:18", "https://picsum.photos/seed/dltrack2/400/400"),
-    DownloadTrack("3", "Surface Tension", "Kinesis", "Kinesis EP", "4:07", "https://picsum.photos/seed/dltrack3/400/400"),
-    DownloadTrack("4", "Glass Ceiling", "AELOS", "AELOS", "6:01", "https://picsum.photos/seed/dltrack4/400/400"),
+data class QuickLink(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val color: Color
+)
+
+private val mockPlaylists = listOf(
+    Playlist("1", "Chill Vibes", "Electronic, Ambient", "https://picsum.photos/seed/pl1/400/400", 24),
+    Playlist("2", "Focus Mode", "Instrumental, Lo-Fi", "https://picsum.photos/seed/pl2/400/400", 18),
+    Playlist("3", "Late Night Drives", "Synthwave, Dark", "https://picsum.photos/seed/pl3/400/400", 32),
+    Playlist("4", "Workout Energy", "Industrial, Metal", "https://picsum.photos/seed/pl4/400/400", 15),
 )
 
 @Composable
 fun LibraryScreen(
     modifier: Modifier = Modifier,
-    onTrackClick: (DownloadTrack) -> Unit = {},
+    onTrackClick: (Playlist) -> Unit = {},
+    onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
 ) {
     LibraryScreenContent(
         onTrackClick = onTrackClick,
+        onSearchClick = onSearchClick,
         onProfileClick = onProfileClick,
         modifier = modifier
     )
@@ -80,7 +93,8 @@ fun LibraryScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryScreenContent(
-    onTrackClick: (DownloadTrack) -> Unit = {},
+    onTrackClick: (Playlist) -> Unit = {},
+    onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -99,7 +113,7 @@ private fun LibraryScreenContent(
         modifier = modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            LibraryTopBar(onProfileClick = onProfileClick)
+            LibraryTopBar(onSearchClick = onSearchClick, onProfileClick = onProfileClick)
 
             LazyColumn(
                 modifier = Modifier
@@ -107,11 +121,10 @@ private fun LibraryScreenContent(
                     .weight(1f)
             ) {
                 item { LibraryHeader() }
-                item { Spacer(modifier = Modifier.height(20.dp)) }
-                item { DownloadToggle(isDownloadedOnly = false, onToggle = {}) }
-                item { Spacer(modifier = Modifier.height(20.dp)) }
-                item { DownloadTracksSection(tracks = mockTracks, onTrackClick = onTrackClick) }
-                item { StatsFooter(trackCount = 4, storageUsed = "42.5 MB") }
+                item { Spacer(modifier = Modifier.height(24.dp)) }
+                item { QuickLinksSection() }
+                item { Spacer(modifier = Modifier.height(32.dp)) }
+                item { PlaylistsSection(playlists = mockPlaylists, onPlaylistClick = onTrackClick) }
                 item { Spacer(modifier = Modifier.height(68.dp)) }
             }
         }
@@ -120,6 +133,7 @@ private fun LibraryScreenContent(
 
 @Composable
 private fun LibraryTopBar(
+    onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -135,29 +149,24 @@ private fun LibraryTopBar(
             painter = ResonaLogoIcon(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(59.dp)
+            modifier = Modifier.size(66.dp)
         )
         Spacer(modifier = Modifier.weight(1f))
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(50))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .clickable { }
-                .padding(horizontal = 8.dp, vertical = 0.dp)
-        ) {
-            Text(
-                text = "Search",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        IconButton(onClick = onSearchClick) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = "Search",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
             )
         }
+        Spacer(modifier = Modifier.width(4.dp))
         IconButton(onClick = onProfileClick) {
             Icon(
                 imageVector = Icons.Outlined.AccountCircle,
                 contentDescription = "Profile",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(27.dp)
+                modifier = Modifier.size(28.dp)
             )
         }
     }
@@ -165,76 +174,124 @@ private fun LibraryTopBar(
 
 @Composable
 private fun LibraryHeader(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(horizontal = 17.dp)) {
-        Text(
-            text = "Library",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = "Downloads",
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
+    Text(
+        text = "Your Library",
+        style = MaterialTheme.typography.headlineSmall,
+        color = MaterialTheme.colorScheme.primary,
+        fontFamily = JosefinSansFontFamily,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier.padding(horizontal = 17.dp)
+    )
 }
 
 @Composable
-private fun DownloadToggle(
-    isDownloadedOnly: Boolean,
-    onToggle: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun QuickLinksSection(modifier: Modifier = Modifier) {
+    val quickLinks = listOf(
+        QuickLink("liked", "Liked Songs", "Your favorites", Icons.Outlined.FavoriteBorder, Color(0xFFFFFFFF)),
+        QuickLink("downloads", "Downloads", "Offline tracks", Icons.Outlined.DownloadDone, Color(0xFF43A047)),
+    )
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 17.dp),
-        horizontalArrangement = Arrangement.End,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        quickLinks.forEach { link ->
+            QuickLinkCard(link = link, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun QuickLinkCard(
+    link: QuickLink,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .clickable { }
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "Downloaded Only",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.width(10.dp))
         Box(
             modifier = Modifier
-                .width(41.dp)
-                .height(20.dp)
-                .clip(MaterialTheme.shapes.extraLarge)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                .clickable(onClick = onToggle)
-                .padding(2.dp),
-            contentAlignment = if (isDownloadedOnly) Alignment.CenterEnd else Alignment.CenterStart
+                .size(48.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(link.color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(17.dp)
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .background(MaterialTheme.colorScheme.primary)
+            Icon(
+                imageVector = link.icon,
+                contentDescription = null,
+                tint = link.color,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column {
+            Text(
+                text = link.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = link.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
 
 @Composable
-private fun DownloadTracksSection(
-    tracks: List<DownloadTrack>,
-    onTrackClick: (DownloadTrack) -> Unit = {},
+private fun PlaylistsSection(
+    playlists: List<Playlist>,
+    onPlaylistClick: (Playlist) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        tracks.forEach { track ->
-            DownloadTrackRow(track = track, onClick = { onTrackClick(track) })
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 17.dp)
+                .padding(bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.LibraryMusic,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Your Playlists",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = JosefinSansFontFamily,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        playlists.forEach { playlist ->
+            PlaylistCard(
+                playlist = playlist,
+                onClick = { onPlaylistClick(playlist) }
+            )
         }
     }
 }
 
 @Composable
-private fun DownloadTrackRow(
-    track: DownloadTrack,
+private fun PlaylistCard(
+    playlist: Playlist,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -242,17 +299,17 @@ private fun DownloadTrackRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 17.dp, vertical = 14.dp),
+            .padding(horizontal = 17.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(82.dp)
-                .clip(MaterialTheme.shapes.large)
+                .size(64.dp)
+                .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
         ) {
             AsyncImage(
-                model = track.imageUrl,
+                model = playlist.imageUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
@@ -261,96 +318,40 @@ private fun DownloadTrackRow(
             )
         }
 
-        Spacer(modifier = Modifier.width(20.dp))
+        Spacer(modifier = Modifier.width(16.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = track.title,
-                style = MaterialTheme.typography.titleLarge,
+                text = playlist.title,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "${track.artist} \u2022 ${track.album}",
-                style = MaterialTheme.typography.bodyMedium,
+                text = playlist.subtitle,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-        }
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
             Text(
-                text = track.duration,
+                text = "${playlist.trackCount} tracks",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
-            )
-            Icon(
-                imageVector = Icons.Outlined.DownloadDone,
-                contentDescription = "Downloaded",
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                maxLines = 1
             )
         }
 
-        Spacer(modifier = Modifier.width(7.dp))
+        Spacer(modifier = Modifier.width(8.dp))
 
         Icon(
-            imageVector = Icons.Outlined.MoreHoriz,
-            contentDescription = "More",
-            tint = MaterialTheme.colorScheme.outline
+            imageVector = Icons.Outlined.LibraryMusic,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            modifier = Modifier.size(20.dp)
         )
-    }
-}
-
-@Composable
-private fun StatsFooter(
-    trackCount: Int,
-    storageUsed: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 17.dp, vertical = 20.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outlineVariant)
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "$trackCount TRACKS \u2022 $storageUsed USED",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
-            Box(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .background(Color.Transparent)
-                    .clickable { }
-                    .padding(horizontal = 17.dp, vertical = 7.dp),
-            ) {
-                Text(
-                    text = "MANAGE STORAGE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
     }
 }
 
