@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material3.Icon
-import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -17,7 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -45,7 +47,8 @@ fun ResonaNavGraph() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val showBottomBar = currentRoute in bottomNavDestinations.map { it.route }
+    val showBottomBar = currentRoute in bottomNavDestinations.map { it.route } ||
+        currentRoute?.startsWith("explore/") == true
     val showPlayer = currentRoute !in listOf(
         ResonaDestination.NowPlaying.route,
         ResonaDestination.Onboarding.route,
@@ -90,7 +93,9 @@ fun ResonaNavGraph() {
             }
             composable(ResonaDestination.Home.route) {
                 HomeScreen(
-                    onSearchClick = { navController.navigateToTopLevel(ResonaDestination.Explore.route) },
+                    onSearchQuery = { query ->
+                        navController.navigateToTopLevel(ResonaDestination.Explore.createRoute(query))
+                    },
                     onExploreClick = { navController.navigateToTopLevel(ResonaDestination.Explore.route) },
                     onProfileClick = { navController.navigate(ResonaDestination.MyAccount.route) },
                     onAlbumClick = { album ->
@@ -125,8 +130,21 @@ fun ResonaNavGraph() {
                     }
                 )
             }
+            composable(
+                route = "explore/{query}",
+                arguments = listOf(navArgument("query") { type = NavType.StringType; defaultValue = "" })
+            ) {
+                val query = it.arguments?.getString("query") ?: ""
+                SearchScreen(
+                    initialQuery = query,
+                    onSongClick = playerViewModel::play,
+                    onGenreClick = { },
+                    onProfileClick = { navController.navigate(ResonaDestination.MyAccount.route) }
+                )
+            }
             composable(ResonaDestination.Explore.route) {
                 SearchScreen(
+                    initialQuery = "",
                     onSongClick = playerViewModel::play,
                     onGenreClick = { },
                     onProfileClick = { navController.navigate(ResonaDestination.MyAccount.route) }

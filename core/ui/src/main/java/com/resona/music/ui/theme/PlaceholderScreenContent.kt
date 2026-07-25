@@ -29,7 +29,7 @@ fun ResonaPlaceholderScreenContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -37,10 +37,10 @@ fun ResonaPlaceholderScreenContent(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(40.dp)
+            modifier = Modifier.size(34.dp)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Text(
             text = title,
@@ -48,7 +48,7 @@ fun ResonaPlaceholderScreenContent(
             color = MaterialTheme.colorScheme.onSurface
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(7.dp))
 
         Text(
             text = caption,
@@ -56,7 +56,7 @@ fun ResonaPlaceholderScreenContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(27.dp))
 
         Column(
             modifier = Modifier
@@ -66,14 +66,14 @@ fun ResonaPlaceholderScreenContent(
                     color = MaterialTheme.colorScheme.outline,
                     shape = MaterialTheme.shapes.small
                 )
-                .padding(16.dp)
+                .padding(14.dp)
         ) {
             Text(
                 text = "No shadows here",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = "Surfaces are separated with a 1dp border and flat gray fills instead of elevation.",
                 style = MaterialTheme.typography.bodySmall,
@@ -81,9 +81,9 @@ fun ResonaPlaceholderScreenContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             NocturneFilledButton(text = "Primary", onClick = {})
             NocturneOutlinedButton(text = "Secondary", onClick = {})
         }

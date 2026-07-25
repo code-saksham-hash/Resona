@@ -49,7 +49,7 @@ fun MyAccountScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = 3.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -70,14 +70,14 @@ fun MyAccountScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 17.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(27.dp))
 
             Box(
                 modifier = Modifier
-                    .size(96.dp)
+                    .size(82.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainer),
                 contentAlignment = Alignment.Center
@@ -86,11 +86,11 @@ fun MyAccountScreen(
                     imageVector = Icons.Outlined.AccountCircle,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(54.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 text = "Listener",
@@ -104,21 +104,21 @@ fun MyAccountScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(27.dp))
 
             AccountOption(icon = Icons.Outlined.Settings, label = "Settings")
             AccountOption(icon = Icons.Outlined.Download, label = "Storage Management")
             AccountOption(icon = Icons.Outlined.Info, label = "About Resona")
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             AccountOption(icon = Icons.Outlined.Logout, label = "Sign Out", tint = MaterialTheme.colorScheme.error)
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(41.dp))
 
             Text(
                 text = "Resona v1.0.0",
@@ -128,7 +128,7 @@ fun MyAccountScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
@@ -140,20 +140,20 @@ private fun AccountOption(
     tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,

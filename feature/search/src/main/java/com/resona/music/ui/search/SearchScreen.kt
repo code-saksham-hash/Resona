@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,11 +21,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -39,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,11 +53,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.NocturneOutlinedButton
+import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaTheme
 
 data class Genre(
@@ -79,6 +83,7 @@ data class Creator(
 
 @Composable
 fun SearchScreen(
+    initialQuery: String = "",
     modifier: Modifier = Modifier,
     onSongClick: (Song) -> Unit = {},
     onGenreClick: (String) -> Unit = {},
@@ -87,6 +92,12 @@ fun SearchScreen(
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank()) {
+            viewModel.onQueryChange(initialQuery)
+        }
+    }
 
     ExploreContent(
         query = query,
@@ -112,7 +123,7 @@ private fun ExploreContent(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        ExploreTopBar(onProfileClick = onProfileClick)
+//        ExploreTopBar(onProfileClick = onProfileClick)
 
         LazyColumn(
             modifier = Modifier
@@ -122,22 +133,22 @@ private fun ExploreContent(
             item { SearchBarSection(query = query, onQueryChange = onQueryChange) }
 
             if (query.isBlank()) {
-                item { Spacer(modifier = Modifier.height(12.dp)) }
+                item { Spacer(modifier = Modifier.height(10.dp)) }
                 item { RecentTags() }
-                item { Spacer(modifier = Modifier.height(32.dp)) }
+                item { Spacer(modifier = Modifier.height(27.dp)) }
                 item { GenreGrid(onGenreClick = onGenreClick) }
-                item { Spacer(modifier = Modifier.height(32.dp)) }
+                item { Spacer(modifier = Modifier.height(27.dp)) }
                 item { TrendingNowSection() }
-                item { Spacer(modifier = Modifier.height(48.dp)) }
+                item { Spacer(modifier = Modifier.height(41.dp)) }
                 item { FeaturedCreatorsSection() }
-                item { Spacer(modifier = Modifier.height(80.dp)) }
+                item { Spacer(modifier = Modifier.height(68.dp)) }
             } else {
-                item { Spacer(modifier = Modifier.height(16.dp)) }
+                item { Spacer(modifier = Modifier.height(14.dp)) }
 
                 when (val state = uiState) {
                     is SearchUiState.Loading -> {
                         item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(27.dp), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             }
                         }
@@ -149,12 +160,12 @@ private fun ExploreContent(
                                 onClick = { onSongClick(song) }
                             )
                         }
-                        item { Spacer(modifier = Modifier.height(80.dp)) }
+                        item { Spacer(modifier = Modifier.height(68.dp)) }
                     }
                     is SearchUiState.Error -> {
                         item {
                             Column(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                modifier = Modifier.fillMaxWidth().padding(27.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
@@ -162,14 +173,14 @@ private fun ExploreContent(
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
                                 NocturneOutlinedButton(text = "RETRY", onClick = onRetry)
                             }
                         }
                     }
                     is SearchUiState.Empty -> {
                         item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(27.dp), contentAlignment = Alignment.Center) {
                                 Text(
                                     text = "No results found",
                                     style = MaterialTheme.typography.bodyLarge,
@@ -194,12 +205,12 @@ private fun SearchResultRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 17.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(48.dp)
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
@@ -212,7 +223,7 @@ private fun SearchResultRow(
                 modifier = Modifier.fillMaxSize()
             )
         }
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
@@ -241,21 +252,15 @@ private fun ExploreTopBar(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 20.dp)
-            .height(72.dp),
+            .padding(horizontal = 17.dp)
+            .height(61.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Outlined.GraphicEq,
+            painter = ResonaLogoIcon(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(32.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "Resona",
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(59.dp)
         )
         Spacer(modifier = Modifier.weight(1f))
         IconButton(onClick = onProfileClick) {
@@ -263,7 +268,7 @@ private fun ExploreTopBar(
                 imageVector = Icons.Outlined.AccountCircle,
                 contentDescription = "Profile",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(27.dp)
             )
         }
     }
@@ -275,10 +280,14 @@ private fun SearchBarSection(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
+            .padding(start = 11.dp, end = 17.dp)
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .height(38.dp)
+            .padding(horizontal = 8.dp, vertical = 0.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -287,9 +296,10 @@ private fun SearchBarSection(
             Icon(
                 imageVector = Icons.Outlined.Search,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
@@ -297,8 +307,9 @@ private fun SearchBarSection(
                 placeholder = {
                     Text(
                         "Search...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        modifier = Modifier.offset(y = (-1).dp)
                     )
                 },
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
@@ -328,8 +339,8 @@ private fun RecentTags(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(scrollState)
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 17.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         tags.forEachIndexed { index, tag ->
             SuggestionChip(
@@ -362,18 +373,18 @@ private fun GenreGrid(
     onGenreClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.padding(horizontal = 20.dp)) {
+    Column(modifier = modifier.padding(horizontal = 17.dp)) {
         Text(
             text = "Sonic Landscapes",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 GenreCard(
                     name = "EXPERIMENTAL",
@@ -383,7 +394,7 @@ private fun GenreGrid(
                     modifier = Modifier.weight(2f)
                 )
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     GenreCard(name = "JAZZ", imageUrl = "https://picsum.photos/seed/genre2/400/400", onClick = { onGenreClick("Jazz") })
@@ -392,7 +403,7 @@ private fun GenreGrid(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 GenreCard(name = "PIANO", imageUrl = "https://picsum.photos/seed/genre4/400/400", onClick = { onGenreClick("Piano") }, modifier = Modifier.weight(1f))
                 GenreCard(name = "GLITCH", imageUrl = "https://picsum.photos/seed/genre5/400/400", onClick = { onGenreClick("Glitch") }, modifier = Modifier.weight(1f))
@@ -433,9 +444,9 @@ private fun GenreCard(
                 )
         )
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .align(if (isFeatured) Alignment.BottomStart else Alignment.Center)
-                .padding(if (isFeatured) 24.dp else 0.dp)
+                .padding(if (isFeatured) 20.dp else 0.dp)
         ) {
             if (isFeatured) {
                 Column {
@@ -469,7 +480,7 @@ private fun TrendingNowSection(modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 17.dp)
         ) {
             Column {
                 Text(
@@ -485,14 +496,14 @@ private fun TrendingNowSection(modifier: Modifier = Modifier) {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 17.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             TrendingCard(
                 title = "Ether Drift",
@@ -526,7 +537,7 @@ private fun TrendingCard(
 ) {
     Column(
         modifier = modifier
-            .width(240.dp)
+            .width(204.dp)
             .clickable(onClick = onClick)
     ) {
         Box(
@@ -547,8 +558,8 @@ private fun TrendingCard(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(12.dp)
-                    .size(40.dp)
+                    .padding(10.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
                     .clickable { },
@@ -558,11 +569,11 @@ private fun TrendingCard(
                     imageVector = Icons.Outlined.PlayArrow,
                     contentDescription = "Play",
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -598,7 +609,7 @@ private fun FeaturedCreatorsSection(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 17.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -606,7 +617,7 @@ private fun FeaturedCreatorsSection(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -635,10 +646,10 @@ private fun CreatorAvatar(
             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier
-                .size(100.dp)
+                .size(85.dp)
                 .clip(CircleShape)
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(7.dp))
         Text(
             text = name,
             style = MaterialTheme.typography.labelSmall,

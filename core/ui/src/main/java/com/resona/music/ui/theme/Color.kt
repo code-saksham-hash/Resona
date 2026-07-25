@@ -4,8 +4,8 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 
-val NocturneSurface = Color(0xFF121414)
-val NocturneSurfaceDim = Color(0xFF121414)
+val NocturneSurface = Color(0xFF000000)
+val NocturneSurfaceDim = Color(0xFF000000)
 val NocturneSurfaceBright = Color(0xFF383939)
 val NocturneSurfaceContainerLowest = Color(0xFF0D0E0F)
 val NocturneSurfaceContainerLow = Color(0xFF1B1C1C)

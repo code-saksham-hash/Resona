@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,7 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.DownloadDone
-import androidx.compose.material.icons.outlined.GraphicEq
+
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
@@ -36,9 +37,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaTheme
 
 @Composable
@@ -77,17 +80,17 @@ private fun LibraryScreenContent(
         ) {
             item { LibraryHeader() }
 
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
 
             item { DownloadToggle(isDownloadedOnly = uiState.isDownloadedOnly, onToggle = onToggleDownloadedOnly) }
 
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
 
             item { DownloadTracksSection(tracks = uiState.tracks, onTrackClick = onTrackClick) }
 
             item { StatsFooter(trackCount = uiState.trackCount, storageUsed = uiState.storageUsed) }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            item { Spacer(modifier = Modifier.height(68.dp)) }
         }
     }
 }
@@ -101,28 +104,29 @@ private fun LibraryTopBar(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 20.dp)
-            .height(72.dp),
+            .padding(horizontal = 17.dp)
+            .height(61.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Outlined.GraphicEq,
+            painter = ResonaLogoIcon(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(32.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "Resona",
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(59.dp)
         )
         Spacer(modifier = Modifier.weight(1f))
-        IconButton(onClick = { }) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = "Search",
-                tint = MaterialTheme.colorScheme.outline
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clickable { }
+                .padding(horizontal = 8.dp, vertical = 0.dp)
+        ) {
+            Text(
+                text = "Search",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         }
         IconButton(onClick = onProfileClick) {
@@ -130,7 +134,7 @@ private fun LibraryTopBar(
                 imageVector = Icons.Outlined.AccountCircle,
                 contentDescription = "Profile",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(27.dp)
             )
         }
     }
@@ -138,13 +142,13 @@ private fun LibraryTopBar(
 
 @Composable
 private fun LibraryHeader(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(horizontal = 20.dp)) {
+    Column(modifier = modifier.padding(horizontal = 17.dp)) {
         Text(
             text = "Library",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = "Downloads",
             style = MaterialTheme.typography.displayMedium,
@@ -162,7 +166,7 @@ private fun DownloadToggle(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 17.dp),
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -171,11 +175,11 @@ private fun DownloadToggle(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Box(
             modifier = Modifier
-                .width(48.dp)
-                .height(24.dp)
+                .width(41.dp)
+                .height(20.dp)
                 .clip(MaterialTheme.shapes.extraLarge)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                 .clickable(onClick = onToggle)
@@ -184,7 +188,7 @@ private fun DownloadToggle(
         ) {
             Box(
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(17.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
                     .background(MaterialTheme.colorScheme.primary)
             )
@@ -215,12 +219,12 @@ private fun DownloadTrackRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 17.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(96.dp)
+                .size(82.dp)
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
         ) {
@@ -234,7 +238,7 @@ private fun DownloadTrackRow(
             )
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(20.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -244,7 +248,7 @@ private fun DownloadTrackRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = "${track.artist} • ${track.album}",
                 style = MaterialTheme.typography.bodyMedium,
@@ -254,11 +258,11 @@ private fun DownloadTrackRow(
             )
         }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         Column(
             horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Text(
                 text = track.duration,
@@ -272,7 +276,7 @@ private fun DownloadTrackRow(
             )
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(7.dp))
 
         Icon(
             imageVector = Icons.Outlined.MoreHoriz,
@@ -291,7 +295,7 @@ private fun StatsFooter(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 24.dp)
+            .padding(horizontal = 17.dp, vertical = 20.dp)
     ) {
         Box(
             modifier = Modifier
@@ -299,7 +303,7 @@ private fun StatsFooter(
                 .height(1.dp)
                 .background(MaterialTheme.colorScheme.outlineVariant)
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -315,7 +319,7 @@ private fun StatsFooter(
                     .clip(MaterialTheme.shapes.extraLarge)
                     .background(Color.Transparent)
                     .clickable { }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 17.dp, vertical = 7.dp),
             ) {
                 Text(
                     text = "MANAGE STORAGE",

@@ -57,7 +57,7 @@ fun MiniPlayerBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .padding(horizontal = 14.dp, vertical = 3.dp)
             )
         }
         Box(
@@ -71,7 +71,7 @@ fun MiniPlayerBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -87,11 +87,11 @@ fun MiniPlayerBar(
                     placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(34.dp)
                         .clip(MaterialTheme.shapes.small)
                 )
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Column {
                     Text(
@@ -111,7 +111,7 @@ fun MiniPlayerBar(
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(7.dp))
 
             IconButton(onClick = onTogglePlayPause) {
                 if (isPlaying) {

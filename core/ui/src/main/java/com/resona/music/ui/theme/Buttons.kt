@@ -35,7 +35,7 @@ fun NocturneFilledButton(
             hoveredElevation = 0.dp,
             disabledElevation = 0.dp
         ),
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
     ) {
         Text(text, style = MaterialTheme.typography.labelSmall)
     }
@@ -58,7 +58,7 @@ fun NocturneOutlinedButton(
         colors = ButtonDefaults.outlinedButtonColors(
             contentColor = MaterialTheme.colorScheme.onSurface
         ),
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
     ) {
         Text(text, style = MaterialTheme.typography.labelSmall)
     }

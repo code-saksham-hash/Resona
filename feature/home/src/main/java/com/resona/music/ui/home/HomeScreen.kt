@@ -4,7 +4,15 @@ import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +21,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,7 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.GraphicEq
+
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
@@ -30,6 +39,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -45,12 +58,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.resona.music.ui.theme.NocturneSurface
+import com.resona.music.ui.theme.ResonaLogoIcon
+import com.resona.music.ui.theme.MontserratFontFamily
 import com.resona.music.ui.theme.ResonaTheme
 
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    onSearchClick: () -> Unit = {},
+    onSearchQuery: (String) -> Unit = {},
     onExploreClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
@@ -62,7 +77,7 @@ fun HomeScreen(
 
     HomeScreenContent(
         uiState = uiState,
-        onSearchClick = onSearchClick,
+        onSearchQuery = onSearchQuery,
         onExploreClick = onExploreClick,
         onProfileClick = onProfileClick,
         onAlbumClick = onAlbumClick,
@@ -75,7 +90,7 @@ fun HomeScreen(
 @Composable
 private fun HomeScreenContent(
     uiState: HomeUiState,
-    onSearchClick: () -> Unit,
+    onSearchQuery: (String) -> Unit = {},
     onExploreClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
@@ -84,30 +99,34 @@ private fun HomeScreenContent(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        HomeTopBar(onSearchClick = onSearchClick, onProfileClick = onProfileClick)
+        HomeTopBar(onSearchQuery = onSearchQuery, onProfileClick = onProfileClick)
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .weight(1f)
         ) {
-            item { Spacer(modifier = Modifier.height(8.dp)) }
+            item { Spacer(modifier = Modifier.height(7.dp)) }
+
+            item { QuickPicksRow() }
+
+            item { Spacer(modifier = Modifier.height(20.dp)) }
 
             item { RecommendedSection(albums = uiState.recommended, onAlbumClick = onAlbumClick) }
 
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
 
             item { TrendingSection(albums = uiState.trending, onAlbumClick = onAlbumClick) }
 
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+            item { Spacer(modifier = Modifier.height(27.dp)) }
 
             item { TopArtistsSection(artists = uiState.topArtists, onArtistClick = onArtistClick) }
 
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+            item { Spacer(modifier = Modifier.height(27.dp)) }
 
             item { NewForYouSection(tracks = uiState.newTracks, onTrackClick = onTrackClick) }
 
-            item { Spacer(modifier = Modifier.height(16.dp)) }
+            item { Spacer(modifier = Modifier.height(14.dp)) }
 
             item {
                 Column(
@@ -121,7 +140,7 @@ private fun HomeScreenContent(
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(7.dp))
                     Box(
                         modifier = Modifier
                             .clickable(onClick = onExploreClick)
@@ -129,64 +148,138 @@ private fun HomeScreenContent(
                                 color = MaterialTheme.colorScheme.primary,
                                 shape = MaterialTheme.shapes.extraLarge
                             )
-                            .padding(horizontal = 24.dp, vertical = 12.dp)
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
                     ) {
                         Text(
                             text = "EXPLORE",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary,
-                            letterSpacing = 0.5.sp
+                            letterSpacing = 0.4.sp
                         )
                     }
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+            item { Spacer(modifier = Modifier.height(27.dp)) }
         }
     }
 }
 
 @Composable
 private fun HomeTopBar(
-    onSearchClick: () -> Unit,
+    onSearchQuery: (String) -> Unit = {},
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var searchText by remember { mutableStateOf("") }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 20.dp)
-            .height(72.dp),
+            .padding(start = 17.dp, end = 17.dp)
+            .height(61.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Outlined.GraphicEq,
+            painter = ResonaLogoIcon(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(59.dp)
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = "Resona",
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        IconButton(onClick = onSearchClick) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = "Search",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+        Spacer(modifier = Modifier.width(6.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .height(38.dp)
+                .padding(start = 12.dp, end = 4.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                TextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = {
+                        Text(
+                            "Search...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.offset(y = (-1).dp)
+                        )
+                    },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        if (searchText.isNotBlank()) {
+                            onSearchQuery(searchText)
+                            searchText = ""
+                        }
+                    }
+                ),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                )
             )
         }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
         IconButton(onClick = onProfileClick) {
             Icon(
                 imageVector = Icons.Outlined.AccountCircle,
                 contentDescription = "Profile",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(27.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun QuickPicksRow(modifier: Modifier = Modifier) {
+    val quickPicks = listOf("Electronic", "Ambient", "Jazz", "Hip-Hop", "Classical", "Lo-Fi", "Techno")
+    val scrollState = rememberScrollState()
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .padding(horizontal = 17.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        quickPicks.forEach { genre ->
+            Box(
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable { }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = genre,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }
@@ -203,13 +296,14 @@ private fun RecommendedSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
+                .padding(horizontal = 17.dp)
+                .padding(bottom = 20.dp)
         ) {
             Text(
                 text = "Recommended For You",
                 style = MaterialTheme.typography.displayMedium,
                 color = MaterialTheme.colorScheme.primary,
+                fontFamily = MontserratFontFamily
             )
         }
 
@@ -217,8 +311,8 @@ private fun RecommendedSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 17.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             albums.forEach { album ->
                 RecommendedCard(
@@ -242,7 +336,7 @@ private fun RecommendedCard(
 ) {
     Box(
         modifier = modifier
-            .width(280.dp)
+            .width(238.dp)
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .clickable(onClick = onClick)
@@ -271,20 +365,22 @@ private fun RecommendedCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(24.dp)
+                    .padding(20.dp)
             ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 14.sp
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     maxLines = 1,
+                    fontSize = 5.sp
                 )
             }
         }
@@ -303,13 +399,14 @@ private fun TrendingSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
+                .padding(horizontal = 17.dp)
+                .padding(bottom = 20.dp)
         ) {
             Text(
                 text = "Trending",
                 style = MaterialTheme.typography.displayMedium,
                 color = MaterialTheme.colorScheme.primary,
+                fontFamily = MontserratFontFamily
             )
         }
 
@@ -317,8 +414,8 @@ private fun TrendingSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 17.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             albums.forEach { album ->
                 TrendingCard(
@@ -342,7 +439,7 @@ private fun TrendingCard(
 ) {
     Box(
         modifier = modifier
-            .width(240.dp)
+            .width(204.dp)
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .clickable(onClick = onClick)
@@ -371,7 +468,7 @@ private fun TrendingCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(16.dp)
+                    .padding(14.dp)
             ) {
                 Text(
                     text = title,
@@ -403,13 +500,14 @@ private fun TopArtistsSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 17.dp)
         ) {
             Column {
                 Text(
                     text = "Your Top Artists",
                     style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.primary,
+                    fontFamily = MontserratFontFamily
                 )
                 Text(
                     text = "Based on your listening habits from the last 30 days.",
@@ -419,14 +517,14 @@ private fun TopArtistsSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 17.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             artists.forEach { artist ->
                 ArtistCard(name = artist.name, imageUrl = artist.imageUrl, onClick = { onArtistClick(artist) })
@@ -444,7 +542,7 @@ private fun ArtistCard(
 ) {
     Column(
         modifier = modifier
-            .width(144.dp)
+            .width(122.dp)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -455,10 +553,10 @@ private fun ArtistCard(
             placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
             modifier = Modifier
-                .size(144.dp)
+                .size(122.dp)
                 .clip(CircleShape)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = name,
             style = MaterialTheme.typography.labelSmall,
@@ -479,20 +577,22 @@ private fun NewForYouSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 16.dp)
+                .padding(horizontal = 17.dp)
+                .padding(bottom = 14.dp)
         ) {
             Text(
                 text = "New for You",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
+                fontFamily = MontserratFontFamily,
+                fontWeight = FontWeight.Bold
             )
         }
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 17.dp)
                 .clip(MaterialTheme.shapes.large)
         ) {
             tracks.forEach { track ->
@@ -513,22 +613,22 @@ private fun NewForYouRow(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .padding(horizontal = 24.dp)
-            .height(80.dp),
+            .padding(horizontal = 20.dp)
+            .height(68.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = String.format("%02d", track.number),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.width(24.dp)
+            modifier = Modifier.width(20.dp)
         )
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(20.dp))
 
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(41.dp)
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
@@ -542,7 +642,7 @@ private fun NewForYouRow(
             )
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(20.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -561,7 +661,7 @@ private fun NewForYouRow(
             )
         }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         Text(
             text = track.duration,
@@ -569,7 +669,7 @@ private fun NewForYouRow(
             color = MaterialTheme.colorScheme.outline,
         )
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         Icon(
             imageVector = Icons.Outlined.MoreHoriz,
@@ -586,7 +686,7 @@ private fun HomeScreenPreview(
     ResonaTheme {
         HomeScreenContent(
             uiState = HomeUiState(),
-            onSearchClick = {},
+            onSearchQuery = {},
             onTrackClick = {},
             modifier = modifier
         )

@@ -87,17 +87,17 @@ fun NowPlayingScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 32.dp),
+                    .padding(horizontal = 27.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 AlbumArt(
                     thumbnailUrl = track.thumbnailUrl,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(27.dp))
 
                 Text(
                     text = track.title,
@@ -109,7 +109,7 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
 
                 Text(
                     text = track.artist,
@@ -121,7 +121,7 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(27.dp))
 
                 SeekBar(
                     position = uiState.position,
@@ -130,7 +130,7 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 PlaybackControls(
                     isPlaying = uiState.isPlaying,
@@ -141,7 +141,7 @@ fun NowPlayingScreen(
 
                 val playError = uiState.error
                 if (playError != null) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
                         text = playError,
                         style = MaterialTheme.typography.bodyMedium,
@@ -151,7 +151,7 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(27.dp))
             }
         }
     }
@@ -168,7 +168,7 @@ private fun NowPlayingTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(horizontal = 3.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {
@@ -285,20 +285,20 @@ private fun PlaybackControls(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onSkipPrevious, modifier = Modifier.size(48.dp)) {
+        IconButton(onClick = onSkipPrevious, modifier = Modifier.size(41.dp)) {
             Icon(
                 imageVector = Icons.Outlined.SkipPrevious,
                 contentDescription = "Previous",
                 tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(20.dp))
 
         Box(
             modifier = Modifier
-                .size(72.dp)
+                .size(61.dp)
                 .clip(MaterialTheme.shapes.extraLarge)
                 .background(MaterialTheme.colorScheme.primary)
                 .clickable(onClick = onTogglePlayPause),
@@ -309,26 +309,26 @@ private fun PlaybackControls(
                     painter = painterResource(R.drawable.ic_pause),
                     contentDescription = "Pause",
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(27.dp)
                 )
             } else {
                 Icon(
                     imageVector = Icons.Outlined.PlayArrow,
                     contentDescription = "Play",
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(27.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(20.dp))
 
-        IconButton(onClick = onSkipNext, modifier = Modifier.size(48.dp)) {
+        IconButton(onClick = onSkipNext, modifier = Modifier.size(41.dp)) {
             Icon(
                 imageVector = Icons.Outlined.SkipNext,
                 contentDescription = "Next",
                 tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
     }

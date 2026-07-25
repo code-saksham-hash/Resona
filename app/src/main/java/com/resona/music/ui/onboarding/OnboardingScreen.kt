@@ -76,7 +76,7 @@ fun OnboardingScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 17.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.End
         ) {
             TextButton(onClick = onGetStarted) {
@@ -98,13 +98,13 @@ fun OnboardingScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 40.dp),
+                    .padding(horizontal = 34.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(120.dp)
+                        .size(102.dp)
                         .clip(MaterialTheme.shapes.extraLarge)
                         .background(MaterialTheme.colorScheme.surfaceContainer),
                     contentAlignment = Alignment.Center
@@ -113,11 +113,11 @@ fun OnboardingScreen(
                         imageVector = page.icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(56.dp)
+                        modifier = Modifier.size(48.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(34.dp))
 
                 Text(
                     text = page.title,
@@ -126,7 +126,7 @@ fun OnboardingScreen(
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
                     text = page.description,
@@ -140,7 +140,7 @@ fun OnboardingScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
+                .padding(bottom = 14.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             repeat(pages.size) { index ->
@@ -153,8 +153,8 @@ fun OnboardingScreen(
                 )
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .size(if (index == pagerState.currentPage) 10.dp else 8.dp)
+                        .padding(horizontal = 3.dp)
+                        .size(if (index == pagerState.currentPage) 9.dp else 7.dp)
                         .clip(CircleShape)
                         .background(color)
                 )
@@ -164,7 +164,7 @@ fun OnboardingScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 24.dp)
+                .padding(horizontal = 17.dp, vertical = 20.dp)
         ) {
             if (isLastPage) {
                 NocturneOutlinedButton(

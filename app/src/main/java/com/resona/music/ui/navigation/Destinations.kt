@@ -15,7 +15,10 @@ sealed class ResonaDestination(
 ) {
     data object Onboarding : ResonaDestination("onboarding", "Onboarding", Icons.Outlined.Home)
     data object Home : ResonaDestination("home", "Home", Icons.Outlined.Home)
-    data object Explore : ResonaDestination("explore", "Explore", Icons.Outlined.Explore)
+    data object Explore : ResonaDestination("explore", "Explore", Icons.Outlined.Explore) {
+        fun createRoute(query: String = ""): String =
+            if (query.isBlank()) "explore" else "explore/${java.net.URLEncoder.encode(query, "UTF-8")}"
+    }
     data object Downloads : ResonaDestination("downloads", "Downloads", Icons.Outlined.Download)
     data object Library : ResonaDestination("library", "Library", Icons.Outlined.LibraryMusic)
     data object NowPlaying : ResonaDestination("now_playing", "Now Playing", Icons.Outlined.PlayArrow)
