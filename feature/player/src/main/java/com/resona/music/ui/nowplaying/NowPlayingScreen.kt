@@ -1,7 +1,8 @@
 package com.resona.music.ui.nowplaying
 
 import android.content.res.Configuration
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,12 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.QueueMusic
+import androidx.compose.material.icons.outlined.SkipNext
+import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -46,17 +48,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.resona.music.feature.player.R
 import com.resona.music.domain.model.Song
+import com.resona.music.feature.player.R
 import com.resona.music.playback.PlayerUiState
 import com.resona.music.ui.theme.ResonaTheme
 
-/**
- * Stateless by design, like [com.resona.music.ui.player.MiniPlayerBar] --
- * [com.resona.music.playback.PlayerViewModel] is Activity-scoped and owned
- * by the nav graph, so this screen only ever receives its state and actions
- * as parameters rather than resolving its own (destination-scoped) instance.
- */
 @Composable
 fun NowPlayingScreen(
     uiState: PlayerUiState,
@@ -68,7 +64,11 @@ fun NowPlayingScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         NowPlayingTopBar(onBack = onBack, onQueueClick = onQueueClick)
 
         val track = uiState.currentTrack
@@ -76,7 +76,7 @@ fun NowPlayingScreen(
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 Text(
                     text = "Nothing is playing",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.Center)
                 )
@@ -87,16 +87,21 @@ fun NowPlayingScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 32.dp, vertical = 16.dp),
+                    .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AlbumArt(thumbnailUrl = track.thumbnailUrl, modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(24.dp))
+                AlbumArt(
+                    thumbnailUrl = track.thumbnailUrl,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
 
                 Text(
                     text = track.title,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
@@ -116,7 +121,7 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
                 SeekBar(
                     position = uiState.position,
@@ -125,7 +130,7 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 PlaybackControls(
                     isPlaying = uiState.isPlaying,
@@ -134,7 +139,19 @@ fun NowPlayingScreen(
                     onSkipPrevious = onSkipPrevious
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                val playError = uiState.error
+                if (playError != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = playError,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -149,7 +166,9 @@ private fun NowPlayingTopBar(
     var overflowExpanded by remember { mutableStateOf(false) }
 
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {
@@ -164,7 +183,7 @@ private fun NowPlayingTopBar(
 
         IconButton(onClick = onQueueClick) {
             Icon(
-                painter = painterResource(R.drawable.ic_queue),
+                imageVector = Icons.Outlined.QueueMusic,
                 contentDescription = "Queue",
                 tint = MaterialTheme.colorScheme.onSurface
             )
@@ -205,17 +224,10 @@ private fun AlbumArt(thumbnailUrl: String, modifier: Modifier = Modifier) {
         error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
         modifier = modifier
             .aspectRatio(1f)
-            .clip(MaterialTheme.shapes.small)
-            .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.small)
+            .clip(MaterialTheme.shapes.large)
     )
 }
 
-/**
- * While the thumb is being dragged, the displayed value tracks the drag
- * locally instead of [position] -- otherwise the ~500ms position poll in
- * PlayerViewModel would fight the user's finger. [onSeek] (and therefore the
- * real [position]) only updates once the drag ends.
- */
 @Composable
 private fun SeekBar(
     position: Long,
@@ -238,22 +250,22 @@ private fun SeekBar(
             valueRange = 0f..safeDuration.toFloat(),
             enabled = duration > 0,
             colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.onSurface,
-                activeTrackColor = MaterialTheme.colorScheme.onSurface,
-                inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
 
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = formatDuration(displayedMillis),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = formatDuration(duration),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -275,7 +287,7 @@ private fun PlaybackControls(
     ) {
         IconButton(onClick = onSkipPrevious, modifier = Modifier.size(48.dp)) {
             Icon(
-                painter = painterResource(R.drawable.ic_skip_previous),
+                imageVector = Icons.Outlined.SkipPrevious,
                 contentDescription = "Previous",
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(28.dp)
@@ -284,24 +296,26 @@ private fun PlaybackControls(
 
         Spacer(modifier = Modifier.width(24.dp))
 
-        FilledIconButton(
-            onClick = onTogglePlayPause,
-            modifier = Modifier.size(72.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            )
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable(onClick = onTogglePlayPause),
+            contentAlignment = Alignment.Center
         ) {
             if (isPlaying) {
                 Icon(
                     painter = painterResource(R.drawable.ic_pause),
                     contentDescription = "Pause",
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(32.dp)
                 )
             } else {
                 Icon(
                     imageVector = Icons.Outlined.PlayArrow,
                     contentDescription = "Play",
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -311,7 +325,7 @@ private fun PlaybackControls(
 
         IconButton(onClick = onSkipNext, modifier = Modifier.size(48.dp)) {
             Icon(
-                painter = painterResource(R.drawable.ic_skip_next),
+                imageVector = Icons.Outlined.SkipNext,
                 contentDescription = "Next",
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(28.dp)
@@ -364,27 +378,6 @@ private fun NowPlayingScreenPlayingDarkPreview() {
                 currentTrack = previewTrack,
                 isPlaying = true,
                 position = 87_000L,
-                duration = 244_000L
-            ),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Paused")
-@Composable
-private fun NowPlayingScreenPausedPreview() {
-    ResonaTheme {
-        NowPlayingScreen(
-            uiState = PlayerUiState(
-                currentTrack = previewTrack,
-                isPlaying = false,
-                position = 30_000L,
                 duration = 244_000L
             ),
             onTogglePlayPause = {},

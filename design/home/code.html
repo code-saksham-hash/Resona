@@ -1,0 +1,362 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>VOLUMES | Nocturne Monolith</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&amp;family=Hanken+Grotesk:wght@400;500;600&amp;family=Geist:wght@400;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#1c1b1b",
+                    "background": "#121414",
+                    "surface-container": "#1f2020",
+                    "surface-variant": "#343535",
+                    "surface-container-highest": "#343535",
+                    "on-background": "#e3e2e2",
+                    "surface-container-lowest": "#0d0e0f",
+                    "surface-dim": "#121414",
+                    "on-secondary-fixed-variant": "#474746",
+                    "primary-container": "#e0e0e0",
+                    "inverse-surface": "#e3e2e2",
+                    "surface": "#121414",
+                    "on-tertiary-fixed-variant": "#474746",
+                    "surface-container-low": "#1b1c1c",
+                    "tertiary-fixed-dim": "#c8c6c5",
+                    "tertiary": "#fffcfb",
+                    "on-surface": "#e3e2e2",
+                    "error": "#ffb4ab",
+                    "outline-variant": "#444748",
+                    "outline": "#8e9192",
+                    "tertiary-fixed": "#e5e2e1",
+                    "surface-container-high": "#292a2a",
+                    "secondary": "#c8c6c5",
+                    "secondary-container": "#474746",
+                    "primary": "#fdfdfc",
+                    "on-secondary-container": "#b6b5b4",
+                    "on-error": "#690005",
+                    "on-error-container": "#ffdad6",
+                    "on-secondary": "#303030",
+                    "secondary-fixed": "#e4e2e1",
+                    "error-container": "#93000a",
+                    "on-tertiary-container": "#636262",
+                    "on-primary-container": "#626363",
+                    "on-primary-fixed-variant": "#454747",
+                    "on-tertiary": "#313030",
+                    "surface-tint": "#c6c6c6",
+                    "primary-fixed": "#e2e2e2",
+                    "secondary-fixed-dim": "#c8c6c5",
+                    "on-surface-variant": "#c4c7c8",
+                    "tertiary-container": "#e2dfdf",
+                    "on-secondary-fixed": "#1b1c1c",
+                    "on-primary-fixed": "#1a1c1c",
+                    "surface-bright": "#383939",
+                    "on-primary": "#2f3131",
+                    "inverse-on-surface": "#303031",
+                    "inverse-primary": "#5d5f5f",
+                    "primary-fixed-dim": "#c6c6c6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "mobile-margin": "20px",
+                    "unit": "8px",
+                    "card-gap": "32px",
+                    "container-padding": "40px"
+            },
+            "fontFamily": {
+                    "display-lg": ["DM Sans"],
+                    "body-lg": ["Hanken Grotesk"],
+                    "label-sm": ["Geist"],
+                    "display-lg-mobile": ["DM Sans"],
+                    "headline-md": ["DM Sans"],
+                    "body-md": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "display-lg-mobile": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #121414;
+            color: #e3e2e2;
+            -webkit-font-smoothing: antialiased;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .stage-gradient {
+            background: linear-gradient(180deg, rgba(18, 20, 20, 0) 0%, rgba(18, 20, 20, 1) 100%);
+        }
+        .subtle-border {
+            border: 1px solid #2A2A2A;
+        }
+        .artist-mask {
+            clip-path: circle(50% at 50% 50%);
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-background selection:bg-primary selection:text-background">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-background border-b border-surface-variant flex justify-between items-center px-mobile-margin md:px-container-padding h-20 w-full">
+<div class="flex items-center gap-8">
+<div class="flex items-center cursor-pointer active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-primary text-3xl mr-2" style="font-variation-settings: 'FILL' 1;">graphic_eq</span>
+<h1 class="font-display-lg text-display-lg-mobile md:text-display-lg tracking-tighter text-primary">VOLUMES</h1>
+</div>
+<div class="hidden md:flex items-center text-outline hover:text-primary transition-colors duration-300 cursor-pointer">
+<span class="material-symbols-outlined mr-2">search</span>
+<span class="font-label-sm uppercase tracking-widest">Search Catalog</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex flex-col items-end mr-4">
+<span class="font-label-sm text-primary">Alex Mercer</span>
+<span class="font-label-sm text-outline text-[10px]">PREMIUM</span>
+</div>
+<span class="material-symbols-outlined text-primary text-3xl cursor-pointer active:scale-95 transition-transform">account_circle</span>
+</div>
+</header>
+<!-- Main Content Stage -->
+<main class="pt-24 pb-32 min-h-screen px-mobile-margin md:px-container-padding max-w-[1600px] mx-auto">
+<!-- Hero Section / Recently Played -->
+<section class="mb-16 mt-8"><div class="flex justify-between items-end mb-8"><h2 class="font-display-lg text-display-lg-mobile md:text-display-lg text-primary">Recommended For You</h2></div><div class="flex gap-6 overflow-x-auto no-scrollbar -mx-4 px-4"><div class="flex-shrink-0 w-2/3 group relative overflow-hidden bg-surface-container-lowest transition-all duration-500"><div class="aspect-square relative overflow-hidden cursor-pointer"><img src="https://lh3.googleusercontent.com/aida/AP1WRLtlf_MKIcUGEGF0KyMjtas4gUleLA3xywWX_YoEYyCVqwQqeraoDHSztk_62Wsca7x6cyJAPhJ0ksaYle7zLRLEpoS0ipcyP-eEnsFFmVceb8_q8tVMJEE3mEC9lZpqA2EkD2Krk4i780VCoSUA5dl1V5iBSWfxq08FXd-_T7GqAcNXINc5idkzCeup_ku_ALLFTYDlBDUpE_4R8_xcYIvdAWz_OnZ57Aoe214p5TBOVyiqFeQTKk0iBpAs" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Architectures / Void &amp; Form"><div class="absolute inset-0 stage-gradient"></div><div class="absolute bottom-0 left-0 p-6 w-full"><h3 class="font-display-lg text-primary mb-1">Architectures / Void &amp; Form</h3><p class="font-label-sm text-outline uppercase tracking-widest">Curated Collection</p></div></div></div><div class="flex-shrink-0 w-2/3 group relative overflow-hidden bg-surface-container-lowest transition-all duration-500"><div class="aspect-square relative overflow-hidden cursor-pointer"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCI6vcOR_0G1R36IV9zvDzk-YU82Y-6-CcqUhzbpr1_4q6OK1tEfxV01_7dcYhTunaruu4pY2d91tPhQ2WeV7fxJ2IpszR3RjGZBJ0qzlzHanHWJGzkWx4wYgjNoblFh9Qt1EgY5fmJj_GpXE4tcSBv-kqLL8QJaqRm4cishgyt8gseGc9xxCcujsxahVjTtvLbAMD4KMu5cvbU-VfB5SxjXQGcfRoH7rtdV0CdVgtfHRnu9wOxP0kCSRIrCsJOlZm9CB9rGAjAG5Iu" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Next Discovery"><div class="absolute inset-0 stage-gradient"></div><div class="absolute bottom-0 left-0 p-6 w-full"><h3 class="font-display-lg text-primary mb-1">Next Discovery</h3><p class="font-label-sm text-outline uppercase tracking-widest">Coming Soon</p></div></div></div></div></section>
+<section class="mb-16"><div class="flex justify-between items-end mb-8"><h2 class="font-display-lg text-display-lg-mobile md:text-display-lg text-primary">Trending</h2></div><div class="flex gap-6 overflow-x-auto no-scrollbar -mx-4 px-4"><div class="flex-shrink-0 w-2/3 group relative overflow-hidden bg-surface-container-lowest transition-all duration-500"><div class="aspect-square relative overflow-hidden cursor-pointer"><img src="https://lh3.googleusercontent.com/aida/AP1WRLvrWm5YWOY9cRuCMIQwCkEMIxrR8Xy94P1e-Dp8BxX2smtyiscGdnfLGGTqPyKV0ToOTByGgy3R9gyvgrk4eZuoatcn-B41bQtTJu40v26OnWjLQZkHpwYmgyWCG4Ec6NSNILaxQWf6sJd6fwHQCCOisQrY43oE9tF-xJB5OlT8xxrkmWQd0iP1mhtI-OL0rCi4xnuro_ms_-6yYMdzY-yRg5P_5H4OaQd8yUc501EmG--yYhJP5Sf_gfs0" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Flux // Liquid Aberration"><div class="absolute inset-0 stage-gradient"></div><div class="absolute bottom-0 left-0 p-6 w-full"><h3 class="font-display-lg text-primary mb-1">Flux // Liquid Aberration</h3><p class="font-label-sm text-outline uppercase tracking-widest">New Release</p></div></div></div><div class="flex-shrink-0 w-2/3 group relative overflow-hidden bg-surface-container-lowest transition-all duration-500"><div class="aspect-square relative overflow-hidden cursor-pointer"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFYgnYMKBW0IlHqN7U604QfLkhZM2KAnW14yu-O1Y-3nSAaZyPCIKCAJJC3pnM_U5lcFRmMCCo-_DiWbQNiZWqKJSx3TgpsUMlOWkSyNPx4kGksDwZWa3HbRrJpaAY6QHQtvTRjoF5PMGWDfBi-Or6eJ7vmMMMuAmUxTBc2y0OOiAJbNASnOU6dDWMh6g8I0sZUwrBA1jYxBcYa0_wxqKf3Z5rjbkJ9dStR3Cyb5EEFIYJWjzaVWhvK-A5bFt4fjewoa-CbTeYFbLx" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Rising Beats"><div class="absolute inset-0 stage-gradient"></div><div class="absolute bottom-0 left-0 p-6 w-full"><h3 class="font-display-lg text-primary mb-1">Rising Beats</h3><p class="font-label-sm text-outline uppercase tracking-widest">Trending Now</p></div></div></div></div></section>
+<!-- Top Artists Section -->
+<section class="mb-24">
+<div class="flex justify-between items-end mb-10">
+<div>
+<h2 class="font-display-lg text-display-lg-mobile md:text-display-lg text-primary">Your Top Artists</h2>
+<p class="font-body-md text-outline mt-2">Based on your listening habits from the last 30 days.</p>
+</div>
+</div>
+<!-- Horizontal Scrolling Artist Cards -->
+<div class="flex overflow-x-auto no-scrollbar pb-8 -mx-4 px-4 snap-x snap-mandatory gap-4">
+<!-- Artist 1 -->
+<div class="flex-shrink-0 w-40 text-center group cursor-pointer snap-center">
+<div class="artist-mask w-40 h-40 mb-4 subtle-border p-1 transition-transform duration-300 group-hover:scale-105 group-hover:border-primary">
+<div class="w-full h-full artist-mask overflow-hidden">
+<img class="w-full h-full object-cover grayscale" data-alt="A striking monochrome portrait of a female avant-garde musician with sleek hair and dramatic shadows across her face. The lighting is high-contrast, emphasizing her features against a pitch-black background. The style is editorial and minimalist, capturing a sense of artistic depth and modern elegance in a 1:1 circular crop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZErNE61Of4X9GCa4I_NsQvXMF2XXhKCAOzguz74kjxbMf8SGS3YpT1Y8qk7mwVznygwYgWOyiNlqiAHTTa0A2azHaOBCq9tBVZlnuy-wyjRWnMJu63iZ1gEcNtExNFCOiJKadaqTvbg_IZLwoRI83O2W6cc_xfwDBSRoLOMR57lY52g5bDhs_nnsGPmvdq-LcQNAFCYDvJjpW2XmMYaufkzYm5APMpBAMFFp6H0Ym9pDPmmXcZkz1pVMC6D4-VtEjfZ0B9Gk0Sq_S">
+</div>
+</div>
+<p class="font-label-sm text-primary tracking-wider uppercase">Lyra Vance</p>
+</div>
+<!-- Artist 2 -->
+<div class="flex-shrink-0 w-40 text-center group cursor-pointer snap-center">
+<div class="artist-mask w-40 h-40 mb-4 subtle-border p-1 transition-transform duration-300 group-hover:scale-105 group-hover:border-primary">
+<div class="w-full h-full artist-mask overflow-hidden">
+<img class="w-full h-full object-cover grayscale" data-alt="A close-up black and white photograph of a jazz pianist's hands mid-motion over the keys, captured with a slight motion blur to suggest rhythm and soul. The lighting highlights the texture of the piano and the skin. The overall mood is intimate and professional, set against a dark, velvet-like background in a circular frame." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBa3KYQQrw6A3loK-IIvKSaqL-hLq9Mf1ZWRlXv-CQzJC9sx3FoKLfFo_ssdBu7pvEi5zJsX01oxsI4JPR1Rrkg7rSnDEAIkqUMZgr_g65R0VbwYXll4Z7YyID78WsfbJ1o-nLQcrzivihbjP__p15jg72f-DV7Mh87K99npPJQpINOWX5M1GFp-T_n0Vsd_xEY2YZl-r8VBvB4HiriKjfnql6LSXjCWZgJmmCOfUgplaUgBJxvxHZ78vxc6_3cr25m8rTBK__rHyO8">
+</div>
+</div>
+<p class="font-label-sm text-primary tracking-wider uppercase">Julian Grey</p>
+</div>
+<!-- Artist 3 -->
+<div class="flex-shrink-0 w-40 text-center group cursor-pointer">
+<div class="artist-mask w-40 h-40 mb-4 subtle-border p-1 transition-transform duration-300 group-hover:scale-105 group-hover:border-primary">
+<div class="w-full h-full artist-mask overflow-hidden">
+<img class="w-full h-full object-cover grayscale" data-alt="A minimalist portrait of a modern electronic music duo wearing sleek, matte black tech-wear. The shot is taken from a low angle against a foggy, grey industrial sky. The aesthetic is futuristic and clean, emphasizing form and silhouette in a high-contrast black and white palette, perfectly centered in a circle." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqfdERuCKsE4XszpzLHB85IiED_oMuNOJtfXVjwnMMqO7UcSvwwFUFAkrZnUVEV9vftuYyE--IEXXnQLMCeRab_Q7DSnntYmt_Wn6JSj7qd6VFSJ7dAIQiaL8mAtV4tF6C2gDJUvpezZXWk9mT1ZeTGsqN3eLA8t8JU19I7F7u99VDCqzrZCvSSD_P5YY4raOUCezhpZJ8A74lkdxUP173Mj-WPbrLHwtQ5AIhqoaJigqZ4zlEjJHNSytiYLtflZsnKnQ5WpjfTAyr">
+</div>
+</div>
+<p class="font-label-sm text-primary tracking-wider uppercase">Nihil &amp; Void</p>
+</div>
+<!-- Artist 4 -->
+<div class="flex-shrink-0 w-40 text-center group cursor-pointer">
+<div class="artist-mask w-40 h-40 mb-4 subtle-border p-1 transition-transform duration-300 group-hover:scale-105 group-hover:border-primary">
+<div class="w-full h-full artist-mask overflow-hidden">
+<img class="w-full h-full object-cover grayscale" data-alt="An ethereal black and white portrait of a cellist in a flowing gown, performing in a grand, empty stone cathedral. Sunlight streams through a narrow window, creating a single dramatic shaft of light. The composition is majestic and serene, focusing on the silhouette and the instrument within a circular frame." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnQuQCrC2I2CeasJtzqLwCth2ktKy90ccNDZK9iVvpvHILHcMCyFvIloOMqfNlvmTUeL2jI5ZnOyojgofsUM1JfX4r3Z_HmQo3-he3bimk79gam_drG2pQZLm-1b08BC_Msadc7c6DMqItgeXK91yBqnmPTwBYIRr8Simdmm1C2oJIJHwK6w0pxCOVQZmGG5P_xjZ0sY9CutlMSfbc5ULkPY8BfnHTTCGbdR_mECbZfe6siuaaZ1p2HigB_VO8Dm-mdt3l3TPL36Wc">
+</div>
+</div>
+<p class="font-label-sm text-primary tracking-wider uppercase">Elena Marceau</p>
+</div>
+<!-- Artist 5 -->
+<div class="flex-shrink-0 w-40 text-center group cursor-pointer">
+<div class="artist-mask w-40 h-40 mb-4 subtle-border p-1 transition-transform duration-300 group-hover:scale-105 group-hover:border-primary">
+<div class="w-full h-full artist-mask overflow-hidden">
+<img class="w-full h-full object-cover grayscale" data-alt="A gritty, cinematic black and white close-up of a rock musician with intense eyes and a leather jacket. The image has a heavy film grain and deep, textured shadows. It feels raw and authentic, representing a high-energy alternative rock artist in a premium minimalist design context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQZ3EGK867uEJgI_L2kHZpktKQcshiBGi3_j7fwgwbfZCajCV6MaB6De7l-fJXY9_IZ_4QYICUbgcTpLrld1Tmu1cE4Y3o6MixxmmN2-WLuhoqRlt9GTwHkRTXUFCi3bTAkFtpCTbcf7duk8hrwDaNBAXnPBTs6W9NBsz8cuxTXKO8hn7Z-cBACeliBOfiVpE5PHvezZckNKWwWJjw-3TpUdoBI-Mw5eVkfLS1DV7kMhAlqY_Ab119K48mT0vT45wk6ggC1anQFGsu">
+</div>
+</div>
+<p class="font-label-sm text-primary tracking-wider uppercase">Dagger Heart</p>
+</div>
+<!-- Artist 6 -->
+<div class="flex-shrink-0 w-40 text-center group cursor-pointer">
+<div class="artist-mask w-40 h-40 mb-4 subtle-border p-1 transition-transform duration-300 group-hover:scale-105 group-hover:border-primary">
+<div class="w-full h-full artist-mask overflow-hidden">
+<img class="w-full h-full object-cover grayscale" data-alt="A conceptual black and white photograph of an opera singer shrouded in delicate, translucent fabric that caught by a gentle breeze. The image is poetic and ethereal, using soft gradients of grey and white to create a sense of movement and grace within a perfectly circular portrait." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAB3d_3a2VVOYk62JR-XWWnfAbAoluZrmwkzLfPMEHkNklbxFGHp2wUPM3vgdyIrUMHpA-8bgZCqFQ_AbFE6A2y36ucxdZ0f4-4_d48YJ1fVutlve5zGinU2K-tdN4kg4FV8Ufm6oRtyMKX1ItDmhanXhRtLHQ5Bj64jPpzIKqjB0PdghlC8rakWXW20HZK8q4vg_5b43pJUumvo1HJU3KfEWbhm-w_kRstNcfxuqGLbi25jo66jy7uqpaDb0nNKizt_9XQVrRbH5j8">
+</div>
+</div>
+<p class="font-label-sm text-primary tracking-wider uppercase">The Soprano</p>
+</div>
+<div class="flex-shrink-0 w-40 text-center group cursor-pointer snap-center"><div class="artist-mask w-40 h-40 mb-4 subtle-border p-1 transition-transform duration-300 group-hover:scale-105 group-hover:border-primary"><div class="w-full h-full artist-mask overflow-hidden"><img class="w-full h-full object-cover grayscale" alt="VIKTOR KANE" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCE-vQJSKmCYp9mEs7RwY75tIUEnrdbSNNrfaWvxZ_2_OeakOJbIWm_tjHYfPaA5qEKY4e4oDaKonA2-eD0g6FaKPDOgS8E1UpC5O1o3DoYtdAaKwxoMGa3rB8bEVTcnxwUuAUokjRUuIrTYMDAWilpQEo69s36rxT8M09s1fdFdf5_UGTaJTqsFZ4N46QSN0rLQZoVSRWnF1iAxMqf0Y6yi_ggENDzqQDAnaCsV52L9N4yXz9hv-9cTKHo67KqvXnDu0RoATaqukxB"></div></div><p class="font-label-sm text-primary tracking-wider uppercase">VIKTOR KANE</p></div></div>
+</section>
+<!-- New Releases List (Standard row style, high height) -->
+<section class="mt-[-32px]">
+<div class="flex justify-between items-end mb-6">
+<h2 class="font-headline-md text-primary">New for You</h2>
+</div>
+<div class="flex flex-col subtle-border bg-surface-container-lowest">
+<div class="flex items-center justify-between h-20 px-6 hover:bg-surface-container transition-colors cursor-pointer group border-b border-surface-variant/50 last:border-b-0">
+<div class="flex items-center gap-6">
+<span class="font-label-sm text-outline w-4">01</span>
+<div class="w-12 h-12 bg-surface-variant flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Minimalist geometric album art" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJIQQdGYTamZYsBjUMeFCPCx-I-w__IGztfKaIQmavEAzNbyNxWgTsjA_04JZlX4aMWjgQ95a7jpScefodgGZyiVPiGgKwjRYnUqeDbbBh9NHeHkwvzPq5fWHvCuq9Hr19RKAdr-BPi3l5cKj3Wt0RXPfaass8NR0x-InSkW2xrj3wBJ59N8KkH6b14KYk4c5Keavf37kXdDSZbA8oQL8gHx985Wh4Wso4Uvck81Qahhp_a7ULcpeEZVPeAHw6XZWR59MptNYoWKBJ">
+</div>
+<div>
+<p class="font-body-md text-primary font-semibold">Fractal Patterns</p>
+<p class="font-label-sm text-outline">LYRA VANCE</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<span class="hidden md:block font-label-sm text-outline">4:22</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_horiz</span>
+</div>
+</div>
+<div class="flex items-center justify-between h-20 px-6 hover:bg-surface-container transition-colors cursor-pointer group border-b border-surface-variant/50 last:border-b-0">
+<div class="flex items-center gap-6">
+<span class="font-label-sm text-outline w-4">02</span>
+<div class="w-12 h-12 bg-surface-variant flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Abstract shadow art" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrkYYXey-orHZ1I5k1ro3JTaDzfax0fBKqJ0MnsAqDBMw4PneORNQ7ZDiFZSPAjBr4w1D7HEdh_wPSCfLt7LDGj7cRrGY3hhX58KBG6wp32nfHO2dMaR0sBXOthx8Mpd3XcrFYkEb6ctGKc1xGkoKkmbcn4z6_5IR6435mrPsJo_yvzZQMULonJ-FrEPB1so7wRZ7G8yt8-5nttryOrSK6Ti9nzMXLYlqOS6yNOAWBE_39Apm2nGgxBRXJLru8dTWgWnMbh3y9kWSq">
+</div>
+<div>
+<p class="font-body-md text-primary font-semibold">Concrete Waves</p>
+<p class="font-label-sm text-outline">NIHIL &amp; VOID</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<span class="hidden md:block font-label-sm text-outline">3:51</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_horiz</span>
+</div>
+</div>
+<div class="flex items-center justify-between h-20 px-6 hover:bg-surface-container transition-colors cursor-pointer group border-b border-surface-variant/50 last:border-b-0">
+<div class="flex items-center gap-6">
+<span class="font-label-sm text-outline w-4">03</span>
+<div class="w-12 h-12 bg-surface-variant flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Black and white landscape music cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwzb7HXE1udExIuvN6cjn22BREVDhR77oqu7k22d7z8QV4k5Aor4pymbl2sDiuYGWNLWR7acZEmZ68PkH9V77IGT3s_Mol4XstJh4lO6uWK4dPcJnp5_x5pOQMqYCKr595lGNqbxTbCFYSIg42H0JiiPDM6qTek4pz5HAR0t5x5zEKm4fVv6M1042gms5opTLyxPqLYCU846LGcQBLMoC4owjwvzoXHdM2OiHhnZNgA9FTURC5-ffurA_7bbHBYlB_AHTiQFHv78eh">
+</div>
+<div>
+<p class="font-body-md text-primary font-semibold">Slow Motion Dusk</p>
+<p class="font-label-sm text-outline">JULIAN GREY</p>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<span class="hidden md:block font-label-sm text-outline">5:08</span>
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">more_horiz</span>
+</div>
+</div>
+</div>
+</section><section class="mt-16 mb-24 flex flex-col items-center text-center px-4">
+  <p class="font-body-lg text-on-background mb-8">Don't see what you want here? Go to Explore</p>
+  <button class="bg-primary text-background rounded-full uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 px-6 py-2 text-[10px]">
+    Explore
+    <span class="material-symbols-outlined">arrow_forward</span>
+  </button>
+</section>
+</main>
+<!-- BottomNavBar (Mobile only / Top-row logic applied for Desktop) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full h-16 flex justify-around items-center bg-surface-container-lowest border-t border-surface-variant z-50">
+<div class="flex items-center justify-center text-primary scale-110 active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+</div>
+<div class="flex items-center justify-center text-outline hover:text-on-surface-variant active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">explore</span>
+</div>
+<div class="flex items-center justify-center text-outline hover:text-on-surface-variant active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">download</span>
+</div>
+<div class="flex items-center justify-center text-outline hover:text-on-surface-variant active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">library_music</span>
+</div>
+</nav>
+<!-- Now Playing Persistent Bar (Desktop) -->
+<div class="hidden md:flex fixed bottom-0 w-full h-24 bg-surface-container-lowest border-t border-surface-variant px-container-padding items-center justify-between z-50">
+<!-- Currently Playing -->
+<div class="flex items-center gap-4 w-1/4">
+<div class="w-14 h-14 bg-surface-variant">
+<img class="w-full h-full object-cover" data-alt="Minimalist album cover thumbnail" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqUrZC0ViQrDKzsGNKJzRXYAP3o0s0M00WiemV88X8m1HR0s_uNqY2kflwv5ke9lkmzpLUei80A8gojffoMQG_YaS9MigxFlDwegUQyKnY9sA-T9lPslSWSn0NHlUytXAHkJGHTrs1kEwTXIlyA83yd0Yr0-Oj-9zdPsMFAOXvrgKn1yVmdDK9QaTSSZj0W5IO9Sm1iy7uPFrdD3jTf0T8GJpysD-gw0L6BFEBUivHixJSYX6UPzOFI8ptXyKTfSJDkb5akWNebB9O">
+</div>
+<div>
+<p class="font-label-sm text-primary">Aether Resonance</p>
+<p class="font-label-sm text-outline text-[10px]">MONOLITH RECORDS</p>
+</div>
+<span class="material-symbols-outlined text-outline ml-2 cursor-pointer hover:text-primary">favorite</span>
+</div>
+<!-- Controls -->
+<div class="flex flex-col items-center w-2/4 max-w-xl">
+<div class="flex items-center gap-8 mb-2">
+<span class="material-symbols-outlined text-outline hover:text-primary cursor-pointer text-xl">shuffle</span>
+<span class="material-symbols-outlined text-primary hover:scale-110 cursor-pointer text-2xl">skip_previous</span>
+<div class="h-12 w-12 rounded-full bg-primary text-background flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+<span class="material-symbols-outlined text-primary hover:scale-110 cursor-pointer text-2xl">skip_next</span>
+<span class="material-symbols-outlined text-outline hover:text-primary cursor-pointer text-xl">repeat</span>
+</div>
+<div class="w-full group flex items-center gap-3">
+<span class="font-label-sm text-outline text-[10px]">1:24</span>
+<div class="relative flex-1 h-1 bg-surface-variant cursor-pointer">
+<div class="absolute left-0 top-0 h-full bg-primary w-1/3"></div>
+<div class="absolute left-1/3 top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<span class="font-label-sm text-outline text-[10px]">4:45</span>
+</div>
+</div>
+<!-- Utility -->
+<div class="flex items-center justify-end gap-6 w-1/4">
+<span class="material-symbols-outlined text-outline hover:text-primary cursor-pointer">lyrics</span>
+<span class="material-symbols-outlined text-outline hover:text-primary cursor-pointer">queue_music</span>
+<div class="flex items-center gap-2 group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary cursor-pointer">volume_up</span>
+<div class="w-24 h-1 bg-surface-variant relative cursor-pointer">
+<div class="absolute left-0 top-0 h-full bg-outline group-hover:bg-primary w-2/3"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Background Atmospheric Effect (Mild subtle glow) -->
+<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] opacity-[0.03] pointer-events-none rounded-full blur-[120px] bg-primary z-0"></div>
+<script>
+        // Simple Interaction Script
+        document.querySelectorAll('.active\\:scale-95').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.style.transform = 'scale(0.95)';
+            });
+            el.addEventListener('mouseup', () => {
+                el.style.transform = 'scale(1)';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = 'scale(1)';
+            });
+        });
+
+        // Horizontal scroll with wheel for Artist section
+        const scrollContainer = document.querySelector('.overflow-x-auto');
+        if (scrollContainer) {
+            scrollContainer.addEventListener('wheel', (evt) => {
+                evt.preventDefault();
+                scrollContainer.scrollLeft += evt.deltaY;
+            });
+        }
+    </script>
+
+
+</body></html>

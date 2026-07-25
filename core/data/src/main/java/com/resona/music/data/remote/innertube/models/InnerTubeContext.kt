@@ -12,6 +12,8 @@ data class InnerTubeContext(
 data class ClientInfo(
     val clientName: String,
     val clientVersion: String,
+    val androidSdkVersion: Int? = null,
+    val osVersion: String? = null,
     val hl: String = "en",
     val gl: String = "US"
 )

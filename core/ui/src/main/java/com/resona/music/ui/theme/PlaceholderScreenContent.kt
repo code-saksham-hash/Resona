@@ -19,12 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
-/**
- * Shared layout for the four placeholder screens. Exercises every rule in
- * the design system at once: monochrome color, weight-based type hierarchy,
- * an outlined icon, a bordered surface instead of a shadowed one, and both
- * button styles.
- */
 @Composable
 fun ResonaPlaceholderScreenContent(
     icon: ImageVector,
@@ -90,8 +84,8 @@ fun ResonaPlaceholderScreenContent(
         Spacer(modifier = Modifier.height(24.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ResonaFilledButton(text = "Primary", onClick = {})
-            ResonaOutlinedButton(text = "Secondary", onClick = {})
+            NocturneFilledButton(text = "Primary", onClick = {})
+            NocturneOutlinedButton(text = "Secondary", onClick = {})
         }
     }
 }
