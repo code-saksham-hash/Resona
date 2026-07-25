@@ -1,4 +1,4 @@
-package com.resona.music.ui.search
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -25,11 +25,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
@@ -37,12 +37,10 @@ import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,12 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.ResonaTheme
 
@@ -94,75 +87,50 @@ private val mockGenres = listOf(
 @Composable
 fun SearchScreen(
     modifier: Modifier = Modifier,
-    onSongClick: (Song) -> Unit = {},
-    viewModel: SearchViewModel = hiltViewModel()
+    onGenreClick: (String) -> Unit = {},
+    onProfileClick: () -> Unit = {},
 ) {
-    val query by viewModel.query.collectAsStateWithLifecycle()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var query by remember { mutableStateOf("") }
 
-    SearchScreenContent(
+    ExploreContent(
         query = query,
-        uiState = uiState,
-        onQueryChange = viewModel::onQueryChange,
-        onRetry = viewModel::retry,
-        onSongClick = onSongClick,
+        onQueryChange = { query = it },
+        onGenreClick = onGenreClick,
+        onProfileClick = onProfileClick,
         modifier = modifier
     )
 }
 
 @Composable
-private fun SearchScreenContent(
+private fun ExploreContent(
     query: String,
-    uiState: SearchUiState,
     onQueryChange: (String) -> Unit,
-    onRetry: () -> Unit,
-    onSongClick: (Song) -> Unit,
+    onGenreClick: (String) -> Unit = {},
+    onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        SearchBarSection(query = query, onQueryChange = onQueryChange)
-
-        Box(
+        LazyColumn(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .weight(1f)
         ) {
+            item { SearchBarSection(query = query, onQueryChange = onQueryChange) }
+
             if (query.isBlank()) {
-                ExploreLanding()
+                item { Spacer(modifier = Modifier.height(10.dp)) }
+                item { RecentTags() }
+                item { Spacer(modifier = Modifier.height(27.dp)) }
+                item { GenreGrid(onGenreClick = onGenreClick) }
+                item { Spacer(modifier = Modifier.height(27.dp)) }
+                item { TrendingNowSection() }
+                item { Spacer(modifier = Modifier.height(41.dp)) }
+                item { FeaturedCreatorsSection() }
+                item { Spacer(modifier = Modifier.height(68.dp)) }
             } else {
-                when (uiState) {
-                    SearchUiState.Loading -> CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                    is SearchUiState.Success -> SearchResultsList(
-                        results = uiState.results,
-                        onSongClick = onSongClick
-                    )
-                    SearchUiState.Empty -> Text(
-                        text = "No results found",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                    is SearchUiState.Error -> Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = 32.dp)
-                    ) {
-                        Text(
-                            text = uiState.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        NocturneOutlinedButton(
-                            text = "Retry",
-                            onClick = onRetry,
-                            borderColor = MaterialTheme.colorScheme.onSurface
-                        )
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(27.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -179,7 +147,7 @@ private fun SearchBarSection(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 11.dp, end = 17.dp, top = 7.dp, bottom = 7.dp)
+            .padding(start = 11.dp, end = 17.dp)
             .clip(RoundedCornerShape(50))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .height(38.dp)
@@ -226,39 +194,6 @@ private fun SearchBarSection(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ExploreLanding(modifier: Modifier = Modifier) {
-    var isRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            scope.launch {
-                isRefreshing = true
-                delay(1500)
-                isRefreshing = false
-            }
-        },
-        modifier = modifier.fillMaxSize()
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            item { Spacer(modifier = Modifier.height(10.dp)) }
-            item { RecentTags() }
-            item { Spacer(modifier = Modifier.height(27.dp)) }
-            item { GenreGrid() }
-            item { Spacer(modifier = Modifier.height(27.dp)) }
-            item { TrendingNowSection() }
-            item { Spacer(modifier = Modifier.height(41.dp)) }
-            item { FeaturedCreatorsSection() }
-            item { Spacer(modifier = Modifier.height(68.dp)) }
-        }
-    }
-}
-
 @Composable
 private fun RecentTags(modifier: Modifier = Modifier) {
     val tags = listOf("Deep Ambient", "Glitch Jazz", "Post-Piano")
@@ -299,6 +234,7 @@ private fun RecentTags(modifier: Modifier = Modifier) {
 
 @Composable
 private fun GenreGrid(
+    onGenreClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.padding(horizontal = 17.dp)) {
@@ -318,22 +254,23 @@ private fun GenreGrid(
                     name = mockGenres[0].name,
                     imageUrl = mockGenres[0].imageUrl,
                     isFeatured = true,
+                    onClick = { onGenreClick(mockGenres[0].name) },
                     modifier = Modifier.weight(2f)
                 )
                 Column(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    GenreCard(name = mockGenres[1].name, imageUrl = mockGenres[1].imageUrl)
-                    GenreCard(name = mockGenres[2].name, imageUrl = mockGenres[2].imageUrl)
+                    GenreCard(name = mockGenres[1].name, imageUrl = mockGenres[1].imageUrl, onClick = { onGenreClick(mockGenres[1].name) })
+                    GenreCard(name = mockGenres[2].name, imageUrl = mockGenres[2].imageUrl, onClick = { onGenreClick(mockGenres[2].name) })
                 }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                GenreCard(name = mockGenres[3].name, imageUrl = mockGenres[3].imageUrl, modifier = Modifier.weight(1f))
-                GenreCard(name = mockGenres[4].name, imageUrl = mockGenres[4].imageUrl, modifier = Modifier.weight(1f))
+                GenreCard(name = mockGenres[3].name, imageUrl = mockGenres[3].imageUrl, onClick = { onGenreClick(mockGenres[3].name) }, modifier = Modifier.weight(1f))
+                GenreCard(name = mockGenres[4].name, imageUrl = mockGenres[4].imageUrl, onClick = { onGenreClick(mockGenres[4].name) }, modifier = Modifier.weight(1f))
             }
         }
     }
@@ -432,17 +369,20 @@ private fun TrendingNowSection(modifier: Modifier = Modifier) {
             TrendingCard(
                 title = "Ether Drift",
                 artist = "Vanish In Dust",
-                imageUrl = "https://picsum.photos/seed/trending1/400/300"
+                imageUrl = "https://picsum.photos/seed/trending1/400/300",
+                onClick = {}
             )
             TrendingCard(
                 title = "Monolith IV",
                 artist = "Structural Integrity",
-                imageUrl = "https://picsum.photos/seed/trending2/400/300"
+                imageUrl = "https://picsum.photos/seed/trending2/400/300",
+                onClick = {}
             )
             TrendingCard(
                 title = "Surface Tension",
                 artist = "Kinesis",
-                imageUrl = "https://picsum.photos/seed/trending3/400/300"
+                imageUrl = "https://picsum.photos/seed/trending3/400/300",
+                onClick = {}
             )
         }
     }
@@ -453,7 +393,7 @@ private fun TrendingCard(
     title: String,
     artist: String,
     imageUrl: String,
-    onClick: () -> Unit = {},
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -579,87 +519,14 @@ private fun CreatorAvatar(
     }
 }
 
-@Composable
-private fun SearchResultsList(
-    results: List<Song>,
-    onSongClick: (Song) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(modifier = modifier.fillMaxSize()) {
-        items(results, key = { it.videoId }) { song ->
-            SearchResultRow(song = song, onClick = { onSongClick(song) })
-        }
-    }
-}
-
-@Composable
-private fun SearchResultRow(song: Song, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 17.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            AsyncImage(
-                model = song.thumbnailUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
-        Spacer(modifier = Modifier.width(16.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-private val previewSongs = listOf(
-    Song(videoId = "1", title = "Midnight City", artist = "M83", thumbnailUrl = ""),
-    Song(videoId = "2", title = "Nightcall", artist = "Kavinsky", thumbnailUrl = ""),
-    Song(
-        videoId = "3",
-        title = "Instant Crush",
-        artist = "Daft Punk ft. Julian Casablancas",
-        thumbnailUrl = ""
-    )
-)
-
 @Preview(showBackground = true, name = "Explore")
 @Composable
 private fun SearchScreenPreview() {
     ResonaTheme {
-        SearchScreenContent(
+        ExploreContent(
             query = "",
-            uiState = SearchUiState.Empty,
             onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
+            onGenreClick = {}
         )
     }
 }
@@ -668,54 +535,10 @@ private fun SearchScreenPreview() {
 @Composable
 private fun SearchScreenDarkPreview() {
     ResonaTheme(darkTheme = true) {
-        SearchScreenContent(
+        ExploreContent(
             query = "",
-            uiState = SearchUiState.Empty,
             onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Results")
-@Composable
-private fun SearchScreenResultsPreview() {
-    ResonaTheme {
-        SearchScreenContent(
-            query = "daft punk",
-            uiState = SearchUiState.Success(previewSongs),
-            onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Loading")
-@Composable
-private fun SearchScreenLoadingPreview() {
-    ResonaTheme {
-        SearchScreenContent(
-            query = "daft punk",
-            uiState = SearchUiState.Loading,
-            onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Error")
-@Composable
-private fun SearchScreenErrorPreview() {
-    ResonaTheme {
-        SearchScreenContent(
-            query = "daft punk",
-            uiState = SearchUiState.Error("Unable to resolve host \"music.youtube.com\""),
-            onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
+            onGenreClick = {}
         )
     }
 }
