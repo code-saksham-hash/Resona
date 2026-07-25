@@ -1,6 +1,11 @@
 package com.resona.music.ui.navigation
 
 import android.net.Uri
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -38,6 +43,16 @@ import com.resona.music.ui.player.MiniPlayerBar
 import com.resona.music.ui.search.ExploreScreen
 import com.resona.music.ui.search.SearchPage
 import com.resona.music.ui.search.SearchScreen
+
+private val navAnimSpec = tween<Float>(450)
+
+private val bottomNavEnter = slideInHorizontally { it } + fadeIn(animationSpec = navAnimSpec)
+private val bottomNavExit = slideOutHorizontally { -it } + fadeOut(animationSpec = navAnimSpec)
+
+private val slideEnter = slideInHorizontally { it } + fadeIn(animationSpec = navAnimSpec)
+private val slideExit = slideOutHorizontally { -it } + fadeOut(animationSpec = navAnimSpec)
+private val slidePopEnter = slideInHorizontally { -it } + fadeIn(animationSpec = navAnimSpec)
+private val slidePopExit = slideOutHorizontally { it } + fadeOut(animationSpec = navAnimSpec)
 
 @Composable
 fun ResonaNavGraph() {
@@ -84,7 +99,13 @@ fun ResonaNavGraph() {
             startDestination = ResonaDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(ResonaDestination.Home.route) {
+            composable(
+                ResonaDestination.Home.route,
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
+            ) {
                 HomeScreen(
                     onTrackClick = { track ->
                         playerViewModel.play(
@@ -119,7 +140,13 @@ fun ResonaNavGraph() {
                     },
                 )
             }
-            composable(ResonaDestination.Explore.route) {
+            composable(
+                ResonaDestination.Explore.route,
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
+            ) {
                 ExploreScreen(
                     onSearchClick = {
                         navController.navigate(ResonaDestination.Search.route)
@@ -131,7 +158,11 @@ fun ResonaNavGraph() {
             }
             composable(
                 route = "${ResonaDestination.Search.route}?query={query}",
-                arguments = listOf(navArgument("query") { type = NavType.StringType; defaultValue = "" })
+                arguments = listOf(navArgument("query") { type = NavType.StringType; defaultValue = "" }),
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
             ) { backStackEntry ->
                 SearchPage(
                     initialQuery = backStackEntry.arguments?.getString("query").orEmpty(),
@@ -139,7 +170,13 @@ fun ResonaNavGraph() {
                     onSongClick = playerViewModel::play,
                 )
             }
-            composable(ResonaDestination.NowPlaying.route) {
+            composable(
+                ResonaDestination.NowPlaying.route,
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
+            ) {
                 NowPlayingScreen(
                     uiState = playerUiState,
                     onTogglePlayPause = playerViewModel::togglePlayPause,
@@ -157,7 +194,13 @@ fun ResonaNavGraph() {
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable(ResonaDestination.Library.route) {
+            composable(
+                ResonaDestination.Library.route,
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
+            ) {
                 LibraryScreen(
                     onDownloadedSongClick = playerViewModel::play,
                     onLikedSongClick = playerViewModel::play,
@@ -175,7 +218,11 @@ fun ResonaNavGraph() {
                 arguments = listOf(
                     navArgument(PlaylistDetailViewModel.ARG_BROWSE_ID) { type = NavType.StringType },
                     navArgument(PlaylistDetailViewModel.ARG_TITLE) { type = NavType.StringType; defaultValue = "" }
-                )
+                ),
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
             ) {
                 PlaylistDetailScreen(
                     onBack = { navController.popBackStack() },
@@ -184,7 +231,11 @@ fun ResonaNavGraph() {
             }
             composable(
                 route = "${ResonaDestination.ArtistDetail.route}/{${ArtistDetailViewModel.ARG_NAME}}",
-                arguments = listOf(navArgument(ArtistDetailViewModel.ARG_NAME) { type = NavType.StringType })
+                arguments = listOf(navArgument(ArtistDetailViewModel.ARG_NAME) { type = NavType.StringType }),
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
             ) {
                 ArtistDetailScreen(
                     onBack = { navController.popBackStack() },
