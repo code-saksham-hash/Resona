@@ -3,6 +3,7 @@ package com.resona.music.playback
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
@@ -50,11 +53,16 @@ data class PlayerUiState(
  * [PlayerService] exclusively through a [MediaController] -- it never
  * touches an [androidx.media3.exoplayer.ExoPlayer] directly, so playback
  * keeps running in the service regardless of this ViewModel's lifecycle.
+ *
+ * @OptIn below is for [DefaultHttpDataSource.Factory.setUserAgent], which
+ * Media3 marks `@UnstableApi` (see [PlayerService]'s kdoc for the same deal).
  */
+@OptIn(markerClass = [UnstableApi::class])
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val musicRepository: MusicRepository
+    private val musicRepository: MusicRepository,
+    private val httpDataSourceFactory: DefaultHttpDataSource.Factory,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -88,7 +96,11 @@ class PlayerViewModel @Inject constructor(
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.d(TAG, "onPlayerError: errorCode=${error.errorCodeName}, message=${error.message}")
+                        Log.d(
+                            TAG,
+                            "onPlayerError: errorCode=${error.errorCodeName}, message=${error.message}",
+                            error.cause
+                        )
                         _uiState.update {
                             it.copy(isBuffering = false, error = error.message ?: "Playback error")
                         }
@@ -133,11 +145,14 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(currentTrack = song, isBuffering = true, error = null) }
             try {
-                val streamUrl = musicRepository.getStreamUrl(song.videoId)
+                val streamSource = musicRepository.getStreamSource(song.videoId)
+                // has to happen before prepare()/play() or ExoPlayer opens
+                // the connection with the wrong user agent and gets rejected
+                httpDataSourceFactory.setUserAgent(streamSource.userAgent)
                 val controller = controllerReady.await()
                 val mediaItem = MediaItem.Builder()
                     .setMediaId(song.videoId)
-                    .setUri(streamUrl)
+                    .setUri(streamSource.url)
                     .setMediaMetadata(
                         MediaMetadata.Builder()
                             .setTitle(song.title)

@@ -1,5 +1,12 @@
 package com.resona.music.data.repository
 
+import com.resona.music.data.extractor.InnerTubeExtractionClient
+import com.resona.music.data.extractor.JsEngine
+import com.resona.music.data.extractor.YouTubeStreamExtractor
+import com.resona.music.data.extractor.decipher.DecipherService
+import com.resona.music.data.extractor.decipher.NParamDecipherer
+import com.resona.music.data.extractor.decipher.PlayerJsRepository
+import com.resona.music.data.extractor.decipher.SignatureDecipherer
 import com.resona.music.data.remote.innertube.InnerTubeApi
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -165,7 +172,23 @@ class MusicRepositoryImplTest {
                 json(Json { ignoreUnknownKeys = true })
             }
         }
-        return MusicRepositoryImpl(InnerTubeApi(httpClient))
+        // just needs to be constructible here, so a no-op JsEngine fake is
+        // fine -- the real WebView-backed one needs a live Context this
+        // plain JVM test doesn't have
+        val jsEngine = object : JsEngine {
+            override suspend fun execute(functionCode: String, argument: String) = null
+            override suspend fun executeWithPlayerJs(playerJs: String, discoveryScript: String) = null
+        }
+        val streamExtractor = YouTubeStreamExtractor(
+            client = InnerTubeExtractionClient(httpClient),
+            playerJsRepo = PlayerJsRepository(httpClient),
+            decipherService = DecipherService(
+                playerJsRepo = PlayerJsRepository(httpClient),
+                nParamDecipherer = NParamDecipherer(jsEngine),
+                signatureDecipherer = SignatureDecipherer(jsEngine),
+            ),
+        )
+        return MusicRepositoryImpl(InnerTubeApi(httpClient), streamExtractor)
     }
 
     @Test
