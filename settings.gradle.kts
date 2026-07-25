@@ -21,4 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Resona"
 include(":core:domain")
+include(":core:data")
 include(":core:ui")
