@@ -1,4 +1,4 @@
-package com.resona.music.ui.onboarding
+package com.resona.music.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -16,8 +16,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -61,7 +61,7 @@ private val pages = listOf(
 
 @Composable
 fun OnboardingScreen(
-    onGetStarted: () -> Unit,
+    onGetStarted: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val pagerState = rememberPagerState(pageCount = { pages.size })

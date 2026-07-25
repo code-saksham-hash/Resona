@@ -1,18 +1,10 @@
-package com.resona.music.ui.home
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,15 +20,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,17 +46,66 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.resona.music.ui.theme.MontserratFontFamily
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
-import com.resona.music.ui.theme.MontserratFontFamily
 import com.resona.music.ui.theme.ResonaTheme
+
+data class HomeAlbum(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val imageUrl: String,
+    val videoId: String = ""
+)
+
+data class HomeArtist(
+    val id: String,
+    val name: String,
+    val imageUrl: String,
+    val videoId: String = ""
+)
+
+data class HomeTrack(
+    val id: String,
+    val number: Int,
+    val title: String,
+    val artist: String,
+    val duration: String,
+    val imageUrl: String
+)
+
+private val mockRecommended = listOf(
+    HomeAlbum("1", "Eternal Waves", "Ambient", "https://picsum.photos/seed/rec1/400/400"),
+    HomeAlbum("2", "Neon Dusk", "Electronic", "https://picsum.photos/seed/rec2/400/400"),
+    HomeAlbum("3", "Fractal Dreams", "Experimental", "https://picsum.photos/seed/rec3/400/400"),
+)
+
+private val mockTrending = listOf(
+    HomeAlbum("4", "Midnight Signal", "Synthwave", "https://picsum.photos/seed/trend1/400/400"),
+    HomeAlbum("5", "Glacier", "Ambient", "https://picsum.photos/seed/trend2/400/400"),
+    HomeAlbum("6", "Pulse", "Techno", "https://picsum.photos/seed/trend3/400/400"),
+)
+
+private val mockArtists = listOf(
+    HomeArtist("1", "Vanish In Dust", "https://picsum.photos/seed/artist1/400/400"),
+    HomeArtist("2", "Kinesis", "https://picsum.photos/seed/artist2/400/400"),
+    HomeArtist("3", "AELOS", "https://picsum.photos/seed/artist3/400/400"),
+    HomeArtist("4", "OBSCURA", "https://picsum.photos/seed/artist4/400/400"),
+)
+
+private val mockTracks = listOf(
+    HomeTrack("1", 1, "Ether Drift", "Vanish In Dust", "3:42", "https://picsum.photos/seed/track1/400/400"),
+    HomeTrack("2", 2, "Monolith IV", "Structural Integrity", "5:18", "https://picsum.photos/seed/track2/400/400"),
+    HomeTrack("3", 3, "Surface Tension", "Kinesis", "4:07", "https://picsum.photos/seed/track3/400/400"),
+    HomeTrack("4", 4, "Glass Ceiling", "AELOS", "6:01", "https://picsum.photos/seed/track4/400/400"),
+)
 
 @Composable
 fun HomeScreen(
@@ -71,12 +116,8 @@ fun HomeScreen(
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
     onTrackClick: (HomeTrack) -> Unit = {},
-    viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
     HomeScreenContent(
-        uiState = uiState,
         onSearchQuery = onSearchQuery,
         onExploreClick = onExploreClick,
         onProfileClick = onProfileClick,
@@ -89,7 +130,6 @@ fun HomeScreen(
 
 @Composable
 private fun HomeScreenContent(
-    uiState: HomeUiState,
     onSearchQuery: (String) -> Unit = {},
     onExploreClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -107,27 +147,16 @@ private fun HomeScreenContent(
                 .weight(1f)
         ) {
             item { Spacer(modifier = Modifier.height(7.dp)) }
-
             item { QuickPicksRow() }
-
             item { Spacer(modifier = Modifier.height(20.dp)) }
-
-            item { RecommendedSection(albums = uiState.recommended, onAlbumClick = onAlbumClick) }
-
+            item { RecommendedSection(albums = mockRecommended, onAlbumClick = onAlbumClick) }
             item { Spacer(modifier = Modifier.height(20.dp)) }
-
-            item { TrendingSection(albums = uiState.trending, onAlbumClick = onAlbumClick) }
-
+            item { TrendingSection(albums = mockTrending, onAlbumClick = onAlbumClick) }
             item { Spacer(modifier = Modifier.height(27.dp)) }
-
-            item { TopArtistsSection(artists = uiState.topArtists, onArtistClick = onArtistClick) }
-
+            item { TopArtistsSection(artists = mockArtists, onArtistClick = onArtistClick) }
             item { Spacer(modifier = Modifier.height(27.dp)) }
-
-            item { NewForYouSection(tracks = uiState.newTracks, onTrackClick = onTrackClick) }
-
+            item { NewForYouSection(tracks = mockTracks, onTrackClick = onTrackClick) }
             item { Spacer(modifier = Modifier.height(14.dp)) }
-
             item {
                 Column(
                     modifier = Modifier
@@ -159,7 +188,6 @@ private fun HomeScreenContent(
                     }
                 }
             }
-
             item { Spacer(modifier = Modifier.height(27.dp)) }
         }
     }
@@ -219,28 +247,28 @@ private fun HomeTopBar(
                             modifier = Modifier.offset(y = (-1).dp)
                         )
                     },
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                ),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        if (searchText.isNotBlank()) {
-                            onSearchQuery(searchText)
-                            searchText = ""
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            if (searchText.isNotBlank()) {
+                                onSearchQuery(searchText)
+                                searchText = ""
+                            }
                         }
-                    }
-                ),
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        cursorColor = MaterialTheme.colorScheme.onSurface,
+                    )
                 )
-            )
-        }
+            }
         }
         Spacer(modifier = Modifier.width(12.dp))
         IconButton(onClick = onProfileClick) {
@@ -679,28 +707,18 @@ private fun NewForYouRow(
     }
 }
 
-@Composable
-private fun HomeScreenPreview(
-    modifier: Modifier = Modifier
-) {
-    ResonaTheme {
-        HomeScreenContent(
-            uiState = HomeUiState(),
-            onSearchQuery = {},
-            onTrackClick = {},
-            modifier = modifier
-        )
-    }
-}
-
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenLightPreview() {
-    HomeScreenPreview()
+    ResonaTheme {
+        HomeScreenContent(onTrackClick = {})
+    }
 }
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun HomeScreenDarkPreview() {
-    HomeScreenPreview()
+    ResonaTheme {
+        HomeScreenContent(onTrackClick = {})
+    }
 }

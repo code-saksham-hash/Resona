@@ -1,4 +1,4 @@
-package com.resona.music.ui.nowplaying
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -48,20 +48,46 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.resona.music.domain.model.Song
-import com.resona.music.feature.player.R
-import com.resona.music.playback.PlayerUiState
 import com.resona.music.ui.theme.ResonaTheme
+
+data class PlayerTrack(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val thumbnailUrl: String,
+    val durationMs: Long = 0L
+)
+
+data class PlayerUiState(
+    val currentTrack: PlayerTrack? = null,
+    val isPlaying: Boolean = false,
+    val position: Long = 0L,
+    val duration: Long = 0L,
+    val error: String? = null
+)
+
+private val previewTrack = PlayerTrack(
+    id = "1",
+    title = "Midnight City",
+    artist = "M83",
+    thumbnailUrl = "https://picsum.photos/seed/nowplaying/400/400",
+    durationMs = 244_000L
+)
 
 @Composable
 fun NowPlayingScreen(
-    uiState: PlayerUiState,
-    onTogglePlayPause: () -> Unit,
-    onSeek: (positionMs: Long) -> Unit,
-    onSkipNext: () -> Unit,
-    onSkipPrevious: () -> Unit,
-    onQueueClick: () -> Unit,
-    onBack: () -> Unit,
+    uiState: PlayerUiState = PlayerUiState(
+        currentTrack = previewTrack,
+        isPlaying = true,
+        position = 87_000L,
+        duration = 244_000L
+    ),
+    onTogglePlayPause: () -> Unit = {},
+    onSeek: (positionMs: Long) -> Unit = {},
+    onSkipNext: () -> Unit = {},
+    onSkipPrevious: () -> Unit = {},
+    onQueueClick: () -> Unit = {},
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -306,7 +332,7 @@ private fun PlaybackControls(
         ) {
             if (isPlaying) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_pause),
+                    painter = painterResource(com.resona.music.feature.player.R.drawable.ic_pause),
                     contentDescription = "Pause",
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(27.dp)
@@ -341,31 +367,11 @@ private fun formatDuration(millis: Long): String {
     return "%d:%02d".format(minutes, seconds)
 }
 
-private val previewTrack = Song(
-    videoId = "1",
-    title = "Midnight City",
-    artist = "M83",
-    thumbnailUrl = ""
-)
-
 @Preview(showBackground = true, name = "Playing")
 @Composable
 private fun NowPlayingScreenPlayingPreview() {
     ResonaTheme {
-        NowPlayingScreen(
-            uiState = PlayerUiState(
-                currentTrack = previewTrack,
-                isPlaying = true,
-                position = 87_000L,
-                duration = 244_000L
-            ),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen()
     }
 }
 
@@ -373,20 +379,7 @@ private fun NowPlayingScreenPlayingPreview() {
 @Composable
 private fun NowPlayingScreenPlayingDarkPreview() {
     ResonaTheme(darkTheme = true) {
-        NowPlayingScreen(
-            uiState = PlayerUiState(
-                currentTrack = previewTrack,
-                isPlaying = true,
-                position = 87_000L,
-                duration = 244_000L
-            ),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen()
     }
 }
 
@@ -394,14 +387,6 @@ private fun NowPlayingScreenPlayingDarkPreview() {
 @Composable
 private fun NowPlayingScreenEmptyPreview() {
     ResonaTheme {
-        NowPlayingScreen(
-            uiState = PlayerUiState(),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen(uiState = PlayerUiState())
     }
 }

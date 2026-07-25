@@ -1,10 +1,9 @@
-package com.resona.music.ui.library
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,10 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.DownloadDone
-
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
@@ -27,7 +26,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,25 +35,33 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaTheme
+
+data class DownloadTrack(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val duration: String,
+    val imageUrl: String
+)
+
+private val mockTracks = listOf(
+    DownloadTrack("1", "Ether Drift", "Vanish In Dust", "Monolith", "3:42", "https://picsum.photos/seed/dltrack1/400/400"),
+    DownloadTrack("2", "Monolith IV", "Structural Integrity", "Breakdown", "5:18", "https://picsum.photos/seed/dltrack2/400/400"),
+    DownloadTrack("3", "Surface Tension", "Kinesis", "Kinesis EP", "4:07", "https://picsum.photos/seed/dltrack3/400/400"),
+    DownloadTrack("4", "Glass Ceiling", "AELOS", "AELOS", "6:01", "https://picsum.photos/seed/dltrack4/400/400"),
+)
 
 @Composable
 fun LibraryScreen(
     modifier: Modifier = Modifier,
     onTrackClick: (DownloadTrack) -> Unit = {},
     onProfileClick: () -> Unit = {},
-    viewModel: LibraryViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
     LibraryScreenContent(
-        uiState = uiState,
-        onToggleDownloadedOnly = viewModel::toggleDownloadedOnly,
         onTrackClick = onTrackClick,
         onProfileClick = onProfileClick,
         modifier = modifier
@@ -64,8 +70,6 @@ fun LibraryScreen(
 
 @Composable
 private fun LibraryScreenContent(
-    uiState: DownloadsUiState,
-    onToggleDownloadedOnly: () -> Unit,
     onTrackClick: (DownloadTrack) -> Unit = {},
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -79,17 +83,11 @@ private fun LibraryScreenContent(
                 .weight(1f)
         ) {
             item { LibraryHeader() }
-
             item { Spacer(modifier = Modifier.height(20.dp)) }
-
-            item { DownloadToggle(isDownloadedOnly = uiState.isDownloadedOnly, onToggle = onToggleDownloadedOnly) }
-
+            item { DownloadToggle(isDownloadedOnly = false, onToggle = {}) }
             item { Spacer(modifier = Modifier.height(20.dp)) }
-
-            item { DownloadTracksSection(tracks = uiState.tracks, onTrackClick = onTrackClick) }
-
-            item { StatsFooter(trackCount = uiState.trackCount, storageUsed = uiState.storageUsed) }
-
+            item { DownloadTracksSection(tracks = mockTracks, onTrackClick = onTrackClick) }
+            item { StatsFooter(trackCount = 4, storageUsed = "42.5 MB") }
             item { Spacer(modifier = Modifier.height(68.dp)) }
         }
     }
@@ -250,7 +248,7 @@ private fun DownloadTrackRow(
             )
             Spacer(modifier = Modifier.height(3.dp))
             Text(
-                text = "${track.artist} • ${track.album}",
+                text = "${track.artist} \u2022 ${track.album}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline,
                 maxLines = 1,
@@ -310,7 +308,7 @@ private fun StatsFooter(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "$trackCount TRACKS • $storageUsed USED",
+                text = "$trackCount TRACKS \u2022 $storageUsed USED",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -331,25 +329,18 @@ private fun StatsFooter(
     }
 }
 
-@Composable
-private fun LibraryScreenPreview(modifier: Modifier = Modifier) {
-    ResonaTheme {
-        LibraryScreenContent(
-            uiState = DownloadsUiState(),
-            onToggleDownloadedOnly = {},
-            modifier = modifier
-        )
-    }
-}
-
 @Preview(showBackground = true)
 @Composable
 private fun LibraryScreenLightPreview() {
-    LibraryScreenPreview()
+    ResonaTheme {
+        LibraryScreenContent()
+    }
 }
 
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun LibraryScreenDarkPreview() {
-    LibraryScreenPreview()
+    ResonaTheme {
+        LibraryScreenContent()
+    }
 }
