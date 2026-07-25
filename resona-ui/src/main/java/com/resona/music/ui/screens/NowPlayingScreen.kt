@@ -1,4 +1,4 @@
-package com.resona.music.ui.nowplaying
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -17,13 +17,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.QueueMusic
+import androidx.compose.material.icons.outlined.SkipNext
+import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -48,22 +48,46 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.resona.music.feature.player.R
-import com.resona.music.domain.model.Song
-import com.resona.music.playback.PlayerUiState
 import com.resona.music.ui.theme.ResonaTheme
+
+data class PlayerTrack(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val thumbnailUrl: String,
+    val durationMs: Long = 0L
+)
+
+data class PlayerUiState(
+    val currentTrack: PlayerTrack? = null,
+    val isPlaying: Boolean = false,
+    val position: Long = 0L,
+    val duration: Long = 0L,
+    val error: String? = null
+)
+
+private val previewTrack = PlayerTrack(
+    id = "1",
+    title = "Midnight City",
+    artist = "M83",
+    thumbnailUrl = "https://picsum.photos/seed/nowplaying/400/400",
+    durationMs = 244_000L
+)
 
 @Composable
 fun NowPlayingScreen(
-    uiState: PlayerUiState,
-    onTogglePlayPause: () -> Unit,
-    onSeek: (positionMs: Long) -> Unit,
-    onSkipNext: () -> Unit,
-    onSkipPrevious: () -> Unit,
-    onQueueClick: () -> Unit,
-    onDownloadClick: () -> Unit = {},
-    onToggleLike: () -> Unit = {},
-    onBack: () -> Unit,
+    uiState: PlayerUiState = PlayerUiState(
+        currentTrack = previewTrack,
+        isPlaying = true,
+        position = 87_000L,
+        duration = 244_000L
+    ),
+    onTogglePlayPause: () -> Unit = {},
+    onSeek: (positionMs: Long) -> Unit = {},
+    onSkipNext: () -> Unit = {},
+    onSkipPrevious: () -> Unit = {},
+    onQueueClick: () -> Unit = {},
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -71,7 +95,7 @@ fun NowPlayingScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        NowPlayingTopBar(onBack = onBack, onQueueClick = onQueueClick, onDownloadClick = onDownloadClick)
+        NowPlayingTopBar(onBack = onBack, onQueueClick = onQueueClick)
 
         val track = uiState.currentTrack
         if (track == null) {
@@ -138,9 +162,7 @@ fun NowPlayingScreen(
                     isPlaying = uiState.isPlaying,
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipNext = onSkipNext,
-                    onSkipPrevious = onSkipPrevious,
-                    onToggleLike = onToggleLike,
-                    onDownloadClick = onDownloadClick
+                    onSkipPrevious = onSkipPrevious
                 )
 
                 val playError = uiState.error
@@ -165,7 +187,6 @@ fun NowPlayingScreen(
 private fun NowPlayingTopBar(
     onBack: () -> Unit,
     onQueueClick: () -> Unit,
-    onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var overflowExpanded by remember { mutableStateOf(false) }
@@ -188,7 +209,7 @@ private fun NowPlayingTopBar(
 
         IconButton(onClick = onQueueClick) {
             Icon(
-                painter = painterResource(R.drawable.ic_queue),
+                imageVector = Icons.Outlined.QueueMusic,
                 contentDescription = "Queue",
                 tint = MaterialTheme.colorScheme.onSurface
             )
@@ -213,13 +234,6 @@ private fun NowPlayingTopBar(
                 DropdownMenuItem(
                     text = { Text("Add to playlist") },
                     onClick = { overflowExpanded = false }
-                )
-                DropdownMenuItem(
-                    text = { Text("Download") },
-                    onClick = {
-                        overflowExpanded = false
-                        onDownloadClick()
-                    }
                 )
             }
         }
@@ -290,8 +304,6 @@ private fun PlaybackControls(
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
-    onToggleLike: () -> Unit = {},
-    onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -299,20 +311,9 @@ private fun PlaybackControls(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onToggleLike, modifier = Modifier.size(41.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.FavoriteBorder,
-                contentDescription = "Like",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
         IconButton(onClick = onSkipPrevious, modifier = Modifier.size(41.dp)) {
             Icon(
-                painter = painterResource(R.drawable.ic_skip_previous),
+                imageVector = Icons.Outlined.SkipPrevious,
                 contentDescription = "Previous",
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(24.dp)
@@ -324,14 +325,14 @@ private fun PlaybackControls(
         Box(
             modifier = Modifier
                 .size(61.dp)
-                .clip(CircleShape)
+                .clip(MaterialTheme.shapes.extraLarge)
                 .background(MaterialTheme.colorScheme.primary)
                 .clickable(onClick = onTogglePlayPause),
             contentAlignment = Alignment.Center
         ) {
             if (isPlaying) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_pause),
+                    painter = painterResource(com.resona.music.feature.player.R.drawable.ic_pause),
                     contentDescription = "Pause",
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(27.dp)
@@ -350,19 +351,8 @@ private fun PlaybackControls(
 
         IconButton(onClick = onSkipNext, modifier = Modifier.size(41.dp)) {
             Icon(
-                painter = painterResource(R.drawable.ic_skip_next),
+                imageVector = Icons.Outlined.SkipNext,
                 contentDescription = "Next",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        IconButton(onClick = onDownloadClick, modifier = Modifier.size(41.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.Download,
-                contentDescription = "Download",
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(24.dp)
             )
@@ -377,31 +367,11 @@ private fun formatDuration(millis: Long): String {
     return "%d:%02d".format(minutes, seconds)
 }
 
-private val previewTrack = Song(
-    videoId = "1",
-    title = "Midnight City",
-    artist = "M83",
-    thumbnailUrl = ""
-)
-
 @Preview(showBackground = true, name = "Playing")
 @Composable
 private fun NowPlayingScreenPlayingPreview() {
     ResonaTheme {
-        NowPlayingScreen(
-            uiState = PlayerUiState(
-                currentTrack = previewTrack,
-                isPlaying = true,
-                position = 87_000L,
-                duration = 244_000L
-            ),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen()
     }
 }
 
@@ -409,20 +379,7 @@ private fun NowPlayingScreenPlayingPreview() {
 @Composable
 private fun NowPlayingScreenPlayingDarkPreview() {
     ResonaTheme(darkTheme = true) {
-        NowPlayingScreen(
-            uiState = PlayerUiState(
-                currentTrack = previewTrack,
-                isPlaying = true,
-                position = 87_000L,
-                duration = 244_000L
-            ),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen()
     }
 }
 
@@ -430,14 +387,6 @@ private fun NowPlayingScreenPlayingDarkPreview() {
 @Composable
 private fun NowPlayingScreenEmptyPreview() {
     ResonaTheme {
-        NowPlayingScreen(
-            uiState = PlayerUiState(),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen(uiState = PlayerUiState())
     }
 }

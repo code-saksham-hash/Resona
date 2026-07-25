@@ -19,8 +19,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.resona.music.domain.model.Song
 import com.resona.music.playback.PlayerViewModel
+import com.resona.music.ui.home.HomeAlbum
+import com.resona.music.ui.home.HomeArtist
 import com.resona.music.ui.home.HomeScreen
+import com.resona.music.ui.home.HomeTrack
 import com.resona.music.ui.library.LibraryScreen
 import com.resona.music.ui.nowplaying.NowPlayingScreen
 import com.resona.music.ui.player.MiniPlayerBar
@@ -68,7 +72,50 @@ fun ResonaNavGraph() {
             startDestination = ResonaDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(ResonaDestination.Home.route) { HomeScreen() }
+            composable(ResonaDestination.Home.route) {
+                HomeScreen(
+                    onTrackClick = { track ->
+                        playerViewModel.play(
+                            Song(
+                                videoId = track.id,
+                                title = track.title,
+                                artist = track.artist,
+                                thumbnailUrl = track.imageUrl
+                            )
+                        )
+                    },
+                    onAlbumClick = { album ->
+                        if (album.videoId.isNotBlank()) {
+                            playerViewModel.play(
+                                Song(
+                                    videoId = album.videoId,
+                                    title = album.title,
+                                    artist = album.subtitle,
+                                    thumbnailUrl = album.imageUrl
+                                )
+                            )
+                        }
+                    },
+                    onArtistClick = { artist ->
+                        if (artist.videoId.isNotBlank()) {
+                            playerViewModel.play(
+                                Song(
+                                    videoId = artist.videoId,
+                                    title = artist.name,
+                                    artist = artist.name,
+                                    thumbnailUrl = artist.imageUrl
+                                )
+                            )
+                        }
+                    },
+                    onExploreClick = {
+                        navController.navigateToTopLevel(ResonaDestination.Search.route)
+                    },
+                    onSearchQuery = {
+                        navController.navigateToTopLevel(ResonaDestination.Search.route)
+                    },
+                )
+            }
             composable(ResonaDestination.Search.route) {
                 SearchScreen(onSongClick = playerViewModel::play)
             }
@@ -84,6 +131,12 @@ fun ResonaNavGraph() {
                     // once this route is no longer current -- same idiom the
                     // bottom bar itself uses to switch tabs.
                     onQueueClick = {},
+                    onDownloadClick = {
+                        // TODO: wire real download logic here
+                    },
+                    onToggleLike = {
+                        // TODO: wire real like/unlike logic here
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }

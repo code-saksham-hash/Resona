@@ -1,4 +1,4 @@
-package com.resona.music.ui.home
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -25,21 +25,18 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,8 +52,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.resona.music.ui.theme.MontserratFontFamily
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
@@ -133,7 +128,6 @@ fun HomeScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeScreenContent(
     onSearchQuery: (String) -> Unit = {},
@@ -144,28 +138,14 @@ private fun HomeScreenContent(
     onTrackClick: (HomeTrack) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    Column(modifier = modifier.fillMaxSize()) {
+        HomeTopBar(onSearchQuery = onSearchQuery, onProfileClick = onProfileClick)
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            scope.launch {
-                isRefreshing = true
-                delay(1500)
-                isRefreshing = false
-            }
-        },
-        modifier = modifier.fillMaxSize()
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            HomeTopBar(onSearchQuery = onSearchQuery, onProfileClick = onProfileClick)
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-            ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
             item { Spacer(modifier = Modifier.height(7.dp)) }
             item { QuickPicksRow() }
             item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -209,7 +189,6 @@ private fun HomeScreenContent(
                 }
             }
             item { Spacer(modifier = Modifier.height(27.dp)) }
-            }
         }
     }
 }
@@ -721,7 +700,7 @@ private fun NewForYouRow(
         Spacer(modifier = Modifier.width(14.dp))
 
         Icon(
-            imageVector = Icons.Outlined.MoreVert,
+            imageVector = Icons.Outlined.MoreHoriz,
             contentDescription = "More",
             tint = MaterialTheme.colorScheme.outline
         )
