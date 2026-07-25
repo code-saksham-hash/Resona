@@ -5,11 +5,15 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.resona.music.core.player.R
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * Hosts the single [ExoPlayer]/[MediaSession] pair for the whole app. Holds
@@ -17,15 +21,21 @@ import com.resona.music.core.player.R
  * [PlayerViewModel] resolves each stream URL before handing this service a
  * ready-to-play [androidx.media3.common.MediaItem], so this class only ever
  * deals with playback mechanics (player, session, notification, foreground
- * lifecycle), never networking.
+ * lifecycle), never networking. One exception: [httpDataSourceFactory]'s
+ * User-Agent has to match whatever InnerTube client resolved the current
+ * track (see [PlaybackDataSourceModule]) -- [PlayerViewModel] updates it,
+ * this service just wires it into ExoPlayer.
  *
  * [DefaultMediaNotificationProvider] is marked `@UnstableApi` by Media3
  * itself (via androidx.annotation.RequiresOptIn, not Kotlin's own
  * @OptIn/@RequiresOptIn) -- that's what the class-level @OptIn below is
  * silencing, not a real stability concern in how it's used here.
  */
+@AndroidEntryPoint
 @OptIn(markerClass = [UnstableApi::class])
 class PlayerService : MediaSessionService() {
+
+    @Inject lateinit var httpDataSourceFactory: DefaultHttpDataSource.Factory
 
     private var mediaSession: MediaSession? = null
 
@@ -33,6 +43,7 @@ class PlayerService : MediaSessionService() {
         super.onCreate()
 
         val player = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(httpDataSourceFactory))
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)

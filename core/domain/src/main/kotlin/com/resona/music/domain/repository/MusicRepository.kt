@@ -4,25 +4,21 @@ import com.resona.music.domain.model.Song
 
 interface MusicRepository {
     suspend fun search(query: String): List<Song>
-    suspend fun getStreamUrl(videoId: String): String
+    suspend fun getStreamSource(videoId: String): StreamSource
 }
 
-/**
- * Thrown when InnerTube reports a video can't currently be played -- e.g.
- * sign-in required, region-locked, or otherwise unavailable. [status] is
- * InnerTube's own playabilityStatus.status value (e.g. "LOGIN_REQUIRED",
- * "UNPLAYABLE") so callers can distinguish failure reasons if they need to.
- */
+// A bare url isn't enough -- the CDN rejects requests that don't come from
+// the same client identity (userAgent) that resolved it.
+data class StreamSource(
+    val url: String,
+    val userAgent: String,
+)
+
+// InnerTube reported a video as unplayable right now -- sign-in required,
+// region-locked, etc. status is InnerTube's own playabilityStatus.status.
 class PlaybackUnavailableException(
     val status: String,
     val reasonText: String
 ) : Exception("Playback unavailable ($status): $reasonText")
 
-/**
- * Thrown when the best available audio stream is signature-ciphered.
- * Deciphering it requires parsing YouTube's obfuscated player JavaScript,
- * which changes over time and is deliberately not implemented here -- see
- * how yt-dlp or NewPipeExtractor handle signatureCipher/'n'-parameter
- * decoding if this is needed.
- */
 class StreamCipherRequiredException(message: String) : Exception(message)
