@@ -28,6 +28,8 @@ import com.resona.music.ui.home.HomeTrack
 import com.resona.music.ui.library.LibraryScreen
 import com.resona.music.ui.nowplaying.NowPlayingScreen
 import com.resona.music.ui.player.MiniPlayerBar
+import com.resona.music.ui.search.ExploreScreen
+import com.resona.music.ui.search.SearchPage
 import com.resona.music.ui.search.SearchScreen
 
 @Composable
@@ -109,15 +111,28 @@ fun ResonaNavGraph() {
                         }
                     },
                     onExploreClick = {
-                        navController.navigateToTopLevel(ResonaDestination.Search.route)
+                        navController.navigateToTopLevel(ResonaDestination.Explore.route)
                     },
                     onSearchQuery = {
-                        navController.navigateToTopLevel(ResonaDestination.Search.route)
+                        navController.navigate(ResonaDestination.Search.route)
                     },
                 )
             }
+            composable(ResonaDestination.Explore.route) {
+                ExploreScreen(
+                    onSearchClick = {
+                        navController.navigate(ResonaDestination.Search.route)
+                    },
+                    onProfileClick = {
+                        // TODO: navigate to profile
+                    }
+                )
+            }
             composable(ResonaDestination.Search.route) {
-                SearchScreen(onSongClick = playerViewModel::play)
+                SearchPage(
+                    onBack = { navController.popBackStack() },
+                    onSongClick = playerViewModel::play,
+                )
             }
             composable(ResonaDestination.NowPlaying.route) {
                 NowPlayingScreen(

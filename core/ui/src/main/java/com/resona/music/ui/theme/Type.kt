@@ -17,6 +17,10 @@ val MontserratFontFamily = FontFamily(
     Font(com.resona.music.core.ui.R.font.montserrat_bold, FontWeight.Bold)
 )
 
+val JosefinSansFontFamily = FontFamily(
+    Font(com.resona.music.core.ui.R.font.josefin_sans_bold, FontWeight.Bold)
+)
+
 val Typography = Typography(
     displayLarge = TextStyle(
         fontFamily = ResonaFontFamily,
