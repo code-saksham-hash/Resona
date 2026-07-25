@@ -56,8 +56,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.resona.music.feature.player.R
 import com.resona.music.domain.model.Song
+import com.resona.music.feature.player.R
 import com.resona.music.playback.DownloadState
 import com.resona.music.playback.LyricsState
 import com.resona.music.playback.PlayerUiState
@@ -111,7 +111,7 @@ fun NowPlayingScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 AlbumArt(
-                    thumbnailUrl = track.thumbnailUrl,
+                    thumbnailUrl = track.highResThumbnailUrl,
                     modifier = Modifier.fillMaxWidth()
                 )
 

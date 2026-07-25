@@ -26,9 +26,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
-// Constructor is internal, not the class itself -- :app needs the type
-// (RepositoryModule binds it) but never constructs it directly, Hilt's
-// generated factory does that from within :core:data.
 class MusicRepositoryImpl @Inject internal constructor(
     private val api: InnerTubeApi,
     private val streamExtractor: YouTubeStreamExtractor,
@@ -49,8 +46,6 @@ class MusicRepositoryImpl @Inject internal constructor(
             )
         }
 
-    // A single WEB_REMIX request comes back UNPLAYABLE anonymously, so this
-    // tries a chain of client identities instead -- see YouTubeStreamExtractor.
     override suspend fun getStreamSource(videoId: String): StreamSource =
         streamExtractor.resolveStreamUrl(videoId)
 
