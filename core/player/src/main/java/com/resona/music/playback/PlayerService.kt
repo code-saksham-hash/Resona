@@ -5,6 +5,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -26,6 +27,11 @@ import javax.inject.Inject
  * track (see [PlaybackDataSourceModule]) -- [PlayerViewModel] updates it,
  * this service just wires it into ExoPlayer.
  *
+ * The media source factory wraps [httpDataSourceFactory] in a
+ * [DefaultDataSource.Factory] rather than using it directly: that's what
+ * makes `file://` MediaItems (downloaded tracks, played back offline) work
+ * at all -- [DefaultHttpDataSource] on its own only understands http(s).
+ *
  * [DefaultMediaNotificationProvider] is marked `@UnstableApi` by Media3
  * itself (via androidx.annotation.RequiresOptIn, not Kotlin's own
  * @OptIn/@RequiresOptIn) -- that's what the class-level @OptIn below is
@@ -42,8 +48,9 @@ class PlayerService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
 
+        val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
         val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(httpDataSourceFactory))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(dataSourceFactory))
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
