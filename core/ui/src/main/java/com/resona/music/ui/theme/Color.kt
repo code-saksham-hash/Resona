@@ -14,6 +14,9 @@ val Gray800 = Color(0xFF2E2E2E)
 val Gray600 = Color(0xFF757575)
 val Gray300 = Color(0xFFE0E0E0)
 
+val NocturneSurface = Color(0xFF000000)
+val NocturneSurfaceContainerLowest = Color(0xFF0D0E0F)
+
 // error/onError etc. are deliberately mapped to the same black/white pairing
 // as primary rather than left unset -- Material3's defaults for those roles
 // are a saturated red, which would smuggle color back into the palette.

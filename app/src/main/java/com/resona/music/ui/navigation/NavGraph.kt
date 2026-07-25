@@ -1,5 +1,10 @@
 package com.resona.music.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -19,12 +24,28 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.resona.music.domain.model.Song
 import com.resona.music.playback.PlayerViewModel
+import com.resona.music.ui.home.HomeAlbum
+import com.resona.music.ui.home.HomeArtist
 import com.resona.music.ui.home.HomeScreen
+import com.resona.music.ui.home.HomeTrack
 import com.resona.music.ui.library.LibraryScreen
 import com.resona.music.ui.nowplaying.NowPlayingScreen
 import com.resona.music.ui.player.MiniPlayerBar
+import com.resona.music.ui.search.ExploreScreen
+import com.resona.music.ui.search.SearchPage
 import com.resona.music.ui.search.SearchScreen
+
+private val navAnimSpec = tween<Float>(450)
+
+private val bottomNavEnter = slideInHorizontally { it } + fadeIn(animationSpec = navAnimSpec)
+private val bottomNavExit = slideOutHorizontally { -it } + fadeOut(animationSpec = navAnimSpec)
+
+private val slideEnter = slideInHorizontally { it } + fadeIn(animationSpec = navAnimSpec)
+private val slideExit = slideOutHorizontally { -it } + fadeOut(animationSpec = navAnimSpec)
+private val slidePopEnter = slideInHorizontally { -it } + fadeIn(animationSpec = navAnimSpec)
+private val slidePopExit = slideOutHorizontally { it } + fadeOut(animationSpec = navAnimSpec)
 
 @Composable
 fun ResonaNavGraph() {
@@ -68,11 +89,91 @@ fun ResonaNavGraph() {
             startDestination = ResonaDestination.Home.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(ResonaDestination.Home.route) { HomeScreen() }
-            composable(ResonaDestination.Search.route) {
-                SearchScreen(onSongClick = playerViewModel::play)
+            composable(
+                ResonaDestination.Home.route,
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
+            ) {
+                HomeScreen(
+                    onTrackClick = { track ->
+                        playerViewModel.play(
+                            Song(
+                                videoId = track.id,
+                                title = track.title,
+                                artist = track.artist,
+                                thumbnailUrl = track.imageUrl
+                            )
+                        )
+                    },
+                    onAlbumClick = { album ->
+                        if (album.videoId.isNotBlank()) {
+                            playerViewModel.play(
+                                Song(
+                                    videoId = album.videoId,
+                                    title = album.title,
+                                    artist = album.subtitle,
+                                    thumbnailUrl = album.imageUrl
+                                )
+                            )
+                        }
+                    },
+                    onArtistClick = { artist ->
+                        if (artist.videoId.isNotBlank()) {
+                            playerViewModel.play(
+                                Song(
+                                    videoId = artist.videoId,
+                                    title = artist.name,
+                                    artist = artist.name,
+                                    thumbnailUrl = artist.imageUrl
+                                )
+                            )
+                        }
+                    },
+                    onExploreClick = {
+                        navController.navigateToTopLevel(ResonaDestination.Explore.route)
+                    },
+                    onSearchQuery = {
+                        navController.navigate(ResonaDestination.Search.route)
+                    },
+                )
             }
-            composable(ResonaDestination.NowPlaying.route) {
+            composable(
+                ResonaDestination.Explore.route,
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
+            ) {
+                ExploreScreen(
+                    onSearchClick = {
+                        navController.navigate(ResonaDestination.Search.route)
+                    },
+                    onProfileClick = {
+                        // TODO: navigate to profile
+                    }
+                )
+            }
+            composable(
+                ResonaDestination.Search.route,
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
+            ) {
+                SearchPage(
+                    onBack = { navController.popBackStack() },
+                    onSongClick = playerViewModel::play,
+                )
+            }
+            composable(
+                ResonaDestination.NowPlaying.route,
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
+            ) {
                 NowPlayingScreen(
                     uiState = playerUiState,
                     onTogglePlayPause = playerViewModel::togglePlayPause,
@@ -84,10 +185,28 @@ fun ResonaNavGraph() {
                     // once this route is no longer current -- same idiom the
                     // bottom bar itself uses to switch tabs.
                     onQueueClick = {},
+                    onDownloadClick = {
+                        // TODO: wire real download logic here
+                    },
+                    onToggleLike = {
+                        // TODO: wire real like/unlike logic here
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable(ResonaDestination.Library.route) { LibraryScreen() }
+            composable(
+                ResonaDestination.Library.route,
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
+            ) {
+                LibraryScreen(
+                    onSearchClick = {
+                        navController.navigate(ResonaDestination.Search.route)
+                    },
+                )
+            }
         }
     }
 }

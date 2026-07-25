@@ -1,4 +1,4 @@
-package com.resona.music.ui.player
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -29,16 +29,28 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.resona.music.feature.player.R
-import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.ResonaTheme
+
+data class MiniPlayerTrack(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val thumbnailUrl: String
+)
+
+private val previewTrack = MiniPlayerTrack(
+    id = "1",
+    title = "Midnight City",
+    artist = "M83",
+    thumbnailUrl = "https://picsum.photos/seed/miniplayer/200/200"
+)
 
 @Composable
 fun MiniPlayerBar(
-    track: Song,
-    isPlaying: Boolean,
-    onTogglePlayPause: () -> Unit,
-    onClick: () -> Unit,
+    track: MiniPlayerTrack = previewTrack,
+    isPlaying: Boolean = true,
+    onTogglePlayPause: () -> Unit = {},
+    onClick: () -> Unit = {},
     error: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -111,7 +123,7 @@ fun MiniPlayerBar(
             IconButton(onClick = onTogglePlayPause) {
                 if (isPlaying) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_pause),
+                        painter = painterResource(com.resona.music.feature.player.R.drawable.ic_pause),
                         contentDescription = "Pause",
                         tint = MaterialTheme.colorScheme.onSurface
                     )
@@ -127,23 +139,11 @@ fun MiniPlayerBar(
     }
 }
 
-private val previewTrack = Song(
-    videoId = "1",
-    title = "Midnight City",
-    artist = "M83",
-    thumbnailUrl = ""
-)
-
 @Preview(showBackground = true, name = "Playing")
 @Composable
 private fun MiniPlayerBarPlayingPreview() {
     ResonaTheme {
-        MiniPlayerBar(
-            track = previewTrack,
-            isPlaying = true,
-            onTogglePlayPause = {},
-            onClick = {}
-        )
+        MiniPlayerBar()
     }
 }
 
@@ -151,12 +151,7 @@ private fun MiniPlayerBarPlayingPreview() {
 @Composable
 private fun MiniPlayerBarPausedPreview() {
     ResonaTheme {
-        MiniPlayerBar(
-            track = previewTrack,
-            isPlaying = false,
-            onTogglePlayPause = {},
-            onClick = {}
-        )
+        MiniPlayerBar(isPlaying = false)
     }
 }
 
@@ -164,11 +159,6 @@ private fun MiniPlayerBarPausedPreview() {
 @Composable
 private fun MiniPlayerBarDarkPreview() {
     ResonaTheme(darkTheme = true) {
-        MiniPlayerBar(
-            track = previewTrack,
-            isPlaying = true,
-            onTogglePlayPause = {},
-            onClick = {}
-        )
+        MiniPlayerBar()
     }
 }

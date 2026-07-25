@@ -157,7 +157,7 @@ class PlayerViewModel @Inject constructor(
                         MediaMetadata.Builder()
                             .setTitle(song.title)
                             .setArtist(song.artist)
-                            .setArtworkUri(song.thumbnailUrl.toUri())
+                            .setArtworkUri(song.highResThumbnailUrl.toUri())
                             .build()
                     )
                     .build()

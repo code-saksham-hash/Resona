@@ -1,4 +1,4 @@
-package com.resona.music.ui.home
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -13,29 +13,30 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,9 +52,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import com.resona.music.ui.theme.JosefinSansFontFamily
+import com.resona.music.ui.theme.MontserratFontFamily
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaTheme
@@ -129,7 +128,6 @@ fun HomeScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeScreenContent(
     onSearchQuery: (String) -> Unit = {},
@@ -140,28 +138,14 @@ private fun HomeScreenContent(
     onTrackClick: (HomeTrack) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    Column(modifier = modifier.fillMaxSize()) {
+        HomeTopBar(onSearchQuery = onSearchQuery, onProfileClick = onProfileClick)
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            scope.launch {
-                isRefreshing = true
-                delay(1500)
-                isRefreshing = false
-            }
-        },
-        modifier = modifier.fillMaxSize()
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            HomeTopBar(onSearchQuery = onSearchQuery, onProfileClick = onProfileClick)
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-            ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
             item { Spacer(modifier = Modifier.height(7.dp)) }
             item { QuickPicksRow() }
             item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -205,7 +189,6 @@ private fun HomeScreenContent(
                 }
             }
             item { Spacer(modifier = Modifier.height(27.dp)) }
-            }
         }
     }
 }
@@ -216,6 +199,8 @@ private fun HomeTopBar(
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var searchText by remember { mutableStateOf("") }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -228,24 +213,70 @@ private fun HomeTopBar(
             painter = ResonaLogoIcon(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(66.dp)
+            modifier = Modifier.size(59.dp)
         )
-        Spacer(modifier = Modifier.weight(1f))
-        IconButton(onClick = { onSearchQuery("") }) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = "Search",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
+        Spacer(modifier = Modifier.width(6.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .height(38.dp)
+                .padding(start = 12.dp, end = 4.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                TextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = {
+                        Text(
+                            "Search...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.offset(y = (-1).dp)
+                        )
+                    },
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            if (searchText.isNotBlank()) {
+                                onSearchQuery(searchText)
+                                searchText = ""
+                            }
+                        }
+                    ),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        cursorColor = MaterialTheme.colorScheme.onSurface,
+                    )
+                )
+            }
         }
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         IconButton(onClick = onProfileClick) {
             Icon(
                 imageVector = Icons.Outlined.AccountCircle,
                 contentDescription = "Profile",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(27.dp)
             )
         }
     }
@@ -298,10 +329,9 @@ private fun RecommendedSection(
         ) {
             Text(
                 text = "Recommended For You",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.displayMedium,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
-                fontWeight = FontWeight.Bold
+                fontFamily = MontserratFontFamily
             )
         }
 
@@ -363,20 +393,22 @@ private fun RecommendedCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(14.dp)
+                    .padding(20.dp)
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 14.sp
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     maxLines = 1,
+                    fontSize = 5.sp
                 )
             }
         }
@@ -400,10 +432,9 @@ private fun TrendingSection(
         ) {
             Text(
                 text = "Trending",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.displayMedium,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
-                fontWeight = FontWeight.Bold
+                fontFamily = MontserratFontFamily
             )
         }
 
@@ -502,10 +533,9 @@ private fun TopArtistsSection(
             Column {
                 Text(
                     text = "Your Top Artists",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    fontFamily = JosefinSansFontFamily,
-                    fontWeight = FontWeight.Bold
+                    fontFamily = MontserratFontFamily
                 )
                 Text(
                     text = "Based on your listening habits from the last 30 days.",
@@ -582,7 +612,7 @@ private fun NewForYouSection(
                 text = "New for You",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
+                fontFamily = MontserratFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -670,7 +700,7 @@ private fun NewForYouRow(
         Spacer(modifier = Modifier.width(14.dp))
 
         Icon(
-            imageVector = Icons.Outlined.MoreVert,
+            imageVector = Icons.Outlined.MoreHoriz,
             contentDescription = "More",
             tint = MaterialTheme.colorScheme.outline
         )

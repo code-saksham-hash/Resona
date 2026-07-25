@@ -1,4 +1,4 @@
-package com.resona.music.ui.nowplaying
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -17,15 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.DropdownMenu
@@ -47,26 +43,51 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.resona.music.domain.model.Song
-import com.resona.music.feature.player.R
-import com.resona.music.playback.PlayerUiState
 import com.resona.music.ui.theme.ResonaTheme
+
+data class PlayerTrack(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val thumbnailUrl: String,
+    val durationMs: Long = 0L
+)
+
+data class PlayerUiState(
+    val currentTrack: PlayerTrack? = null,
+    val isPlaying: Boolean = false,
+    val position: Long = 0L,
+    val duration: Long = 0L,
+    val error: String? = null
+)
+
+private val previewTrack = PlayerTrack(
+    id = "1",
+    title = "Midnight City",
+    artist = "M83",
+    thumbnailUrl = "https://picsum.photos/seed/nowplaying/400/400",
+    durationMs = 244_000L
+)
 
 @Composable
 fun NowPlayingScreen(
-    uiState: PlayerUiState,
-    onTogglePlayPause: () -> Unit,
-    onSeek: (positionMs: Long) -> Unit,
-    onSkipNext: () -> Unit,
-    onSkipPrevious: () -> Unit,
-    onQueueClick: () -> Unit,
-    onDownloadClick: () -> Unit = {},
-    onToggleLike: () -> Unit = {},
-    onBack: () -> Unit,
+    uiState: PlayerUiState = PlayerUiState(
+        currentTrack = previewTrack,
+        isPlaying = true,
+        position = 87_000L,
+        duration = 244_000L
+    ),
+    onTogglePlayPause: () -> Unit = {},
+    onSeek: (positionMs: Long) -> Unit = {},
+    onSkipNext: () -> Unit = {},
+    onSkipPrevious: () -> Unit = {},
+    onQueueClick: () -> Unit = {},
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -92,39 +113,41 @@ fun NowPlayingScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 27.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 AlbumArt(
-                    thumbnailUrl = track.highResThumbnailUrl,
+                    thumbnailUrl = track.thumbnailUrl,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(27.dp))
 
                 Text(
                     text = track.title,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
 
                 Text(
                     text = track.artist,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(27.dp))
 
                 SeekBar(
                     position = uiState.position,
@@ -133,20 +156,18 @@ fun NowPlayingScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 PlaybackControls(
                     isPlaying = uiState.isPlaying,
                     onTogglePlayPause = onTogglePlayPause,
                     onSkipNext = onSkipNext,
-                    onSkipPrevious = onSkipPrevious,
-                    onToggleLike = onToggleLike,
-                    onDownloadClick = onDownloadClick
+                    onSkipPrevious = onSkipPrevious
                 )
 
                 val playError = uiState.error
                 if (playError != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
                         text = playError,
                         style = MaterialTheme.typography.bodyMedium,
@@ -156,7 +177,7 @@ fun NowPlayingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(27.dp))
             }
         }
     }
@@ -173,7 +194,7 @@ private fun NowPlayingTopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(horizontal = 3.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {
@@ -188,7 +209,7 @@ private fun NowPlayingTopBar(
 
         IconButton(onClick = onQueueClick) {
             Icon(
-                painter = painterResource(R.drawable.ic_queue),
+                imageVector = Icons.Outlined.QueueMusic,
                 contentDescription = "Queue",
                 tint = MaterialTheme.colorScheme.onSurface
             )
@@ -207,17 +228,11 @@ private fun NowPlayingTopBar(
                 onDismissRequest = { overflowExpanded = false }
             ) {
                 DropdownMenuItem(
-                    text = { Text("Add to playlist") },
+                    text = { Text("Like") },
                     onClick = { overflowExpanded = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("Download") },
-                    onClick = {
-                        overflowExpanded = false
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Share") },
+                    text = { Text("Add to playlist") },
                     onClick = { overflowExpanded = false }
                 )
             }
@@ -235,7 +250,7 @@ private fun AlbumArt(thumbnailUrl: String, modifier: Modifier = Modifier) {
         error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.large)
     )
 }
 
@@ -289,96 +304,58 @@ private fun PlaybackControls(
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
-    onToggleLike: () -> Unit = {},
-    onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onSkipPrevious, modifier = Modifier.size(41.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.SkipPrevious,
+                contentDescription = "Previous",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(20.dp))
+
+        Box(
+            modifier = Modifier
+                .size(61.dp)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable(onClick = onTogglePlayPause),
+            contentAlignment = Alignment.Center
         ) {
-            IconButton(
-                onClick = onToggleLike,
-                modifier = Modifier.size(44.dp)
-            ) {
+            if (isPlaying) {
                 Icon(
-                    imageVector = Icons.Outlined.FavoriteBorder,
-                    contentDescription = "Like",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(26.dp)
+                    painter = painterResource(com.resona.music.feature.player.R.drawable.ic_pause),
+                    contentDescription = "Pause",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(27.dp)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.PlayArrow,
+                    contentDescription = "Play",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(27.dp)
                 )
             }
+        }
 
-            Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(20.dp))
 
-            IconButton(
-                onClick = onSkipPrevious,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.SkipPrevious,
-                    contentDescription = "Previous",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-                    .clickable(onClick = onTogglePlayPause),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isPlaying) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_pause),
-                        contentDescription = "Pause",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.PlayArrow,
-                        contentDescription = "Play",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            IconButton(
-                onClick = onSkipNext,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.SkipNext,
-                    contentDescription = "Next",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            IconButton(
-                onClick = onDownloadClick,
-                modifier = Modifier.size(44.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Download,
-                    contentDescription = "Download",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
+        IconButton(onClick = onSkipNext, modifier = Modifier.size(41.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.SkipNext,
+                contentDescription = "Next",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
@@ -390,31 +367,11 @@ private fun formatDuration(millis: Long): String {
     return "%d:%02d".format(minutes, seconds)
 }
 
-private val previewTrack = Song(
-    videoId = "1",
-    title = "Midnight City",
-    artist = "M83",
-    thumbnailUrl = ""
-)
-
 @Preview(showBackground = true, name = "Playing")
 @Composable
 private fun NowPlayingScreenPlayingPreview() {
     ResonaTheme {
-        NowPlayingScreen(
-            uiState = PlayerUiState(
-                currentTrack = previewTrack,
-                isPlaying = true,
-                position = 87_000L,
-                duration = 244_000L
-            ),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen()
     }
 }
 
@@ -422,20 +379,7 @@ private fun NowPlayingScreenPlayingPreview() {
 @Composable
 private fun NowPlayingScreenPlayingDarkPreview() {
     ResonaTheme(darkTheme = true) {
-        NowPlayingScreen(
-            uiState = PlayerUiState(
-                currentTrack = previewTrack,
-                isPlaying = true,
-                position = 87_000L,
-                duration = 244_000L
-            ),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen()
     }
 }
 
@@ -443,14 +387,6 @@ private fun NowPlayingScreenPlayingDarkPreview() {
 @Composable
 private fun NowPlayingScreenEmptyPreview() {
     ResonaTheme {
-        NowPlayingScreen(
-            uiState = PlayerUiState(),
-            onTogglePlayPause = {},
-            onSeek = {},
-            onSkipNext = {},
-            onSkipPrevious = {},
-            onQueueClick = {},
-            onBack = {}
-        )
+        NowPlayingScreen(uiState = PlayerUiState())
     }
 }
