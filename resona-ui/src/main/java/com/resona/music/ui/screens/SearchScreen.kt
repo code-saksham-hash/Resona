@@ -1,0 +1,544 @@
+package com.resona.music.ui.screens
+
+import android.content.res.Configuration
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.resona.music.ui.theme.NocturneOutlinedButton
+import com.resona.music.ui.theme.ResonaTheme
+
+data class Genre(
+    val name: String,
+    val imageUrl: String,
+    val isFeatured: Boolean = false
+)
+
+data class TrendingAlbum(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val imageUrl: String
+)
+
+data class Creator(
+    val id: String,
+    val name: String,
+    val imageUrl: String
+)
+
+private val mockGenres = listOf(
+    Genre("Experimental", "https://picsum.photos/seed/genre1/400/400", isFeatured = true),
+    Genre("Jazz", "https://picsum.photos/seed/genre2/400/400"),
+    Genre("Techno", "https://picsum.photos/seed/genre3/400/400"),
+    Genre("Piano", "https://picsum.photos/seed/genre4/400/400"),
+    Genre("Glitch", "https://picsum.photos/seed/genre5/400/400"),
+)
+
+@Composable
+fun SearchScreen(
+    modifier: Modifier = Modifier,
+    onGenreClick: (String) -> Unit = {},
+    onProfileClick: () -> Unit = {},
+) {
+    var query by remember { mutableStateOf("") }
+
+    ExploreContent(
+        query = query,
+        onQueryChange = { query = it },
+        onGenreClick = onGenreClick,
+        onProfileClick = onProfileClick,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun ExploreContent(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onGenreClick: (String) -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
+            item { SearchBarSection(query = query, onQueryChange = onQueryChange) }
+
+            if (query.isBlank()) {
+                item { Spacer(modifier = Modifier.height(10.dp)) }
+                item { RecentTags() }
+                item { Spacer(modifier = Modifier.height(27.dp)) }
+                item { GenreGrid(onGenreClick = onGenreClick) }
+                item { Spacer(modifier = Modifier.height(27.dp)) }
+                item { TrendingNowSection() }
+                item { Spacer(modifier = Modifier.height(41.dp)) }
+                item { FeaturedCreatorsSection() }
+                item { Spacer(modifier = Modifier.height(68.dp)) }
+            } else {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(27.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchBarSection(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 11.dp, end = 17.dp)
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .height(38.dp)
+            .padding(horizontal = 8.dp, vertical = 0.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.weight(1f),
+                placeholder = {
+                    Text(
+                        "Search...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                        modifier = Modifier.offset(y = (-1).dp)
+                    )
+                },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = {}),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.onSurface,
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentTags(modifier: Modifier = Modifier) {
+    val tags = listOf("Deep Ambient", "Glitch Jazz", "Post-Piano")
+    val scrollState = rememberScrollState()
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .padding(horizontal = 17.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        tags.forEachIndexed { index, tag ->
+            SuggestionChip(
+                onClick = { },
+                label = {
+                    Text(
+                        text = if (index == 0) "Recent: $tag" else tag,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                },
+                colors = SuggestionChipDefaults.suggestionChipColors(
+                    containerColor = if (index == 0)
+                        MaterialTheme.colorScheme.surfaceContainer
+                    else
+                        Color.Transparent,
+                    labelColor = MaterialTheme.colorScheme.onSurface
+                ),
+                border = SuggestionChipDefaults.suggestionChipBorder(
+                    borderColor = MaterialTheme.colorScheme.outlineVariant,
+                    enabled = true
+                ),
+                shape = MaterialTheme.shapes.extraLarge
+            )
+        }
+    }
+}
+
+@Composable
+private fun GenreGrid(
+    onGenreClick: (String) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.padding(horizontal = 17.dp)) {
+        Text(
+            text = "Sonic Landscapes",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                GenreCard(
+                    name = mockGenres[0].name,
+                    imageUrl = mockGenres[0].imageUrl,
+                    isFeatured = true,
+                    onClick = { onGenreClick(mockGenres[0].name) },
+                    modifier = Modifier.weight(2f)
+                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    GenreCard(name = mockGenres[1].name, imageUrl = mockGenres[1].imageUrl, onClick = { onGenreClick(mockGenres[1].name) })
+                    GenreCard(name = mockGenres[2].name, imageUrl = mockGenres[2].imageUrl, onClick = { onGenreClick(mockGenres[2].name) })
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                GenreCard(name = mockGenres[3].name, imageUrl = mockGenres[3].imageUrl, onClick = { onGenreClick(mockGenres[3].name) }, modifier = Modifier.weight(1f))
+                GenreCard(name = mockGenres[4].name, imageUrl = mockGenres[4].imageUrl, onClick = { onGenreClick(mockGenres[4].name) }, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun GenreCard(
+    name: String,
+    imageUrl: String,
+    isFeatured: Boolean = false,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onClick)
+    ) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+        )
+        Box(
+            modifier = modifier
+                .align(if (isFeatured) Alignment.BottomStart else Alignment.Center)
+                .padding(if (isFeatured) 20.dp else 0.dp)
+        ) {
+            if (isFeatured) {
+                Column {
+                    Text(
+                        text = "GENRE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                    Text(
+                        text = name,
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrendingNowSection(modifier: Modifier = Modifier) {
+    val scrollState = rememberScrollState()
+
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 17.dp)
+        ) {
+            Column {
+                Text(
+                    text = "Trending Now",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                Text(
+                    text = "High Fidelity Signals",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState)
+                .padding(horizontal = 17.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            TrendingCard(
+                title = "Ether Drift",
+                artist = "Vanish In Dust",
+                imageUrl = "https://picsum.photos/seed/trending1/400/300",
+                onClick = {}
+            )
+            TrendingCard(
+                title = "Monolith IV",
+                artist = "Structural Integrity",
+                imageUrl = "https://picsum.photos/seed/trending2/400/300",
+                onClick = {}
+            )
+            TrendingCard(
+                title = "Surface Tension",
+                artist = "Kinesis",
+                imageUrl = "https://picsum.photos/seed/trending3/400/300",
+                onClick = {}
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrendingCard(
+    title: String,
+    artist: String,
+    imageUrl: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(204.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(4f / 3f)
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+        ) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
+                    .clickable { },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.PlayArrow,
+                    contentDescription = "Play",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = Icons.Outlined.MoreVert,
+                contentDescription = "More",
+                tint = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeaturedCreatorsSection(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 17.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Featured CREATORS",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            CreatorAvatar(name = "AELOS", imageUrl = "https://picsum.photos/seed/creator1/200/200")
+            CreatorAvatar(name = "K\u00d8HL", imageUrl = "https://picsum.photos/seed/creator2/200/200")
+            CreatorAvatar(name = "OBSCURA", imageUrl = "https://picsum.photos/seed/creator3/200/200")
+        }
+    }
+}
+
+@Composable
+private fun CreatorAvatar(
+    name: String,
+    imageUrl: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier
+                .size(85.dp)
+                .clip(CircleShape)
+        )
+        Spacer(modifier = Modifier.height(7.dp))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Explore")
+@Composable
+private fun SearchScreenPreview() {
+    ResonaTheme {
+        ExploreContent(
+            query = "",
+            onQueryChange = {},
+            onGenreClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "Explore Dark")
+@Composable
+private fun SearchScreenDarkPreview() {
+    ResonaTheme(darkTheme = true) {
+        ExploreContent(
+            query = "",
+            onQueryChange = {},
+            onGenreClick = {}
+        )
+    }
+}
