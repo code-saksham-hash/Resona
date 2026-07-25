@@ -155,7 +155,13 @@ fun ResonaNavGraph() {
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable(ResonaDestination.Library.route) { LibraryScreen() }
+            composable(ResonaDestination.Library.route) {
+                LibraryScreen(
+                    onSearchClick = {
+                        navController.navigate(ResonaDestination.Search.route)
+                    },
+                )
+            }
         }
     }
 }
