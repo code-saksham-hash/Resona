@@ -1,4 +1,4 @@
-package com.resona.music.ui.library
+package com.resona.music.ui.screens
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -21,18 +21,11 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,8 +36,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaTheme
 
@@ -77,43 +68,27 @@ fun LibraryScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LibraryScreenContent(
     onTrackClick: (DownloadTrack) -> Unit = {},
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var isRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    Column(modifier = modifier.fillMaxSize()) {
+        LibraryTopBar(onProfileClick = onProfileClick)
 
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            scope.launch {
-                isRefreshing = true
-                delay(1500)
-                isRefreshing = false
-            }
-        },
-        modifier = modifier.fillMaxSize()
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            LibraryTopBar(onProfileClick = onProfileClick)
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-            ) {
-                item { LibraryHeader() }
-                item { Spacer(modifier = Modifier.height(20.dp)) }
-                item { DownloadToggle(isDownloadedOnly = false, onToggle = {}) }
-                item { Spacer(modifier = Modifier.height(20.dp)) }
-                item { DownloadTracksSection(tracks = mockTracks, onTrackClick = onTrackClick) }
-                item { StatsFooter(trackCount = 4, storageUsed = "42.5 MB") }
-                item { Spacer(modifier = Modifier.height(68.dp)) }
-            }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
+            item { LibraryHeader() }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+            item { DownloadToggle(isDownloadedOnly = false, onToggle = {}) }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+            item { DownloadTracksSection(tracks = mockTracks, onTrackClick = onTrackClick) }
+            item { StatsFooter(trackCount = 4, storageUsed = "42.5 MB") }
+            item { Spacer(modifier = Modifier.height(68.dp)) }
         }
     }
 }
