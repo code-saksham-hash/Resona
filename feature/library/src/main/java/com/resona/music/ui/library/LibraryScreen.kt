@@ -188,7 +188,7 @@ private fun LibraryHeader(modifier: Modifier = Modifier) {
 private fun QuickLinksSection(modifier: Modifier = Modifier) {
     val quickLinks = listOf(
         QuickLink("liked", "Liked Songs", "Your favorites", Icons.Outlined.FavoriteBorder, Color(0xFFFFFFFF)),
-        QuickLink("downloads", "Downloads", "Offline tracks", Icons.Outlined.DownloadDone, Color(0xFF43A047)),
+        QuickLink("downloads", "Downloads", "Offline tracks", Icons.Outlined.DownloadDone, Color(0xFFFFFFFF)),
     )
 
     Row(
