@@ -1,0 +1,19 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.hprof
+
+# Every module's build output (app, core/*, feature/*), not just app's --
+# matches at any depth so new modules don't need a manual entry here.
+**/build/
+release/
+
+# Local Claude Code state (permissions, scheduled-task lock) -- machine-local,
+# not project source.
+.claude/
