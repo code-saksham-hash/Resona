@@ -20,6 +20,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Resona"
+include(":app")
 include(":core:domain")
 include(":core:data")
 include(":core:player")

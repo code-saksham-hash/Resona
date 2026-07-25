@@ -1,0 +1,6 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. The real theming (Material 3 + dynamic color) is
+         applied in Kotlin via ResonaTheme; this only prevents a flash of an
+         unstyled window before Compose takes over. -->
+    <style name="Theme.Resona" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

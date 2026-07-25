@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Resona</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_now_playing">Now Playing</string>
+    <string name="nav_library">Library</string>
+</resources>
