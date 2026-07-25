@@ -1,8 +1,10 @@
 package com.resona.music.playback
 
 import android.content.Intent
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
@@ -16,7 +18,13 @@ import com.resona.music.core.player.R
  * ready-to-play [androidx.media3.common.MediaItem], so this class only ever
  * deals with playback mechanics (player, session, notification, foreground
  * lifecycle), never networking.
+ *
+ * [DefaultMediaNotificationProvider] is marked `@UnstableApi` by Media3
+ * itself (via androidx.annotation.RequiresOptIn, not Kotlin's own
+ * @OptIn/@RequiresOptIn) -- that's what the class-level @OptIn below is
+ * silencing, not a real stability concern in how it's used here.
  */
+@OptIn(markerClass = [UnstableApi::class])
 class PlayerService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
