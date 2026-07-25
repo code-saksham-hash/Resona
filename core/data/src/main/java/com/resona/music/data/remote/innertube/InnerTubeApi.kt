@@ -1,7 +1,11 @@
 package com.resona.music.data.remote.innertube
 
+import com.resona.music.data.remote.innertube.models.BrowseRequest
+import com.resona.music.data.remote.innertube.models.BrowseResponse
 import com.resona.music.data.remote.innertube.models.ClientInfo
 import com.resona.music.data.remote.innertube.models.InnerTubeContext
+import com.resona.music.data.remote.innertube.models.NextRequest
+import com.resona.music.data.remote.innertube.models.NextResponse
 import com.resona.music.data.remote.innertube.models.PlayerRequest
 import com.resona.music.data.remote.innertube.models.PlayerResponse
 import com.resona.music.data.remote.innertube.models.SearchRequest
@@ -13,9 +17,24 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.request.url
+import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import javax.inject.Inject
+
+/**
+ * Thrown when InnerTube responds with a non-2xx status. The shared
+ * [HttpClient] sets `expectSuccess = false` (so error bodies can be
+ * inspected instead of Ktor throwing generically), which means every call
+ * site is responsible for checking [HttpResponse.status] itself -- otherwise
+ * a 4xx/5xx response just gets deserialized as if it were a normal, empty
+ * result (every field in these response models is nullable/defaulted), and
+ * a real outage or block silently looks like "no results" instead of an
+ * error.
+ */
+class InnerTubeHttpException(val statusCode: Int) :
+    Exception("InnerTube request failed with HTTP $statusCode")
 
 /**
  * Thin wrapper around YouTube Music's undocumented InnerTube API.
@@ -38,17 +57,42 @@ class InnerTubeApi @Inject constructor(
     private val httpClient: HttpClient
 ) {
 
-    suspend fun search(query: String): SearchResponse =
-        httpClient.post("$BASE_URL/search") {
+    suspend fun search(query: String): SearchResponse {
+        val response = httpClient.post("$BASE_URL/search") {
             applyInnerTubeDefaults()
             setBody(SearchRequest(context = webRemixContext(), query = query))
-        }.body()
+        }
+        if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
+        return response.body()
+    }
 
     suspend fun getPlayerResponse(videoId: String): PlayerResponse =
         httpClient.post("$BASE_URL/player") {
             applyInnerTubeDefaults()
             setBody(PlayerRequest(context = webRemixContext(), videoId = videoId))
         }.body()
+
+    /** Backs both the home feed's playlist carousels (browseId "FEmusic_home")
+     *  and a single playlist's track listing (browseId "VL<playlistId>"). */
+    suspend fun browse(browseId: String): BrowseResponse {
+        val response = httpClient.post("$BASE_URL/browse") {
+            applyInnerTubeDefaults()
+            setBody(BrowseRequest(context = webRemixContext(), browseId = browseId))
+        }
+        if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
+        return response.body()
+    }
+
+    /** The "up next" watch panel for [videoId] -- only used for its Lyrics tab
+     *  browseId (see NextResponse.extractLyricsBrowseId in LyricsModels.kt). */
+    suspend fun next(videoId: String): NextResponse {
+        val response = httpClient.post("$BASE_URL/next") {
+            applyInnerTubeDefaults()
+            setBody(NextRequest(context = webRemixContext(), videoId = videoId))
+        }
+        if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
+        return response.body()
+    }
 
     private fun HttpRequestBuilder.applyInnerTubeDefaults() {
         url {
