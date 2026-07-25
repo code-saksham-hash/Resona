@@ -13,7 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +43,9 @@ fun MiniPlayerBar(
     isPlaying: Boolean,
     onTogglePlayPause: () -> Unit,
     onClick: () -> Unit,
+    isLooping: Boolean = false,
+    onToggleRepeat: () -> Unit = {},
+    onCancel: () -> Unit = {},
     error: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -66,7 +73,7 @@ fun MiniPlayerBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                .padding(horizontal = 14.dp, vertical = 7.dp),
+                .padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
@@ -106,9 +113,16 @@ fun MiniPlayerBar(
                 }
             }
 
-            Spacer(modifier = Modifier.width(7.dp))
+            IconButton(onClick = onToggleRepeat, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = if (isLooping) Icons.Filled.RepeatOne else Icons.Outlined.Repeat,
+                    contentDescription = if (isLooping) "Repeat one: on" else "Repeat: off",
+                    tint = if (isLooping) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
 
-            IconButton(onClick = onTogglePlayPause) {
+            IconButton(onClick = onTogglePlayPause, modifier = Modifier.size(36.dp)) {
                 if (isPlaying) {
                     Icon(
                         painter = painterResource(R.drawable.ic_pause),
@@ -122,6 +136,15 @@ fun MiniPlayerBar(
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
+            }
+
+            IconButton(onClick = onCancel, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = "Stop and close",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -147,13 +170,14 @@ private fun MiniPlayerBarPlayingPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Paused")
+@Preview(showBackground = true, name = "Paused, looping")
 @Composable
 private fun MiniPlayerBarPausedPreview() {
     ResonaTheme {
         MiniPlayerBar(
             track = previewTrack,
             isPlaying = false,
+            isLooping = true,
             onTogglePlayPause = {},
             onClick = {}
         )

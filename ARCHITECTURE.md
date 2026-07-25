@@ -20,7 +20,9 @@ graph TD
     core_data --> core_domain
     core_player --> core_domain
 
+    feature_home --> core_domain
     feature_home --> core_ui
+    feature_library --> core_domain
     feature_library --> core_ui
     feature_search --> core_domain
     feature_search --> core_ui
@@ -39,14 +41,14 @@ another `:feature:*` module or on `:core:data` directly.
 | Module | Type | Depends on | Contains |
 |---|---|---|---|
 | `:app` | Android application | everything | `MainActivity`, `ResonaApplication`, `NavGraph`/`Destinations`, the three Hilt `@Module`s (`AppModule`, `NetworkModule`, `RepositoryModule`) |
-| `:core:domain` | Kotlin/JVM (no Android) | — | `Song`, `MusicRepository` interface, `StreamSource`, `PlaybackUnavailableException`/`StreamCipherRequiredException` |
-| `:core:data` | Android library | `:core:domain` | InnerTube/Ktor networking (`InnerTubeApi`, response models), `MusicRepositoryImpl`, and `extractor/` (stream URL resolution -- see `NOTICE.md`). Room would live here too if/when it's added. |
-| `:core:player` | Android library | `:core:domain` | `PlayerService` (ExoPlayer + MediaSession foreground service), `PlayerViewModel`/`PlayerUiState`, `PlaybackDataSourceModule` |
+| `:core:domain` | Kotlin/JVM (no Android) | — | `Song`, `HomeFeed`/`HomeFeedSection`/`ArtistSpotlight`, `DownloadedSong`, `MusicRepository` interface, `StreamSource`, `PlaybackUnavailableException`/`StreamCipherRequiredException` |
+| `:core:data` | Android library | `:core:domain` | InnerTube/Ktor networking (`InnerTubeApi`, response models), `MusicRepositoryImpl`, `extractor/` (stream URL resolution -- see `NOTICE.md`), and `download/` (`SongDownloader`, `DownloadedSongsStore` -- fetches and persists offline copies of a resolved stream). Room would live here too if/when it's added. |
+| `:core:player` | Android library | `:core:domain` | `PlayerService` (ExoPlayer + MediaSession foreground service), `PlayerViewModel`/`PlayerUiState`/`DownloadState`, `PlaybackDataSourceModule` |
 | `:core:ui` | Android library (Compose) | — | Theme, colors, typography, shapes, shared composables (`ResonaFilledButton`, `ResonaOutlinedButton`, `ResonaPlaceholderScreenContent`) |
-| `:feature:home` | Android library (Compose) | `:core:ui` | `HomeScreen` |
+| `:feature:home` | Android library (Compose) | `:core:domain`, `:core:ui` | `HomeScreen`, `HomeViewModel` |
 | `:feature:search` | Android library (Compose) | `:core:domain`, `:core:ui`, `:core:player` | `SearchScreen`, `SearchViewModel` |
 | `:feature:player` | Android library (Compose) | `:core:domain`, `:core:ui`, `:core:player` | `NowPlayingScreen`, `MiniPlayerBar` |
-| `:feature:library` | Android library (Compose) | `:core:ui` | `LibraryScreen` |
+| `:feature:library` | Android library (Compose) | `:core:domain`, `:core:ui` | `LibraryScreen`, `LibraryViewModel` |
 
 `:core:domain` is a plain `kotlin("jvm")` module, not an Android library --
 it cannot reference `android.*` or `androidx.*` at all, which is what
@@ -74,22 +76,25 @@ documenting it.
 
    Two nuances worth knowing:
 
-   - `:core:data`, `:core:player`, and `:feature:search` still each have
-     Hilt's `kapt`/`hilt-android` applied, because `MusicRepositoryImpl`,
-     `InnerTubeApi`, `PlayerViewModel`, and `SearchViewModel` all use
+   - `:core:data`, `:core:player`, `:feature:home`, `:feature:search`, and
+     `:feature:library` still each have Hilt's `kapt`/`hilt-android` applied,
+     because `MusicRepositoryImpl`, `InnerTubeApi`, `PlayerViewModel`,
+     `HomeViewModel`, `SearchViewModel`, and `LibraryViewModel` all use
      `@Inject constructor`/`@HiltViewModel`, and Dagger's annotation processor
      has to run in the module where those are *declared* to generate their
      factory classes. That's different from *wiring* (deciding which
      concrete class satisfies which interface via `@Module`), which is what
      stays exclusive to `:app`.
-   - `:core:data` has one `@Module` of its own: `extractor/ExtractorModule.kt`
-     binds `JsEngine` to `WebViewJsEngine`. This doesn't break the rule above
-     because `JsEngine` isn't a domain-to-data seam -- it's not a domain
-     concept at all, just an internal detail of how `:core:data` resolves a
-     stream URL, and no feature module or `:app` code ever needs to see it.
-     The rule is really about keeping the domain/implementation boundary
-     (the thing feature modules are shielded from) wired in one place, not
-     "literally every `@Binds` anywhere must live in `:app`."
+   - `:core:data` has two `@Module`s of its own: `extractor/ExtractorModule.kt`
+     binds `JsEngine` to `WebViewJsEngine`, and `download/DownloadModule.kt`
+     binds `SongDownloader`/`DownloadedSongsStore` to their implementations.
+     Neither breaks the rule above because none of the four are a
+     domain-to-data seam -- they're not domain concepts at all, just internal
+     details of how `:core:data` resolves a stream URL or persists a
+     downloaded file, and no feature module or `:app` code ever needs to see
+     them. The rule is really about keeping the domain/implementation
+     boundary (the thing feature modules are shielded from) wired in one
+     place, not "literally every `@Binds` anywhere must live in `:app`."
    - `:core:player` similarly has `PlaybackDataSourceModule.kt`, providing a
      single `@Singleton DefaultHttpDataSource.Factory` shared by
      `PlayerService` (which builds ExoPlayer with it) and `PlayerViewModel`

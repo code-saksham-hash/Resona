@@ -23,7 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,10 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,17 +41,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.resona.music.domain.model.ArtistSpotlight
+import com.resona.music.domain.model.HomeFeed
+import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.JosefinSansFontFamily
+import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
+import com.resona.music.ui.theme.ResonaSearchEntryBar
 import com.resona.music.ui.theme.ResonaTheme
 
 data class HomeAlbum(
@@ -69,8 +70,7 @@ data class HomeAlbum(
 data class HomeArtist(
     val id: String,
     val name: String,
-    val imageUrl: String,
-    val videoId: String = ""
+    val imageUrl: String
 )
 
 data class HomeTrack(
@@ -82,31 +82,8 @@ data class HomeTrack(
     val imageUrl: String
 )
 
-private val mockRecommended = listOf(
-    HomeAlbum("1", "Eternal Waves", "Ambient", "https://picsum.photos/seed/rec1/400/400"),
-    HomeAlbum("2", "Neon Dusk", "Electronic", "https://picsum.photos/seed/rec2/400/400"),
-    HomeAlbum("3", "Fractal Dreams", "Experimental", "https://picsum.photos/seed/rec3/400/400"),
-)
-
-private val mockTrending = listOf(
-    HomeAlbum("4", "Midnight Signal", "Synthwave", "https://picsum.photos/seed/trend1/400/400"),
-    HomeAlbum("5", "Glacier", "Ambient", "https://picsum.photos/seed/trend2/400/400"),
-    HomeAlbum("6", "Pulse", "Techno", "https://picsum.photos/seed/trend3/400/400"),
-)
-
-private val mockArtists = listOf(
-    HomeArtist("1", "Vanish In Dust", "https://picsum.photos/seed/artist1/400/400"),
-    HomeArtist("2", "Kinesis", "https://picsum.photos/seed/artist2/400/400"),
-    HomeArtist("3", "AELOS", "https://picsum.photos/seed/artist3/400/400"),
-    HomeArtist("4", "OBSCURA", "https://picsum.photos/seed/artist4/400/400"),
-)
-
-private val mockTracks = listOf(
-    HomeTrack("1", 1, "Ether Drift", "Vanish In Dust", "3:42", "https://picsum.photos/seed/track1/400/400"),
-    HomeTrack("2", 2, "Monolith IV", "Structural Integrity", "5:18", "https://picsum.photos/seed/track2/400/400"),
-    HomeTrack("3", 3, "Surface Tension", "Kinesis", "4:07", "https://picsum.photos/seed/track3/400/400"),
-    HomeTrack("4", 4, "Glass Ceiling", "AELOS", "6:01", "https://picsum.photos/seed/track4/400/400"),
-)
+private val quickPickGenres =
+    listOf("Electronic", "Ambient", "Jazz", "Hip-Hop", "Classical", "Lo-Fi", "Techno")
 
 @Composable
 fun HomeScreen(
@@ -117,8 +94,13 @@ fun HomeScreen(
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
     onTrackClick: (HomeTrack) -> Unit = {},
+    viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
     HomeScreenContent(
+        uiState = uiState,
+        onRefresh = viewModel::refresh,
         onSearchQuery = onSearchQuery,
         onExploreClick = onExploreClick,
         onProfileClick = onProfileClick,
@@ -132,83 +114,201 @@ fun HomeScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeScreenContent(
+    uiState: HomeUiState,
+    onRefresh: () -> Unit = {},
     onSearchQuery: (String) -> Unit = {},
     onExploreClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
-    onTrackClick: (HomeTrack) -> Unit,
+    onTrackClick: (HomeTrack) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var isRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
     PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            scope.launch {
-                isRefreshing = true
-                delay(1500)
-                isRefreshing = false
-            }
-        },
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = onRefresh,
         modifier = modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             HomeTopBar(onSearchQuery = onSearchQuery, onProfileClick = onProfileClick)
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-            ) {
-            item { Spacer(modifier = Modifier.height(7.dp)) }
-            item { QuickPicksRow() }
-            item { Spacer(modifier = Modifier.height(20.dp)) }
-            item { RecommendedSection(albums = mockRecommended, onAlbumClick = onAlbumClick) }
-            item { Spacer(modifier = Modifier.height(20.dp)) }
-            item { TrendingSection(albums = mockTrending, onAlbumClick = onAlbumClick) }
-            item { Spacer(modifier = Modifier.height(27.dp)) }
-            item { TopArtistsSection(artists = mockArtists, onArtistClick = onArtistClick) }
-            item { Spacer(modifier = Modifier.height(27.dp)) }
-            item { NewForYouSection(tracks = mockTracks, onTrackClick = onTrackClick) }
-            item { Spacer(modifier = Modifier.height(14.dp)) }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Don't see what you want here? Go to Explore",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(7.dp))
-                    Box(
-                        modifier = Modifier
-                            .clickable(onClick = onExploreClick)
-                            .background(
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = MaterialTheme.shapes.extraLarge
-                            )
-                            .padding(horizontal = 20.dp, vertical = 10.dp)
-                    ) {
-                        Text(
-                            text = "EXPLORE",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            letterSpacing = 0.4.sp
-                        )
-                    }
-                }
-            }
-            item { Spacer(modifier = Modifier.height(27.dp)) }
+            val feed = uiState.feed
+            when {
+                uiState.isLoading -> LoadingState(modifier = Modifier.weight(1f).fillMaxWidth())
+                feed == null -> ErrorState(
+                    message = uiState.errorMessage ?: "Couldn't load your feed",
+                    onRetry = onRefresh,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+                else -> HomeFeedList(
+                    feed = feed,
+                    onGenreClick = onSearchQuery,
+                    onExploreClick = onExploreClick,
+                    onAlbumClick = onAlbumClick,
+                    onArtistClick = onArtistClick,
+                    onTrackClick = onTrackClick,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
             }
         }
     }
 }
+
+@Composable
+private fun LoadingState(modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        CircularProgressIndicator(
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(horizontal = 32.dp)
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            NocturneOutlinedButton(
+                text = "Retry",
+                onClick = onRetry,
+                borderColor = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeFeedList(
+    feed: HomeFeed,
+    onGenreClick: (String) -> Unit,
+    onExploreClick: () -> Unit,
+    onAlbumClick: (HomeAlbum) -> Unit,
+    onArtistClick: (HomeArtist) -> Unit,
+    onTrackClick: (HomeTrack) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val recommended = feed.songsFor("recommended")
+    val trending = feed.songsFor("trending")
+    val newForYou = feed.songsFor("new")
+
+    LazyColumn(modifier = modifier) {
+        item { Spacer(modifier = Modifier.height(7.dp)) }
+        item { QuickPicksRow(onGenreClick = onGenreClick) }
+        if (recommended.isNotEmpty()) {
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+            item {
+                RecommendedSection(
+                    title = feed.titleFor("recommended", "Recommended For You"),
+                    albums = recommended.map { it.toHomeAlbum() },
+                    onAlbumClick = onAlbumClick
+                )
+            }
+        }
+        if (trending.isNotEmpty()) {
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+            item {
+                TrendingSection(
+                    title = feed.titleFor("trending", "Trending"),
+                    albums = trending.map { it.toHomeAlbum() },
+                    onAlbumClick = onAlbumClick
+                )
+            }
+        }
+        if (feed.popularArtists.isNotEmpty()) {
+            item { Spacer(modifier = Modifier.height(27.dp)) }
+            item {
+                TopArtistsSection(
+                    artists = feed.popularArtists.mapIndexed { index, artist -> artist.toHomeArtist(index) },
+                    onArtistClick = onArtistClick
+                )
+            }
+        }
+        if (newForYou.isNotEmpty()) {
+            item { Spacer(modifier = Modifier.height(27.dp)) }
+            item {
+                NewForYouSection(
+                    title = feed.titleFor("new", "New for You"),
+                    tracks = newForYou.mapIndexed { index, song -> song.toHomeTrack(index) },
+                    onTrackClick = onTrackClick
+                )
+            }
+        }
+        item { Spacer(modifier = Modifier.height(14.dp)) }
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Don't see what you want here? Go to Explore",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(7.dp))
+                Box(
+                    modifier = Modifier
+                        .clickable(onClick = onExploreClick)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = MaterialTheme.shapes.extraLarge
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = "EXPLORE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        letterSpacing = 0.4.sp
+                    )
+                }
+            }
+        }
+        item { Spacer(modifier = Modifier.height(27.dp)) }
+    }
+}
+
+private fun HomeFeed.songsFor(sectionId: String): List<Song> =
+    sections.find { it.id == sectionId }?.songs.orEmpty()
+
+private fun HomeFeed.titleFor(sectionId: String, fallback: String): String =
+    sections.find { it.id == sectionId }?.title?.takeIf { it.isNotBlank() } ?: fallback
+
+private fun Song.toHomeAlbum() = HomeAlbum(
+    id = videoId,
+    title = title,
+    subtitle = artist,
+    imageUrl = thumbnailUrl,
+    videoId = videoId
+)
+
+private fun Song.toHomeTrack(index: Int) = HomeTrack(
+    id = videoId,
+    number = index + 1,
+    title = title,
+    artist = artist,
+    duration = duration,
+    imageUrl = thumbnailUrl
+)
+
+private fun ArtistSpotlight.toHomeArtist(index: Int) = HomeArtist(
+    id = "popular_artist_$index",
+    name = name,
+    imageUrl = thumbnailUrl
+)
 
 @Composable
 private fun HomeTopBar(
@@ -228,18 +328,14 @@ private fun HomeTopBar(
             painter = ResonaLogoIcon(),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(66.dp)
+            modifier = Modifier.size(52.dp)
         )
-        Spacer(modifier = Modifier.weight(1f))
-        IconButton(onClick = { onSearchQuery("") }) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = "Search",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(10.dp))
+        ResonaSearchEntryBar(
+            onClick = { onSearchQuery("") },
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
         IconButton(onClick = onProfileClick) {
             Icon(
                 imageVector = Icons.Outlined.AccountCircle,
@@ -252,8 +348,7 @@ private fun HomeTopBar(
 }
 
 @Composable
-private fun QuickPicksRow(modifier: Modifier = Modifier) {
-    val quickPicks = listOf("Electronic", "Ambient", "Jazz", "Hip-Hop", "Classical", "Lo-Fi", "Techno")
+private fun QuickPicksRow(onGenreClick: (String) -> Unit = {}, modifier: Modifier = Modifier) {
     val scrollState = rememberScrollState()
 
     Row(
@@ -263,12 +358,12 @@ private fun QuickPicksRow(modifier: Modifier = Modifier) {
             .padding(horizontal = 17.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        quickPicks.forEach { genre ->
+        quickPickGenres.forEach { genre ->
             Box(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.extraLarge)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .clickable { }
+                    .clickable { onGenreClick(genre) }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Text(
@@ -284,6 +379,7 @@ private fun QuickPicksRow(modifier: Modifier = Modifier) {
 @Composable
 private fun RecommendedSection(
     albums: List<HomeAlbum>,
+    title: String = "Recommended For You",
     onAlbumClick: (HomeAlbum) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -297,7 +393,7 @@ private fun RecommendedSection(
                 .padding(bottom = 20.dp)
         ) {
             Text(
-                text = "Recommended For You",
+                text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontFamily = JosefinSansFontFamily,
@@ -386,6 +482,7 @@ private fun RecommendedCard(
 @Composable
 private fun TrendingSection(
     albums: List<HomeAlbum>,
+    title: String = "Trending",
     onAlbumClick: (HomeAlbum) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -399,7 +496,7 @@ private fun TrendingSection(
                 .padding(bottom = 20.dp)
         ) {
             Text(
-                text = "Trending",
+                text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontFamily = JosefinSansFontFamily,
@@ -501,14 +598,17 @@ private fun TopArtistsSection(
         ) {
             Column {
                 Text(
-                    text = "Your Top Artists",
+                    text = "Popular Artists",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
                     fontFamily = JosefinSansFontFamily,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Based on your listening habits from the last 30 days.",
+                    // There's no account/listening history in this app to
+                    // personalize against -- this is deliberately framed as
+                    // "popular right now", not "yours".
+                    text = "Trending across YouTube Music right now.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline,
                 )
@@ -568,6 +668,7 @@ private fun ArtistCard(
 @Composable
 private fun NewForYouSection(
     tracks: List<HomeTrack>,
+    title: String = "New for You",
     onTrackClick: (HomeTrack) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -579,7 +680,7 @@ private fun NewForYouSection(
                 .padding(bottom = 14.dp)
         ) {
             Text(
-                text = "New for You",
+                text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontFamily = JosefinSansFontFamily,
@@ -661,13 +762,14 @@ private fun NewForYouRow(
 
         Spacer(modifier = Modifier.width(14.dp))
 
-        Text(
-            text = track.duration,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-        )
-
-        Spacer(modifier = Modifier.width(14.dp))
+        if (track.duration.isNotBlank()) {
+            Text(
+                text = track.duration,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+        }
 
         Icon(
             imageVector = Icons.Outlined.MoreVert,
@@ -677,11 +779,43 @@ private fun NewForYouRow(
     }
 }
 
+private val previewHomeFeed = HomeFeed(
+    sections = listOf(
+        com.resona.music.domain.model.HomeFeedSection(
+            id = "recommended",
+            title = "Recommended For You",
+            songs = listOf(
+                Song("1", "Eternal Waves", "Ambient Collective", "https://picsum.photos/seed/rec1/400/400", "3:12"),
+                Song("2", "Neon Dusk", "Night Drive", "https://picsum.photos/seed/rec2/400/400", "4:01"),
+            )
+        ),
+        com.resona.music.domain.model.HomeFeedSection(
+            id = "trending",
+            title = "Trending Now",
+            songs = listOf(
+                Song("3", "Midnight Signal", "Synthwave Union", "https://picsum.photos/seed/trend1/400/400", "3:45"),
+            )
+        ),
+        com.resona.music.domain.model.HomeFeedSection(
+            id = "new",
+            title = "New For You",
+            songs = listOf(
+                Song("4", "Ether Drift", "Vanish In Dust", "https://picsum.photos/seed/track1/400/400", "3:42"),
+                Song("5", "Monolith IV", "Structural Integrity", "https://picsum.photos/seed/track2/400/400", "5:18"),
+            )
+        ),
+    ),
+    popularArtists = listOf(
+        ArtistSpotlight("Vanish In Dust", "https://picsum.photos/seed/artist1/400/400"),
+        ArtistSpotlight("Kinesis", "https://picsum.photos/seed/artist2/400/400"),
+    )
+)
+
 @Preview(showBackground = true)
 @Composable
 private fun HomeScreenLightPreview() {
     ResonaTheme {
-        HomeScreenContent(onTrackClick = {})
+        HomeScreenContent(uiState = HomeUiState(isLoading = false, feed = previewHomeFeed))
     }
 }
 
@@ -689,6 +823,24 @@ private fun HomeScreenLightPreview() {
 @Composable
 private fun HomeScreenDarkPreview() {
     ResonaTheme {
-        HomeScreenContent(onTrackClick = {})
+        HomeScreenContent(uiState = HomeUiState(isLoading = false, feed = previewHomeFeed))
+    }
+}
+
+@Preview(showBackground = true, name = "Loading")
+@Composable
+private fun HomeScreenLoadingPreview() {
+    ResonaTheme {
+        HomeScreenContent(uiState = HomeUiState(isLoading = true))
+    }
+}
+
+@Preview(showBackground = true, name = "Error")
+@Composable
+private fun HomeScreenErrorPreview() {
+    ResonaTheme {
+        HomeScreenContent(
+            uiState = HomeUiState(isLoading = false, errorMessage = "Unable to resolve host \"music.youtube.com\"")
+        )
     }
 }

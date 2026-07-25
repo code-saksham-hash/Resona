@@ -70,6 +70,9 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.core)
+    // The bottom nav bar's icons (Explore, LibraryMusic, PlayCircle, etc.)
+    // aren't in the core icon set.
+    implementation(libs.androidx.material.icons.extended)
 
     // Navigation Compose
     implementation(libs.androidx.navigation.compose)

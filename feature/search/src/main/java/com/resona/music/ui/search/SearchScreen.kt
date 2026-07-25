@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,11 +22,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
@@ -55,8 +56,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,6 +74,7 @@ import kotlinx.coroutines.launch
 import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.ResonaLogoIcon
+import com.resona.music.ui.theme.ResonaSearchEntryBar
 import com.resona.music.ui.theme.ResonaTheme
 
 data class Genre(
@@ -748,18 +752,14 @@ fun ExploreScreen(
                 painter = ResonaLogoIcon(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(66.dp)
+                modifier = Modifier.size(52.dp)
             )
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = onSearchClick) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = "Search",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(10.dp))
+            ResonaSearchEntryBar(
+                onClick = onSearchClick,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
             IconButton(onClick = onProfileClick) {
                 Icon(
                     imageVector = Icons.Outlined.AccountCircle,
@@ -773,8 +773,74 @@ fun ExploreScreen(
     }
 }
 
+/**
+ * A search field built on [BasicTextField] rather than Material3's [TextField]
+ * -- the stock component's internal padding assumes its ~56dp default height,
+ * so constraining it down to a compact pill with `heightIn(max = ...)` left it
+ * looking cramped/off-center instead of actually shrinking. Owning the box,
+ * padding, and icon layout directly gives a clean, fully-rounded pill at
+ * exactly the size this screen wants.
+ */
+@Composable
+private fun RoundedSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Box(modifier = Modifier.weight(1f)) {
+            if (query.isEmpty()) {
+                Text(
+                    text = "Search...",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                )
+            }
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                textStyle = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                singleLine = true,
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        if (query.isNotEmpty()) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "Clear search",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .size(18.dp)
+                    .clickable { onQueryChange("") }
+            )
+        }
+    }
+}
+
 @Composable
 fun SearchPage(
+    initialQuery: String = "",
     onBack: () -> Unit = {},
     onSongClick: (Song) -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
@@ -782,9 +848,16 @@ fun SearchPage(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+        if (initialQuery.isNotBlank()) viewModel.onQueryChange(initialQuery)
+        // The field may not be attached to the composition/layout tree yet
+        // on the very first frame after navigating here (e.g. mid-transition),
+        // in which case Compose throws IllegalStateException("FocusRequester
+        // is not initialized") -- losing autofocus is a fair trade for never
+        // crashing the screen over it.
+        runCatching { focusRequester.requestFocus() }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -803,43 +876,20 @@ fun SearchPage(
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
-            TextField(
-                value = query,
-                onValueChange = viewModel::onQueryChange,
+            RoundedSearchField(
+                query = query,
+                onQueryChange = viewModel::onQueryChange,
+                onSearch = {
+                    // Search already runs on a debounce as the user types;
+                    // this just lets pressing the keyboard's search key jump
+                    // the queue and dismiss the keyboard, instead of doing
+                    // nothing as it did before.
+                    viewModel.retry()
+                    keyboardController?.hide()
+                },
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester)
-                    .heightIn(max = 38.dp),
-                placeholder = {
-                    Text(
-                        "Search...",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    )
-                },
-                textStyle = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                ),
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {}),
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    cursorColor = MaterialTheme.colorScheme.onSurface,
-                ),
-                shape = RoundedCornerShape(50)
             )
         }
 
