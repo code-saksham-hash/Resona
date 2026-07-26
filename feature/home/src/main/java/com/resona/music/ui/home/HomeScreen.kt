@@ -291,7 +291,7 @@ private fun Song.toHomeAlbum() = HomeAlbum(
     id = videoId,
     title = title,
     subtitle = artist,
-    imageUrl = thumbnailUrl,
+    imageUrl = highResThumbnailUrl,
     videoId = videoId
 )
 
@@ -301,7 +301,7 @@ private fun Song.toHomeTrack(index: Int) = HomeTrack(
     title = title,
     artist = artist,
     duration = duration,
-    imageUrl = thumbnailUrl
+    imageUrl = highResThumbnailUrl
 )
 
 private fun ArtistSpotlight.toHomeArtist(index: Int) = HomeArtist(

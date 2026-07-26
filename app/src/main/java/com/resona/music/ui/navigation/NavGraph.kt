@@ -89,8 +89,8 @@ fun ResonaNavGraph() {
                             onCancel = playerViewModel::stop
                         )
                     }
+                    ResonaBottomBar(navController, currentRoute)
                 }
-                ResonaBottomBar(navController, currentRoute)
             }
         }
     ) { innerPadding ->
@@ -226,7 +226,7 @@ fun ResonaNavGraph() {
             ) {
                 PlaylistDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onSongClick = playerViewModel::play,
+                    onSongClick = { song, songs -> playerViewModel.play(song, songs) },
                 )
             }
             composable(
@@ -239,7 +239,7 @@ fun ResonaNavGraph() {
             ) {
                 ArtistDetailScreen(
                     onBack = { navController.popBackStack() },
-                    onSongClick = playerViewModel::play,
+                    onSongClick = { song, songs -> playerViewModel.play(song, songs) },
                 )
             }
         }
