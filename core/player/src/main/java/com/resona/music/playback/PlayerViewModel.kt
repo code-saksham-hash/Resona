@@ -50,7 +50,8 @@ data class PlayerUiState(
     val downloadState: DownloadState = DownloadState.Idle,
     val isLiked: Boolean = false,
     val lyricsState: LyricsState = LyricsState.NotLoaded,
-    val isLooping: Boolean = false
+    val isLooping: Boolean = false,
+    val queue: List<Song> = emptyList()
 )
 
 /** [PlayerUiState.downloadState] always describes [PlayerUiState.currentTrack], never a stale one. */
@@ -92,6 +93,12 @@ class PlayerViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    /** Songs queued for sequential playback. Empty when playing a single track. */
+    private var queue: List<Song> = emptyList()
+
+    /** Index into [queue] for the currently playing song. */
+    private var currentQueueIndex: Int = 0
 
     private val controllerFuture = MediaController.Builder(
         context,
@@ -171,19 +178,34 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun play(song: Song) {
+    fun play(song: Song, queue: List<Song> = emptyList()) {
+        this.queue = queue
+        currentQueueIndex = if (queue.isNotEmpty()) {
+            queue.indexOfFirst { it.videoId == song.videoId }.coerceAtLeast(0)
+        } else 0
+
         viewModelScope.launch {
-            // Checked up front so the icons reflect the right state as soon
-            // as the track becomes current, not only after a download finishes.
+            val controller = controllerReady.await()
+
+            // Kill the current playback immediately so the position poll
+            // loop sees isPlaying=false and stops scribbling stale data
+            // over the fresh zeroed-out state below.
+            controller.stop()
+            controller.clearMediaItems()
+
             val downloadedFilePath = musicRepository.localFileForSong(song.videoId)
             _uiState.update {
                 it.copy(
                     currentTrack = song,
+                    isPlaying = false,
                     isBuffering = true,
+                    position = 0L,
+                    duration = 0L,
                     error = null,
                     downloadState = if (downloadedFilePath != null) DownloadState.Downloaded else DownloadState.Idle,
                     isLiked = musicRepository.isLiked(song.videoId),
-                    lyricsState = LyricsState.NotLoaded
+                    lyricsState = LyricsState.NotLoaded,
+                    queue = queue
                 )
             }
             try {
@@ -196,7 +218,6 @@ class PlayerViewModel @Inject constructor(
                     httpDataSourceFactory.setUserAgent(streamSource.userAgent)
                     streamSource.url.toUri()
                 }
-                val controller = controllerReady.await()
                 val mediaItem = MediaItem.Builder()
                     .setMediaId(song.videoId)
                     .setUri(mediaUri)
@@ -211,9 +232,6 @@ class PlayerViewModel @Inject constructor(
                 controller.setMediaItem(mediaItem)
                 controller.prepare()
                 controller.play()
-                // Only recorded once playback actually starts -- a failed
-                // resolve/prepare shouldn't count as a "play" for Home's
-                // Recommended For You to chase (see MusicRepositoryImpl).
                 musicRepository.recordPlay(song)
             } catch (e: CancellationException) {
                 throw e
@@ -346,13 +364,27 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /** No-op until there's a real queue to move through -- wired up now so
-     *  callers have a stable API when that queue lands. */
-    fun skipToNext() = Unit
+    fun skipToNext() {
+        if (queue.isEmpty()) return
+        val nextIndex = currentQueueIndex + 1
+        if (nextIndex >= queue.size) return
+        currentQueueIndex = nextIndex
+        play(queue[nextIndex], queue)
+    }
 
-    /** No-op until there's a real queue to move through -- wired up now so
-     *  callers have a stable API when that queue lands. */
-    fun skipToPrevious() = Unit
+    fun skipToPrevious() {
+        if (queue.isEmpty()) {
+            seekTo(0)
+            return
+        }
+        val prevIndex = currentQueueIndex - 1
+        if (prevIndex < 0) {
+            seekTo(0)
+            return
+        }
+        currentQueueIndex = prevIndex
+        play(queue[prevIndex], queue)
+    }
 
     /** Toggles repeating the current track (there's no queue yet -- see
      *  skipToNext/Previous -- so "loop" only ever means repeat-one). */
