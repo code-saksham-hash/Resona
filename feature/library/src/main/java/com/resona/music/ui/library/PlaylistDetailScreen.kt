@@ -44,7 +44,7 @@ import com.resona.music.ui.theme.ResonaTheme
 @Composable
 fun PlaylistDetailScreen(
     onBack: () -> Unit = {},
-    onSongClick: (Song) -> Unit = {},
+    onSongClick: (song: Song, songs: List<Song>) -> Unit = { _, _ -> },
     viewModel: PlaylistDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,7 +63,7 @@ private fun PlaylistDetailScreenContent(
     title: String,
     uiState: PlaylistDetailUiState,
     onBack: () -> Unit = {},
-    onSongClick: (Song) -> Unit = {},
+    onSongClick: (song: Song, songs: List<Song>) -> Unit = { _, _ -> },
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -101,7 +101,7 @@ private fun PlaylistDetailScreenContent(
                 )
                 is PlaylistDetailUiState.Success -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(uiState.songs, key = { it.videoId }) { song ->
-                        PlaylistSongRow(song = song, onClick = { onSongClick(song) })
+                        PlaylistSongRow(song = song, onClick = { onSongClick(song, uiState.songs) })
                     }
                 }
                 PlaylistDetailUiState.Empty -> Text(
