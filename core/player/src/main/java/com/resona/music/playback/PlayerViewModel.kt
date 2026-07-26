@@ -100,6 +100,9 @@ class PlayerViewModel @Inject constructor(
     /** Index into [queue] for the currently playing song. */
     private var currentQueueIndex: Int = 0
 
+    @Volatile
+    private var isTransitioning: Boolean = false
+
     private val controllerFuture = MediaController.Builder(
         context,
         SessionToken(context, ComponentName(context, PlayerService::class.java))
@@ -124,6 +127,14 @@ class PlayerViewModel @Inject constructor(
                                 isBuffering = playbackState == Player.STATE_BUFFERING,
                                 duration = controller.duration.coerceAtLeast(0L)
                             )
+                        }
+                    }
+
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        val id = mediaItem?.mediaId ?: return
+                        when {
+                            id.startsWith(DUMMY_NEXT) -> skipToNext()
+                            id.startsWith(DUMMY_PREV) -> skipToPrevious()
                         }
                     }
 
@@ -170,7 +181,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val controller = controllerReady.await()
             while (isActive) {
-                if (controller.isPlaying) {
+                if (!isTransitioning && controller.isPlaying) {
                     _uiState.update { it.copy(position = controller.currentPosition.coerceAtLeast(0L)) }
                 }
                 delay(POSITION_UPDATE_MILLIS)
@@ -187,11 +198,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val controller = controllerReady.await()
 
-            // Kill the current playback immediately so the position poll
-            // loop sees isPlaying=false and stops scribbling stale data
-            // over the fresh zeroed-out state below.
-            controller.stop()
-            controller.clearMediaItems()
+            isTransitioning = true
 
             val downloadedFilePath = musicRepository.localFileForSong(song.videoId)
             _uiState.update {
@@ -232,10 +239,45 @@ class PlayerViewModel @Inject constructor(
                 controller.setMediaItem(mediaItem)
                 controller.prepare()
                 controller.play()
+                isTransitioning = false
                 musicRepository.recordPlay(song)
+
+                if (currentQueueIndex > 0) {
+                    val prevSong = queue[currentQueueIndex - 1]
+                    val prevDummy = MediaItem.Builder()
+                        .setMediaId("${DUMMY_PREV}${prevSong.videoId}")
+                        .setUri(mediaUri)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(prevSong.title)
+                                .setArtist(prevSong.artist)
+                                .setArtworkUri(prevSong.highResThumbnailUrl.toUri())
+                                .build()
+                        )
+                        .build()
+                    controller.addMediaItem(0, prevDummy)
+                }
+                if (queue.isNotEmpty() && currentQueueIndex < queue.size - 1) {
+                    val nextSong = queue[currentQueueIndex + 1]
+                    val nextDummy = MediaItem.Builder()
+                        .setMediaId("${DUMMY_NEXT}${nextSong.videoId}")
+                        .setUri(mediaUri)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(nextSong.title)
+                                .setArtist(nextSong.artist)
+                                .setArtworkUri(nextSong.highResThumbnailUrl.toUri())
+                                .build()
+                        )
+                        .build()
+                    val nextPos = if (currentQueueIndex > 0) 2 else 1
+                    controller.addMediaItem(nextPos, nextDummy)
+                }
             } catch (e: CancellationException) {
+                isTransitioning = false
                 throw e
             } catch (e: Exception) {
+                isTransitioning = false
                 Log.d(TAG, "play: failed to resolve/prepare stream", e)
                 _uiState.update {
                     it.copy(isBuffering = false, error = e.message ?: "Unable to play this track")
@@ -426,5 +468,7 @@ class PlayerViewModel @Inject constructor(
     private companion object {
         const val TAG = "PlayerViewModel"
         const val POSITION_UPDATE_MILLIS = 500L
+        const val DUMMY_NEXT = "__queue_next__"
+        const val DUMMY_PREV = "__queue_prev__"
     }
 }
