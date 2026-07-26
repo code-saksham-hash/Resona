@@ -2,6 +2,7 @@ package com.resona.music.ui.library
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -37,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -125,22 +128,37 @@ private fun LibraryScreenContent(
         Column(modifier = Modifier.fillMaxSize()) {
             LibraryTopBar(onSearchClick = onSearchClick, onProfileClick = onProfileClick)
 
+            val listState = rememberLazyListState()
+            val likedSectionIndex = 4
+            val downloadedSectionIndex = if (likedSongs.isNotEmpty()) 6 else 4
+
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
             ) {
-                item { LibraryHeader() }
+                item(key = "header") { LibraryHeader() }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
-                item {
+                item(key = "quicklinks") {
                     QuickLinksSection(
                         likedCount = likedSongs.size,
-                        downloadedCount = downloadedSongs.size
+                        downloadedCount = downloadedSongs.size,
+                        onLikedClick = {
+                            if (likedSongs.isNotEmpty()) {
+                                scope.launch { listState.animateScrollToItem(likedSectionIndex) }
+                            }
+                        },
+                        onDownloadsClick = {
+                            if (downloadedSongs.isNotEmpty()) {
+                                scope.launch { listState.animateScrollToItem(downloadedSectionIndex) }
+                            }
+                        }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(32.dp)) }
                 if (likedSongs.isNotEmpty()) {
-                    item {
+                    item(key = "liked") {
                         LikedSongsSection(
                             likedSongs = likedSongs,
                             onSongClick = onLikedSongClick,
@@ -150,7 +168,7 @@ private fun LibraryScreenContent(
                     item { Spacer(modifier = Modifier.height(32.dp)) }
                 }
                 if (downloadedSongs.isNotEmpty()) {
-                    item {
+                    item(key = "downloaded") {
                         DownloadedSongsSection(
                             downloadedSongs = downloadedSongs,
                             onSongClick = onDownloadedSongClick,
@@ -160,7 +178,7 @@ private fun LibraryScreenContent(
                     item { Spacer(modifier = Modifier.height(32.dp)) }
                 }
                 if (featuredPlaylists.isNotEmpty()) {
-                    item { PlaylistsSection(playlists = featuredPlaylists, onPlaylistClick = onPlaylistClick) }
+                    item(key = "playlists") { PlaylistsSection(playlists = featuredPlaylists, onPlaylistClick = onPlaylistClick) }
                 }
                 item { Spacer(modifier = Modifier.height(68.dp)) }
             }
@@ -179,7 +197,8 @@ private fun LibraryTopBar(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 17.dp)
-            .height(61.dp),
+            .height(61.dp)
+            .padding(bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -213,18 +232,25 @@ private fun LibraryHeader(modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.primary,
         fontFamily = JosefinSansFontFamily,
         fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(horizontal = 17.dp)
+        modifier = modifier.padding(start = 17.dp, end = 17.dp, top = 12.dp)
     )
 }
 
 @Composable
-private fun QuickLinksSection(likedCount: Int, downloadedCount: Int, modifier: Modifier = Modifier) {
+private fun QuickLinksSection(
+    likedCount: Int,
+    downloadedCount: Int,
+    onLikedClick: () -> Unit = {},
+    onDownloadsClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val likedSubtitle = if (likedCount > 0) "$likedCount tracks" else "Your favorites"
     val downloadsSubtitle = if (downloadedCount > 0) "$downloadedCount tracks" else "Offline tracks"
     val quickLinks = listOf(
         QuickLink("liked", "Liked Songs", likedSubtitle, Icons.Outlined.FavoriteBorder),
         QuickLink("downloads", "Downloads", downloadsSubtitle, Icons.Outlined.DownloadDone),
     )
+    val onClicks = mapOf("liked" to onLikedClick, "downloads" to onDownloadsClick)
 
     Row(
         modifier = modifier
@@ -233,7 +259,7 @@ private fun QuickLinksSection(likedCount: Int, downloadedCount: Int, modifier: M
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         quickLinks.forEach { link ->
-            QuickLinkCard(link = link, modifier = Modifier.weight(1f))
+            QuickLinkCard(link = link, onClick = onClicks[link.id] ?: {}, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -241,45 +267,44 @@ private fun QuickLinksSection(likedCount: Int, downloadedCount: Int, modifier: M
 @Composable
 private fun QuickLinkCard(
     link: QuickLink,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .clickable { }
-            .padding(16.dp),
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.1f), MaterialTheme.shapes.large)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.1f))
+                .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = link.icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(
                 text = link.title,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = link.subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -396,7 +421,8 @@ private fun LibrarySongRow(
             modifier = Modifier
                 .size(48.dp)
                 .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(Color.White.copy(alpha = 0.08f))
+                .border(0.5.dp, Color.White.copy(alpha = 0.1f), MaterialTheme.shapes.small)
         ) {
             AsyncImage(
                 model = song.thumbnailUrl,
@@ -510,7 +536,8 @@ private fun PlaylistCard(
             modifier = Modifier
                 .size(64.dp)
                 .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(Color.White.copy(alpha = 0.08f))
+                .border(0.5.dp, Color.White.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
         ) {
             AsyncImage(
                 model = playlist.thumbnailUrl,

@@ -202,7 +202,7 @@ private fun SearchBarSection(
             .fillMaxWidth()
             .padding(start = 11.dp, end = 17.dp, top = 7.dp, bottom = 7.dp)
             .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(Color(0xFF000000))
             .height(38.dp)
             .padding(horizontal = 8.dp, vertical = 0.dp)
     ) {
@@ -865,7 +865,7 @@ private fun RoundedSearchField(
         modifier = modifier
             .height(44.dp)
             .clip(RoundedCornerShape(50))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(Color(0xFF000000))
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

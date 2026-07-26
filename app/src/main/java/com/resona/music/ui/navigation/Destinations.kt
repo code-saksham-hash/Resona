@@ -1,16 +1,20 @@
 package com.resona.music.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
@@ -27,11 +31,12 @@ sealed class ResonaDestination(
     val unselectedIcon: ImageVector
 ) {
     data object Home : ResonaDestination("home", "Home", Icons.Filled.Home, Icons.Outlined.Home)
-    data object Explore : ResonaDestination("explore", "Explore", Icons.Filled.Explore, Icons.Outlined.Explore)
+    data object Stats : ResonaDestination("stats", "Stats", Icons.Filled.Leaderboard, Icons.Outlined.Leaderboard)
     data object Search : ResonaDestination("search", "Search", Icons.Filled.Search, Icons.Outlined.Search)
     data object NowPlaying : ResonaDestination(
         "now_playing", "Now Playing", Icons.Filled.PlayCircle, Icons.Outlined.PlayCircleOutline
     )
+    data object History : ResonaDestination("history", "History", Icons.Filled.History, Icons.Outlined.History)
     data object Library : ResonaDestination("library", "Library", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic)
 
     /** Reached from a Library playlist card, not the bottom bar -- its icon is unused. */
@@ -45,7 +50,7 @@ sealed class ResonaDestination(
 
 val bottomNavDestinations = listOf(
     ResonaDestination.Home,
-    ResonaDestination.Explore,
-    ResonaDestination.NowPlaying,
+    ResonaDestination.Stats,
+    ResonaDestination.History,
     ResonaDestination.Library
 )
