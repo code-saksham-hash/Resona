@@ -89,7 +89,7 @@ private val quickPickGenres =
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onSearchQuery: (String) -> Unit = {},
-    onExploreClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
@@ -102,7 +102,7 @@ fun HomeScreen(
         uiState = uiState,
         onRefresh = viewModel::refresh,
         onSearchQuery = onSearchQuery,
-        onExploreClick = onExploreClick,
+        onStatsClick = onStatsClick,
         onProfileClick = onProfileClick,
         onAlbumClick = onAlbumClick,
         onArtistClick = onArtistClick,
@@ -117,7 +117,7 @@ private fun HomeScreenContent(
     uiState: HomeUiState,
     onRefresh: () -> Unit = {},
     onSearchQuery: (String) -> Unit = {},
-    onExploreClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
@@ -143,7 +143,7 @@ private fun HomeScreenContent(
                 else -> HomeFeedList(
                     feed = feed,
                     onGenreClick = onSearchQuery,
-                    onExploreClick = onExploreClick,
+                    onStatsClick = onStatsClick,
                     onAlbumClick = onAlbumClick,
                     onArtistClick = onArtistClick,
                     onTrackClick = onTrackClick,
@@ -193,7 +193,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier 
 private fun HomeFeedList(
     feed: HomeFeed,
     onGenreClick: (String) -> Unit,
-    onExploreClick: () -> Unit,
+    onStatsClick: () -> Unit,
     onAlbumClick: (HomeAlbum) -> Unit,
     onArtistClick: (HomeArtist) -> Unit,
     onTrackClick: (HomeTrack) -> Unit,
@@ -254,14 +254,14 @@ private fun HomeFeedList(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Don't see what you want here? Go to Explore",
+                    text = "Don't see what you want here? Go to Stats",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(7.dp))
                 Box(
                     modifier = Modifier
-                        .clickable(onClick = onExploreClick)
+                        .clickable(onClick = onStatsClick)
                         .background(
                             color = MaterialTheme.colorScheme.primary,
                             shape = MaterialTheme.shapes.extraLarge
@@ -362,7 +362,7 @@ private fun QuickPicksRow(onGenreClick: (String) -> Unit = {}, modifier: Modifie
             Box(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.extraLarge)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .background(Color(0xFF000000))
                     .clickable { onGenreClick(genre) }
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
