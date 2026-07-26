@@ -39,18 +39,19 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.resona.music.domain.model.Song
 import com.resona.music.playback.PlayerViewModel
-import com.resona.music.ui.home.ArtistDetailScreen
-import com.resona.music.ui.home.ArtistDetailViewModel
-import com.resona.music.ui.home.HomeAlbum
-import com.resona.music.ui.home.HomeArtist
 import com.resona.music.ui.home.HomeScreen
 import com.resona.music.ui.home.HomeTrack
+import com.resona.music.ui.home.HomeAlbum
+import com.resona.music.ui.home.HomeArtist
+import com.resona.music.ui.home.ArtistDetailScreen
+import com.resona.music.ui.home.ArtistDetailViewModel
+import com.resona.music.ui.home.HistoryScreen
+import com.resona.music.ui.home.StatsScreen
 import com.resona.music.ui.library.LibraryScreen
 import com.resona.music.ui.library.PlaylistDetailScreen
 import com.resona.music.ui.library.PlaylistDetailViewModel
 import com.resona.music.ui.nowplaying.NowPlayingScreen
 import com.resona.music.ui.player.MiniPlayerBar
-import com.resona.music.ui.search.ExploreScreen
 import com.resona.music.ui.search.SearchPage
 import com.resona.music.ui.search.SearchScreen
 
@@ -142,8 +143,8 @@ fun ResonaNavGraph() {
                     onArtistClick = { artist ->
                         navController.navigate(artistDetailRoute(artist.name))
                     },
-                    onExploreClick = {
-                        navController.navigateToTopLevel(ResonaDestination.Explore.route)
+                    onStatsClick = {
+                        navController.navigateToTopLevel(ResonaDestination.Stats.route)
                     },
                     onSearchQuery = { query ->
                         navController.navigate(searchRoute(query))
@@ -151,20 +152,13 @@ fun ResonaNavGraph() {
                 )
             }
             composable(
-                ResonaDestination.Explore.route,
+                ResonaDestination.Stats.route,
                 enterTransition = { bottomNavEnter },
                 exitTransition = { bottomNavExit },
                 popEnterTransition = { bottomNavEnter },
                 popExitTransition = { bottomNavExit },
             ) {
-                ExploreScreen(
-                    onSearchClick = {
-                        navController.navigate(ResonaDestination.Search.route)
-                    },
-                    onProfileClick = {
-                        // TODO: navigate to profile
-                    }
-                )
+                StatsScreen()
             }
             composable(
                 route = "${ResonaDestination.Search.route}?query={query}",
@@ -203,6 +197,15 @@ fun ResonaNavGraph() {
                     onLoadLyrics = playerViewModel::loadLyrics,
                     onBack = { navController.popBackStack() }
                 )
+            }
+            composable(
+                ResonaDestination.History.route,
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
+            ) {
+                HistoryScreen()
             }
             composable(
                 ResonaDestination.Library.route,
