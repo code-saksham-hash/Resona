@@ -6,17 +6,27 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -82,11 +92,11 @@ fun ResonaNavGraph() {
                         MiniPlayerBar(
                             track = track,
                             isPlaying = playerUiState.isPlaying,
+                            modifier = Modifier.offset(y = (-20).dp),
                             onTogglePlayPause = playerViewModel::togglePlayPause,
-                            onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) },
-                            isLooping = playerUiState.isLooping,
-                            onToggleRepeat = playerViewModel::toggleRepeat,
-                            onCancel = playerViewModel::stop
+                            onSkipToPrevious = playerViewModel::skipToPrevious,
+                            onSkipToNext = playerViewModel::skipToNext,
+                            onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) }
                         )
                     }
                     ResonaBottomBar(navController, currentRoute)
@@ -248,20 +258,39 @@ fun ResonaNavGraph() {
 
 @Composable
 private fun ResonaBottomBar(navController: NavHostController, currentRoute: String?) {
-    NavigationBar {
-        bottomNavDestinations.forEach { destination ->
-            val selected = currentRoute == destination.route
-            NavigationBarItem(
-                selected = selected,
-                onClick = { navController.navigateToTopLevel(destination.route) },
-                icon = {
-                    Icon(
-                        imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                        contentDescription = destination.label
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(0.5.dp)
+                .background(Color.White.copy(alpha = 0.1f))
+                .align(Alignment.TopCenter)
+        )
+        NavigationBar(
+            containerColor = Color.Black.copy(alpha = 0.7f),
+            tonalElevation = 0.dp
+        ) {
+            bottomNavDestinations.forEach { destination ->
+                val selected = currentRoute == destination.route
+                NavigationBarItem(
+                    selected = selected,
+                    onClick = { navController.navigateToTopLevel(destination.route) },
+                    icon = {
+                        Icon(
+                            imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                            contentDescription = destination.label
+                        )
+                    },
+                    label = { Text(destination.label) },
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = Color.White.copy(alpha = 0.12f),
+                        selectedIconColor = Color.White,
+                        unselectedIconColor = Color.White.copy(alpha = 0.4f),
+                        selectedTextColor = Color.White,
+                        unselectedTextColor = Color.White.copy(alpha = 0.4f)
                     )
-                },
-                label = { Text(destination.label) }
-            )
+                )
+            }
         }
     }
 }
