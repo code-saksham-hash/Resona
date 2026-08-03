@@ -18,10 +18,12 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -50,6 +52,7 @@ data class PlayerUiState(
     val downloadState: DownloadState = DownloadState.Idle,
     val isLiked: Boolean = false,
     val lyricsState: LyricsState = LyricsState.NotLoaded,
+    val syncedLyrics: List<LyricsLine> = emptyList(),
     val isLooping: Boolean = false,
     val queue: List<Song> = emptyList()
 )
@@ -212,6 +215,7 @@ class PlayerViewModel @Inject constructor(
                     downloadState = if (downloadedFilePath != null) DownloadState.Downloaded else DownloadState.Idle,
                     isLiked = musicRepository.isLiked(song.videoId),
                     lyricsState = LyricsState.NotLoaded,
+                    syncedLyrics = emptyList(),
                     queue = queue
                 )
             }
@@ -345,16 +349,27 @@ class PlayerViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.updateForTrack(track.videoId) { it.copy(lyricsState = LyricsState.Loading) }
-            val lyrics = try {
-                musicRepository.getLyrics(track.videoId)
+
+            val (plainText, synced) = try {
+                val plainDeferred = viewModelScope.async { musicRepository.getLyrics(track.videoId) }
+                val syncedDeferred = viewModelScope.async { musicRepository.getSyncedLyrics(track.title, track.artist) }
+                plainDeferred.await() to syncedDeferred.await()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "loadLyrics: failed for videoId=${track.videoId}", e)
-                null
+                null to null
             }
+
             _uiState.updateForTrack(track.videoId) {
-                it.copy(lyricsState = lyrics?.let(LyricsState::Available) ?: LyricsState.Unavailable)
+                it.copy(
+                    syncedLyrics = synced ?: emptyList(),
+                    lyricsState = when {
+                        synced != null && synced.isNotEmpty() -> LyricsState.Available("")
+                        plainText != null -> LyricsState.Available(plainText)
+                        else -> LyricsState.Unavailable
+                    }
+                )
             }
         }
     }

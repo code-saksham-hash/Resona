@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
@@ -70,6 +72,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.resona.music.domain.model.Song
 import com.resona.music.feature.player.R
@@ -120,6 +123,8 @@ fun NowPlayingScreen(
                 )
                 activeTab == BottomTab.Lyrics -> LyricsContent(
                     lyricsState = uiState.lyricsState,
+                    syncedLyrics = uiState.syncedLyrics,
+                    position = uiState.position,
                     onLoad = onLoadLyrics
                 )
                 track == null -> {
@@ -339,6 +344,8 @@ private fun QueueContent(
 @Composable
 private fun LyricsContent(
     lyricsState: LyricsState,
+    syncedLyrics: List<com.resona.music.domain.model.LyricsLine>,
+    position: Long,
     onLoad: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -354,20 +361,74 @@ private fun LyricsContent(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.align(Alignment.Center)
             )
-            is LyricsState.Available -> Text(
-                text = lyricsState.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 16.dp)
-            )
+            is LyricsState.Available -> {
+                if (syncedLyrics.isNotEmpty()) {
+                    SyncedLyricsView(
+                        lines = syncedLyrics,
+                        position = position,
+                    )
+                } else {
+                    Text(
+                        text = lyricsState.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                    )
+                }
+            }
             LyricsState.Unavailable -> Text(
                 text = "Lyrics not available for this track",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.Center)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SyncedLyricsView(
+    lines: List<com.resona.music.domain.model.LyricsLine>,
+    position: Long,
+) {
+    val listState = rememberLazyListState()
+
+    val currentIndex = remember(position, lines) {
+        val idx = lines.indexOfLast { it.timestamp <= position }
+        if (idx < 0) 0 else idx
+    }
+
+    LaunchedEffect(currentIndex) {
+        if (currentIndex > 0 && currentIndex < lines.size - 1) {
+            listState.animateScrollToItem(currentIndex - 1)
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        itemsIndexed(lines) { index, line ->
+            val isCurrent = index == currentIndex
+            Text(
+                text = line.text,
+                color = when {
+                    isCurrent -> MaterialTheme.colorScheme.onSurface
+                    index < currentIndex -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                },
+                fontSize = if (isCurrent) 22.sp else 15.sp,
+                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp, vertical = 6.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 2,
             )
         }
     }
