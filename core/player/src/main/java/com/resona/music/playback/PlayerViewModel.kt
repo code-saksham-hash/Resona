@@ -18,10 +18,12 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -50,7 +52,9 @@ data class PlayerUiState(
     val downloadState: DownloadState = DownloadState.Idle,
     val isLiked: Boolean = false,
     val lyricsState: LyricsState = LyricsState.NotLoaded,
-    val isLooping: Boolean = false
+    val syncedLyrics: List<LyricsLine> = emptyList(),
+    val isLooping: Boolean = false,
+    val queue: List<Song> = emptyList()
 )
 
 /** [PlayerUiState.downloadState] always describes [PlayerUiState.currentTrack], never a stale one. */
@@ -93,6 +97,15 @@ class PlayerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
+    /** Songs queued for sequential playback. Empty when playing a single track. */
+    private var queue: List<Song> = emptyList()
+
+    /** Index into [queue] for the currently playing song. */
+    private var currentQueueIndex: Int = 0
+
+    @Volatile
+    private var isTransitioning: Boolean = false
+
     private val controllerFuture = MediaController.Builder(
         context,
         SessionToken(context, ComponentName(context, PlayerService::class.java))
@@ -117,6 +130,14 @@ class PlayerViewModel @Inject constructor(
                                 isBuffering = playbackState == Player.STATE_BUFFERING,
                                 duration = controller.duration.coerceAtLeast(0L)
                             )
+                        }
+                    }
+
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        val id = mediaItem?.mediaId ?: return
+                        when {
+                            id.startsWith(DUMMY_NEXT) -> skipToNext()
+                            id.startsWith(DUMMY_PREV) -> skipToPrevious()
                         }
                     }
 
@@ -163,7 +184,7 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val controller = controllerReady.await()
             while (isActive) {
-                if (controller.isPlaying) {
+                if (!isTransitioning && controller.isPlaying) {
                     _uiState.update { it.copy(position = controller.currentPosition.coerceAtLeast(0L)) }
                 }
                 delay(POSITION_UPDATE_MILLIS)
@@ -171,19 +192,31 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun play(song: Song) {
+    fun play(song: Song, queue: List<Song> = emptyList()) {
+        this.queue = queue
+        currentQueueIndex = if (queue.isNotEmpty()) {
+            queue.indexOfFirst { it.videoId == song.videoId }.coerceAtLeast(0)
+        } else 0
+
         viewModelScope.launch {
-            // Checked up front so the icons reflect the right state as soon
-            // as the track becomes current, not only after a download finishes.
+            val controller = controllerReady.await()
+
+            isTransitioning = true
+
             val downloadedFilePath = musicRepository.localFileForSong(song.videoId)
             _uiState.update {
                 it.copy(
                     currentTrack = song,
+                    isPlaying = false,
                     isBuffering = true,
+                    position = 0L,
+                    duration = 0L,
                     error = null,
                     downloadState = if (downloadedFilePath != null) DownloadState.Downloaded else DownloadState.Idle,
                     isLiked = musicRepository.isLiked(song.videoId),
-                    lyricsState = LyricsState.NotLoaded
+                    lyricsState = LyricsState.NotLoaded,
+                    syncedLyrics = emptyList(),
+                    queue = queue
                 )
             }
             try {
@@ -196,7 +229,6 @@ class PlayerViewModel @Inject constructor(
                     httpDataSourceFactory.setUserAgent(streamSource.userAgent)
                     streamSource.url.toUri()
                 }
-                val controller = controllerReady.await()
                 val mediaItem = MediaItem.Builder()
                     .setMediaId(song.videoId)
                     .setUri(mediaUri)
@@ -211,13 +243,45 @@ class PlayerViewModel @Inject constructor(
                 controller.setMediaItem(mediaItem)
                 controller.prepare()
                 controller.play()
-                // Only recorded once playback actually starts -- a failed
-                // resolve/prepare shouldn't count as a "play" for Home's
-                // Recommended For You to chase (see MusicRepositoryImpl).
+                isTransitioning = false
                 musicRepository.recordPlay(song)
+
+                if (currentQueueIndex > 0) {
+                    val prevSong = queue[currentQueueIndex - 1]
+                    val prevDummy = MediaItem.Builder()
+                        .setMediaId("${DUMMY_PREV}${prevSong.videoId}")
+                        .setUri(mediaUri)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(prevSong.title)
+                                .setArtist(prevSong.artist)
+                                .setArtworkUri(prevSong.highResThumbnailUrl.toUri())
+                                .build()
+                        )
+                        .build()
+                    controller.addMediaItem(0, prevDummy)
+                }
+                if (queue.isNotEmpty() && currentQueueIndex < queue.size - 1) {
+                    val nextSong = queue[currentQueueIndex + 1]
+                    val nextDummy = MediaItem.Builder()
+                        .setMediaId("${DUMMY_NEXT}${nextSong.videoId}")
+                        .setUri(mediaUri)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(nextSong.title)
+                                .setArtist(nextSong.artist)
+                                .setArtworkUri(nextSong.highResThumbnailUrl.toUri())
+                                .build()
+                        )
+                        .build()
+                    val nextPos = if (currentQueueIndex > 0) 2 else 1
+                    controller.addMediaItem(nextPos, nextDummy)
+                }
             } catch (e: CancellationException) {
+                isTransitioning = false
                 throw e
             } catch (e: Exception) {
+                isTransitioning = false
                 Log.d(TAG, "play: failed to resolve/prepare stream", e)
                 _uiState.update {
                     it.copy(isBuffering = false, error = e.message ?: "Unable to play this track")
@@ -285,16 +349,27 @@ class PlayerViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.updateForTrack(track.videoId) { it.copy(lyricsState = LyricsState.Loading) }
-            val lyrics = try {
-                musicRepository.getLyrics(track.videoId)
+
+            val (plainText, synced) = try {
+                val plainDeferred = viewModelScope.async { musicRepository.getLyrics(track.videoId) }
+                val syncedDeferred = viewModelScope.async { musicRepository.getSyncedLyrics(track.title, track.artist) }
+                plainDeferred.await() to syncedDeferred.await()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "loadLyrics: failed for videoId=${track.videoId}", e)
-                null
+                null to null
             }
+
             _uiState.updateForTrack(track.videoId) {
-                it.copy(lyricsState = lyrics?.let(LyricsState::Available) ?: LyricsState.Unavailable)
+                it.copy(
+                    syncedLyrics = synced ?: emptyList(),
+                    lyricsState = when {
+                        synced != null && synced.isNotEmpty() -> LyricsState.Available("")
+                        plainText != null -> LyricsState.Available(plainText)
+                        else -> LyricsState.Unavailable
+                    }
+                )
             }
         }
     }
@@ -346,13 +421,27 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    /** No-op until there's a real queue to move through -- wired up now so
-     *  callers have a stable API when that queue lands. */
-    fun skipToNext() = Unit
+    fun skipToNext() {
+        if (queue.isEmpty()) return
+        val nextIndex = currentQueueIndex + 1
+        if (nextIndex >= queue.size) return
+        currentQueueIndex = nextIndex
+        play(queue[nextIndex], queue)
+    }
 
-    /** No-op until there's a real queue to move through -- wired up now so
-     *  callers have a stable API when that queue lands. */
-    fun skipToPrevious() = Unit
+    fun skipToPrevious() {
+        if (queue.isEmpty()) {
+            seekTo(0)
+            return
+        }
+        val prevIndex = currentQueueIndex - 1
+        if (prevIndex < 0) {
+            seekTo(0)
+            return
+        }
+        currentQueueIndex = prevIndex
+        play(queue[prevIndex], queue)
+    }
 
     /** Toggles repeating the current track (there's no queue yet -- see
      *  skipToNext/Previous -- so "loop" only ever means repeat-one). */
@@ -394,5 +483,7 @@ class PlayerViewModel @Inject constructor(
     private companion object {
         const val TAG = "PlayerViewModel"
         const val POSITION_UPDATE_MILLIS = 500L
+        const val DUMMY_NEXT = "__queue_next__"
+        const val DUMMY_PREV = "__queue_prev__"
     }
 }
