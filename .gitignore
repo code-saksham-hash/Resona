@@ -18,3 +18,7 @@ release/
 # Local Claude Code state (permissions, scheduled-task lock) -- machine-local,
 # not project source.
 .claude/
+
+
+app-release-signed.apk.idsig
+README-CONTEXT.md

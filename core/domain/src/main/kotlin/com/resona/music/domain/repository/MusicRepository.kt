@@ -3,6 +3,7 @@ package com.resona.music.domain.repository
 import com.resona.music.domain.model.DownloadedSong
 import com.resona.music.domain.model.FeaturedPlaylist
 import com.resona.music.domain.model.HomeFeed
+import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.Song
 import kotlinx.coroutines.flow.Flow
 
@@ -44,6 +45,9 @@ interface MusicRepository {
 
     /** [videoId]'s lyrics, or null if InnerTube doesn't have/expose any for it. */
     suspend fun getLyrics(videoId: String): String?
+
+    /** Timed/synced lyrics for [title] by [artist] via LRCLIB, or null if unavailable. */
+    suspend fun getSyncedLyrics(title: String, artist: String): List<LyricsLine>?
 
     /**
      * Up to 5 songs by [artistName]. There's no logged-in session (see

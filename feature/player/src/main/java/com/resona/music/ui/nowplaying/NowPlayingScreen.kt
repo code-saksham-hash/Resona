@@ -1,14 +1,28 @@
 package com.resona.music.ui.nowplaying
 
 import android.content.res.Configuration
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
@@ -38,10 +53,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,12 +63,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.resona.music.domain.model.Song
 import com.resona.music.feature.player.R
@@ -62,6 +80,8 @@ import com.resona.music.playback.DownloadState
 import com.resona.music.playback.LyricsState
 import com.resona.music.playback.PlayerUiState
 import com.resona.music.ui.theme.ResonaTheme
+
+private enum class BottomTab { Queue, Lyrics }
 
 @Composable
 fun NowPlayingScreen(
@@ -77,6 +97,8 @@ fun NowPlayingScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var activeTab by remember { mutableStateOf<BottomTab?>(null) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -84,39 +106,119 @@ fun NowPlayingScreen(
     ) {
         NowPlayingTopBar(
             onBack = onBack,
-            onQueueClick = onQueueClick,
+            onQueueClick = {
+                activeTab = if (activeTab == BottomTab.Queue) null else BottomTab.Queue
+                onQueueClick()
+            },
             downloadState = uiState.downloadState,
             onDownloadClick = onDownloadClick
         )
 
         val track = uiState.currentTrack
-        if (track == null) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                Text(
-                    text = "Nothing is playing",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.Center)
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when {
+                activeTab == BottomTab.Queue -> QueueContent(
+                    queue = uiState.queue,
+                    currentTrack = track
+                )
+                activeTab == BottomTab.Lyrics -> LyricsContent(
+                    lyricsState = uiState.lyricsState,
+                    syncedLyrics = uiState.syncedLyrics,
+                    position = uiState.position,
+                    onLoad = onLoadLyrics
+                )
+                track == null -> {
+                    Text(
+                        text = "Nothing is playing",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                else -> PlayerContent(
+                    track = track,
+                    position = uiState.position,
+                    duration = uiState.duration,
+                    isPlaying = uiState.isPlaying,
+                    isLiked = uiState.isLiked,
+                    isBuffering = uiState.isBuffering,
+                    downloadState = uiState.downloadState,
+                    error = uiState.error,
+                    onSeek = onSeek,
+                    onTogglePlayPause = onTogglePlayPause,
+                    onSkipNext = onSkipNext,
+                    onSkipPrevious = onSkipPrevious,
+                    onToggleLike = onToggleLike,
+                    onDownloadClick = onDownloadClick
                 )
             }
-        } else {
-            Column(
+        }
+
+        BottomActionRow(
+            activeTab = activeTab,
+            queueSize = uiState.queue.size,
+            onQueueClick = {
+                activeTab = if (activeTab == BottomTab.Queue) null else BottomTab.Queue
+                onQueueClick()
+            },
+            onLyricsClick = {
+                activeTab = if (activeTab == BottomTab.Lyrics) null else BottomTab.Lyrics
+                if (activeTab == BottomTab.Lyrics) onLoadLyrics()
+            }
+        )
+    }
+}
+
+@Composable
+private fun PlayerContent(
+    track: Song,
+    position: Long,
+    duration: Long,
+    isPlaying: Boolean,
+    isLiked: Boolean,
+    isBuffering: Boolean,
+    downloadState: DownloadState,
+    error: String?,
+    onSeek: (Long) -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onToggleLike: () -> Unit,
+    onDownloadClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AnimatedContent(
+            targetState = track.videoId,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(400)) togetherWith fadeOut(animationSpec = tween(400))
+            },
+            label = "album_art"
+        ) { _ ->
+            AlbumArt(
+                thumbnailUrl = track.highResThumbnailUrl,
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(modifier = Modifier.height(8.dp))
+                    .weight(1f, fill = false)
+            )
+        }
 
-                AlbumArt(
-                    thumbnailUrl = track.highResThumbnailUrl,
-                    modifier = Modifier.fillMaxWidth()
-                )
+        Spacer(modifier = Modifier.height(24.dp))
 
-                Spacer(modifier = Modifier.height(24.dp))
-
+        AnimatedContent(
+            targetState = track.videoId,
+            transitionSpec = {
+                (slideInHorizontally(animationSpec = tween(300)) { it / 4 } + fadeIn(animationSpec = tween(300)))
+                    .togetherWith(slideOutHorizontally(animationSpec = tween(300)) { -it / 4 } + fadeOut(animationSpec = tween(300)))
+            },
+            label = "track_info"
+        ) { _ ->
+            Column {
                 Text(
                     text = track.title,
                     style = MaterialTheme.typography.headlineMedium,
@@ -136,64 +238,233 @@ fun NowPlayingScreen(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                SeekBar(
-                    position = uiState.position,
-                    duration = uiState.duration,
-                    onSeek = onSeek,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                PlaybackControls(
-                    isPlaying = uiState.isPlaying,
-                    onTogglePlayPause = onTogglePlayPause,
-                    onSkipNext = onSkipNext,
-                    onSkipPrevious = onSkipPrevious,
-                    isLiked = uiState.isLiked,
-                    onToggleLike = onToggleLike,
-                    downloadState = uiState.downloadState,
-                    onDownloadClick = onDownloadClick
-                )
-
-                val playError = uiState.error
-                if (playError != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = playError,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                    )
-                }
-
-                val downloadError = (uiState.downloadState as? DownloadState.Failed)?.message
-                if (downloadError != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Download failed: $downloadError",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                LyricsSection(
-                    lyricsState = uiState.lyricsState,
-                    onExpand = onLoadLyrics,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        SeekBar(
+            position = position,
+            duration = duration,
+            onSeek = onSeek,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        PlaybackControls(
+            isPlaying = isPlaying,
+            onTogglePlayPause = onTogglePlayPause,
+            onSkipNext = onSkipNext,
+            onSkipPrevious = onSkipPrevious,
+            isLiked = isLiked,
+            onToggleLike = onToggleLike,
+            downloadState = downloadState,
+            onDownloadClick = onDownloadClick
+        )
+
+        if (error != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun QueueContent(
+    queue: List<Song>,
+    currentTrack: Song?,
+) {
+    if (queue.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Text(
+                text = "No upcoming songs",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Up Next",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            }
+            itemsIndexed(queue) { index, song ->
+                val isCurrent = song.videoId == currentTrack?.videoId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+                        Text(
+                            text = song.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = song.artist,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LyricsContent(
+    lyricsState: LyricsState,
+    syncedLyrics: List<com.resona.music.domain.model.LyricsLine>,
+    position: Long,
+    onLoad: () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (lyricsState) {
+            LyricsState.NotLoaded -> {
+                LaunchedEffect(Unit) { onLoad() }
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+            LyricsState.Loading -> CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.align(Alignment.Center)
+            )
+            is LyricsState.Available -> {
+                if (syncedLyrics.isNotEmpty()) {
+                    SyncedLyricsView(
+                        lines = syncedLyrics,
+                        position = position,
+                    )
+                } else {
+                    Text(
+                        text = lyricsState.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp, vertical = 16.dp)
+                    )
+                }
+            }
+            LyricsState.Unavailable -> Text(
+                text = "Lyrics not available for this track",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SyncedLyricsView(
+    lines: List<com.resona.music.domain.model.LyricsLine>,
+    position: Long,
+) {
+    val listState = rememberLazyListState()
+
+    val currentIndex = remember(position, lines) {
+        val idx = lines.indexOfLast { it.timestamp <= position }
+        if (idx < 0) 0 else idx
+    }
+
+    LaunchedEffect(currentIndex) {
+        if (currentIndex > 0 && currentIndex < lines.size - 1) {
+            listState.animateScrollToItem(currentIndex - 1)
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        itemsIndexed(lines) { index, line ->
+            val isCurrent = index == currentIndex
+            Text(
+                text = line.text,
+                color = when {
+                    isCurrent -> MaterialTheme.colorScheme.onSurface
+                    index < currentIndex -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                },
+                fontSize = if (isCurrent) 22.sp else 15.sp,
+                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp, vertical = 6.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomActionRow(
+    activeTab: BottomTab?,
+    queueSize: Int,
+    onQueueClick: () -> Unit,
+    onLyricsClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp)
+            .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (queueSize > 0) "Queue ($queueSize)" else "Queue",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (activeTab == BottomTab.Queue) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .clickable(onClick = onQueueClick)
+        )
+        Text(
+            text = "Lyrics",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (activeTab == BottomTab.Lyrics) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .clickable(onClick = onLyricsClick)
+        )
     }
 }
 
@@ -349,26 +620,70 @@ private fun SeekBar(
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var dragPosition by remember { mutableStateOf<Float?>(null) }
+    var dragPosition by remember { mutableStateOf<Long?>(null) }
     val safeDuration = duration.coerceAtLeast(1L)
-    val displayedMillis = dragPosition?.toLong() ?: position
+    val displayedMillis = dragPosition ?: position
+    val progress = (displayedMillis.toFloat() / safeDuration).coerceIn(0f, 1f)
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     Column(modifier = modifier) {
-        Slider(
-            value = (dragPosition ?: position.toFloat()).coerceIn(0f, safeDuration.toFloat()),
-            onValueChange = { dragPosition = it },
-            onValueChangeFinished = {
-                dragPosition?.let { onSeek(it.toLong()) }
-                dragPosition = null
-            },
-            valueRange = 0f..safeDuration.toFloat(),
-            enabled = duration > 0,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(32.dp)
+                .pointerInput(duration) {
+                    if (duration <= 0L) return@pointerInput
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val fraction = (down.position.x / size.width).coerceIn(0f, 1f)
+                        dragPosition = (fraction * safeDuration).toLong()
+
+                        do {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (change.pressed) {
+                                val newFraction = (change.position.x / size.width).coerceIn(0f, 1f)
+                                dragPosition = (newFraction * safeDuration).toLong()
+                                change.consume()
+                            } else {
+                                break
+                            }
+                        } while (true)
+
+                        dragPosition?.let { onSeek(it) }
+                        dragPosition = null
+                    }
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val trackCenterY = size.height / 2
+                val thumbX = size.width * progress
+
+                drawLine(
+                    color = surfaceVariant,
+                    start = Offset(0f, trackCenterY),
+                    end = Offset(size.width, trackCenterY),
+                    strokeWidth = 3.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+
+                drawLine(
+                    color = primaryColor,
+                    start = Offset(0f, trackCenterY),
+                    end = Offset(thumbX, trackCenterY),
+                    strokeWidth = 3.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+
+                drawCircle(
+                    color = primaryColor,
+                    radius = 6.dp.toPx(),
+                    center = Offset(thumbX, trackCenterY)
+                )
+            }
+        }
 
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
