@@ -17,9 +17,13 @@ import com.resona.music.domain.model.DownloadedSong
 import com.resona.music.domain.model.FeaturedPlaylist
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.HomeFeedSection
+import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import com.resona.music.domain.repository.StreamSource
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -33,6 +37,7 @@ class MusicRepositoryImpl @Inject internal constructor(
     private val downloadedSongsStore: DownloadedSongsStore,
     private val likedSongsStore: LikedSongsStore,
     private val playHistoryStore: PlayHistoryStore,
+    private val httpClient: HttpClient,
 ) : MusicRepository {
 
     override suspend fun search(query: String): List<Song> =
@@ -193,6 +198,57 @@ class MusicRepositoryImpl @Inject internal constructor(
         val lyrics = runCatching { api.browse(lyricsBrowseId).extractLyricsText() }.getOrNull()
         Log.d(TAG, "getLyrics: $videoId -> ${if (lyrics != null) "${lyrics.length} chars" else "unavailable"}")
         return lyrics
+    }
+
+    override suspend fun getSyncedLyrics(title: String, artist: String): List<LyricsLine>? {
+        return runCatching {
+            val url = "https://lrclib.net/api/get?artist_name=${artist.take(100)}&track_name=${title.take(100)}"
+            Log.d(TAG, "getSyncedLyrics: fetching from LRCLIB for title=$title artist=$artist")
+            val response = httpClient.get(url)
+            val body = response.bodyAsText()
+            val syncedKey = "\"syncedLyrics\":\""
+            val start = body.indexOf(syncedKey)
+            if (start == -1) {
+                Log.d(TAG, "getSyncedLyrics: no syncedLyrics field in response")
+                return@runCatching null
+            }
+            val lrcStart = start + syncedKey.length
+            val lrcEnd = body.indexOf("\"", lrcStart)
+            if (lrcEnd == -1) {
+                Log.d(TAG, "getSyncedLyrics: malformed JSON")
+                return@runCatching null
+            }
+            val lrcText = body.substring(lrcStart, lrcEnd)
+                .replace("\\n", "\n")
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+            val lines = parseLrc(lrcText)
+            Log.d(TAG, "getSyncedLyrics: parsed ${lines.size} lines")
+            lines
+        }.onFailure { e ->
+            Log.w(TAG, "getSyncedLyrics: failed", e)
+        }.getOrNull()
+    }
+
+    private fun parseLrc(lrcText: String): List<LyricsLine> {
+        val pattern = Regex("""\[(\d+):(\d+(?:\.\d+)?)\](.*)""")
+        return lrcText.lines().mapNotNull { line ->
+            pattern.find(line)?.let { match ->
+                val minutes = match.groupValues[1].toLongOrNull() ?: return@let null
+                val rawSeconds = match.groupValues[2]
+                val millis = if (rawSeconds.contains('.')) {
+                    val parts = rawSeconds.split(".")
+                    val secs = parts[0].toLongOrNull() ?: return@let null
+                    val frac = parts.getOrNull(1)?.let { it.take(3).padEnd(3, '0').toLongOrNull() } ?: 0L
+                    secs * 1000L + frac
+                } else {
+                    rawSeconds.toLongOrNull()?.let { it * 1000L } ?: return@let null
+                }
+                val text = match.groupValues[3].trim()
+                if (text.isBlank()) return@let null
+                LyricsLine(timestamp = minutes * 60_000L + millis, text = text)
+            }
+        }
     }
 
     override suspend fun getTopSongsForArtist(artistName: String): List<Song> {
