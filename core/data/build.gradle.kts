@@ -23,6 +23,15 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // The extractor logs through android.util.Log, which the JVM unit-test
+    // android.jar stubs throw on by default -- return the stub defaults so
+    // tests can exercise Log-heavy paths (stream resolution, scheduling).
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

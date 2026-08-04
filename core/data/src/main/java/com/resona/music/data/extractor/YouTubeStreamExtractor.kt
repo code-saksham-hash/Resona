@@ -33,15 +33,30 @@ internal class YouTubeStreamExtractor @Inject constructor(
     )
 
     suspend fun resolveStreamUrl(videoId: String): StreamSource {
-        // Pre-fetch the player JS URL so WEB/WEB-family clients in the chain can
-        // include signatureTimestamp. Non-fatal if it fails -- proceed without it.
-        val playerJsUrl = runCatching { playerJsRepo.fetchPlayerJsUrl(videoId) }.getOrNull()
-        val signatureTimestamp = playerJsUrl?.let { url ->
-            runCatching { playerJsRepo.extractSignatureTimestamp(playerJsRepo.fetchPlayerJs(url)) }
-                .getOrNull()
-        }
+        // Seed a stable visitor identity without blocking: the first attempt
+        // goes out with whatever token is already cached, and if it gets gated
+        // (every client in the chain returns no playable audio -- the "PO token
+        // needed" pattern) while the chain revealed a fresh token, the chain is
+        // retried once with it. Anonymous player requests without a visitor
+        // identity get gated noticeably faster. The watch-page fetch is a
+        // best-effort fallback source here, but the reliable one is the
+        // visitorData YouTube itself hands back inside gated responses.
+        val initialVisitor = playerJsRepo.currentVisitorData()
+        val visitorFetch = playerJsRepo.ensureVisitorData(videoId)
 
-        val (response, winningClient) = fetchWithFallback(videoId, signatureTimestamp, playerJsRepo.currentVisitorData())
+        val (response, winningClient) = try {
+            fetchWithFallback(videoId, initialVisitor)
+        } catch (e: PlaybackUnavailableException) {
+            val learned = playerJsRepo.currentVisitorData()
+            val token = when {
+                learned != null && learned != initialVisitor -> learned
+                learned == null && initialVisitor == null -> visitorFetch.await()
+                else -> null
+            }
+            if (token == null) throw e
+            Log.d(TAG, "resolveStreamUrl: first attempt gated, retrying chain with a fresh visitor token")
+            fetchWithFallback(videoId, token)
+        }
 
         val audioFormats = response.streamingData
             ?.let { it.adaptiveFormats + it.formats }
@@ -59,8 +74,12 @@ internal class YouTubeStreamExtractor @Inject constructor(
                 audioFormats.joinToString { "itag=${it.itag} br=${it.bitrate} url=${it.url != null} sc=${it.signatureCipher != null}" }
         )
 
-        val resolvedPlayerJsUrl = playerJsUrl
-            ?: runCatching { playerJsRepo.fetchPlayerJsUrl(videoId) }.getOrNull()
+        // Direct urls are the norm; a player JS is only fetched (best-effort)
+        // the rare times a winning client hands back a signature-ciphered
+        // format.
+        val resolvedPlayerJsUrl = if (audioFormats.any { it.url == null }) {
+            runCatching { playerJsRepo.fetchPlayerJsUrl(videoId) }.getOrNull()
+        } else null
 
         // Highest bitrate is usually resolvable, but sometimes comes back with
         // neither url nor signatureCipher (seen with itag 251) -- fall
@@ -84,18 +103,41 @@ internal class YouTubeStreamExtractor @Inject constructor(
 
     private suspend fun fetchWithFallback(
         videoId: String,
-        signatureTimestamp: Int?,
         visitorData: String?,
     ): Pair<RawPlayerResponse, InnerTubeClientConfig> {
         var lastStatus = "UNKNOWN"
         var lastReason = "No client in the fallback chain was tried."
+        // A client can be gated for lacking a visitor identity yet still hand
+        // one back in responseContext.visitorData -- learn it and reuse it for
+        // the rest of the chain instead of waiting for the next attempt.
+        var visitor = visitorData
+        // Crawled lazily, only the first time a client that needs a
+        // signatureTimestamp (WEB) is actually reached -- the fast-path clients
+        // above it handle the common case and never touch the watch page or
+        // the multi-MB player JS.
+        var playerJsUrl: String? = null
+        var signatureTimestamp: Int? = null
         for (config in clientChain) {
+            if (config.includeSignatureTimestamp && signatureTimestamp == null && playerJsUrl == null) {
+                playerJsUrl = runCatching { playerJsRepo.fetchPlayerJsUrl(videoId) }.getOrNull()
+                signatureTimestamp = playerJsUrl?.let { url ->
+                    runCatching { playerJsRepo.extractSignatureTimestamp(playerJsRepo.fetchPlayerJs(url)) }
+                        .getOrNull()
+                }
+            }
             val response = try {
-                client.fetchPlayerResponse(videoId, config, signatureTimestamp, visitorData)
+                client.fetchPlayerResponse(videoId, config, signatureTimestamp, visitor)
             } catch (e: PlaybackUnavailableException) {
                 Log.d(TAG, "fetchWithFallback: ${config.clientName} request failed: ${e.reasonText}")
                 lastStatus = e.status; lastReason = e.reasonText
                 continue
+            }
+            response.responseContext?.visitorData?.takeIf { it.isNotBlank() }?.let {
+                if (it != visitor) {
+                    Log.d(TAG, "fetchWithFallback: ${config.clientName} returned visitorData, reusing it for the chain")
+                    playerJsRepo.seedVisitorData(it)
+                    visitor = it
+                }
             }
             val status = response.playabilityStatus?.status
             // status OK isn't enough on its own -- YouTube can report a video
