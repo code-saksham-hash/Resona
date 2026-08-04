@@ -21,6 +21,13 @@ internal class DecipherService @Inject constructor(
     suspend fun buildPlayableUrl(format: RawFormat, playerJsUrl: String?): String {
         val playerJs = playerJsUrl?.let { runCatching { playerJsRepo.fetchPlayerJs(it) }.getOrNull() }
 
+        // Direct urls come from the Android/iOS/TV clients that win the
+        // extraction chain, and those are playable exactly as returned -- their
+        // `n` token is the CDN's own, not the web player's obfuscated nsig
+        // token. Running it through the nsig transform can only replace it with
+        // a wrong value and turn a working url into a 403 (handed to the
+        // player as a source error), so the transform is only applied to urls
+        // that were rebuilt from a signatureCipher (i.e. web-style formats).
         val rawUrl = format.url
             ?: format.signatureCipher?.let { cipher ->
                 playerJs?.let { signatureDecipherer.decrypt(cipher, it) }
@@ -32,6 +39,10 @@ internal class DecipherService @Inject constructor(
                 "itag ${format.itag} has neither url nor signatureCipher"
             )
 
-        return playerJs?.let { nParamDecipherer.transform(rawUrl, it) } ?: rawUrl
+        return if (format.url != null) {
+            rawUrl
+        } else {
+            playerJs?.let { nParamDecipherer.transform(rawUrl, it) } ?: rawUrl
+        }
     }
 }
