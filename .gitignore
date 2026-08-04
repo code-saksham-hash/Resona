@@ -26,3 +26,10 @@ README-CONTEXT.md
 # Signing material -- never commit the keystore or its credentials.
 keystore/
 keystore.properties
+
+# Kotlin build-script classpath cache -- occasionally written into the project
+# root by a Gradle/KLS invocation instead of .gradle/.
+kls_database.db
+
+# Distributable release builds copied to the project root for sideloading.
+Resona-*-release.apk

@@ -111,12 +111,20 @@ internal class YouTubeStreamExtractor @Inject constructor(
         // one back in responseContext.visitorData -- learn it and reuse it for
         // the rest of the chain instead of waiting for the next attempt.
         var visitor = visitorData
+        // The first client (ANDROID_VR) is the one whose direct URLs are known
+        // to play through Resona's player stack. If it gets gated on the very
+        // first attempt but reveals a fresh visitor, retry it once with that
+        // visitor before settling for a fallback client: fallback clients can
+        // hand back resolvable URLs that the player's HTTP stack still rejects
+        // (403, surfaced as "Source error"). Retried at most once per resolve.
+        var firstClientRetriedWithLearnedVisitor = false
         // Crawled lazily, only the first time a client that needs a
         // signatureTimestamp (WEB) is actually reached -- the fast-path clients
         // above it handle the common case and never touch the watch page or
         // the multi-MB player JS.
         var playerJsUrl: String? = null
         var signatureTimestamp: Int? = null
+        val firstClient = clientChain.first()
         for (config in clientChain) {
             if (config.includeSignatureTimestamp && signatureTimestamp == null && playerJsUrl == null) {
                 playerJsUrl = runCatching { playerJsRepo.fetchPlayerJsUrl(videoId) }.getOrNull()
@@ -153,6 +161,30 @@ internal class YouTubeStreamExtractor @Inject constructor(
                 "fetchWithFallback: ${config.clientName} status=$status hasResolvableAudio=$hasResolvableAudio"
             )
             if (status == "OK" && hasResolvableAudio) return response to config
+            if (config == firstClient && !firstClientRetriedWithLearnedVisitor && visitor != visitorData) {
+                firstClientRetriedWithLearnedVisitor = true
+                Log.d(
+                    TAG,
+                    "fetchWithFallback: $firstClient got gated but revealed a visitor, retrying it once with it"
+                )
+                val retried = try {
+                    client.fetchPlayerResponse(videoId, firstClient, signatureTimestamp, visitor)
+                } catch (e: PlaybackUnavailableException) {
+                    Log.d(TAG, "fetchWithFallback: $firstClient retry request failed: ${e.reasonText}")
+                    lastStatus = e.status; lastReason = e.reasonText
+                    continue
+                }
+                val retriedStatus = retried.playabilityStatus?.status
+                val retriedHasAudio = retried.streamingData
+                    ?.let { it.adaptiveFormats + it.formats }
+                    ?.any { it.mimeType.startsWith("audio/") && (it.url != null || it.signatureCipher != null) }
+                    ?: false
+                Log.d(
+                    TAG,
+                    "fetchWithFallback: $firstClient retry status=$retriedStatus hasResolvableAudio=$retriedHasAudio"
+                )
+                if (retriedStatus == "OK" && retriedHasAudio) return retried to firstClient
+            }
             lastStatus = status ?: "UNKNOWN"
             lastReason = if (status == "OK") {
                 "This client needs a PO token to unlock playable format URLs."
