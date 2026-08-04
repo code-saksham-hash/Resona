@@ -10,7 +10,11 @@ import kotlinx.serialization.json.jsonPrimitive
 @Serializable
 data class NextRequest(
     val context: InnerTubeContext,
-    val videoId: String
+    val videoId: String,
+    /** Drives the response toward the "radio" queue panel for [videoId].
+     *  Omitted for the plain watch-next response the Lyrics tab needs; set to
+     *  "RDAMVM<videoId>" to get the similar-songs mix (see RadioModels.kt). */
+    val playlistId: String? = null
 )
 
 /** Backs the "Up next" watch panel -- [extractLyricsBrowseId] only cares about
@@ -18,7 +22,8 @@ data class NextRequest(
  *  [SearchResponse]/[BrowseResponse]. */
 @Serializable
 data class NextResponse(
-    val contents: JsonElement? = null
+    val contents: JsonElement? = null,
+    val responseContext: ResponseContext? = null
 )
 
 private const val LYRICS_TAB_TITLE = "Lyrics"

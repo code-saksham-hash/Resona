@@ -220,7 +220,7 @@ class MusicRepositoryImplTest {
             override suspend fun recordPlay(song: Song) = Unit
         }
         return MusicRepositoryImpl(
-            InnerTubeApi(httpClient),
+            InnerTubeApi(httpClient, PlayerJsRepository(httpClient)),
             streamExtractor,
             songDownloader,
             downloadedSongsStore,
@@ -320,5 +320,82 @@ class MusicRepositoryImplTest {
         assertEquals("Instant Crush", song.title)
         assertEquals("5:38", song.duration)
         assertEquals("", song.artist)
+    }
+
+    // Shape trimmed from a live next() response fetched with
+    // playlistId="RDAMVM<videoId>" -- the "Up next" panel whose entries are
+    // the similar-songs radio mix. The tapped track is the first entry.
+    private val fakeRadioNextResponseJson = """
+    {
+      "contents": {
+        "singleColumnMusicWatchNextResultsRenderer": {
+          "tabbedRenderer": {
+            "watchNextTabbedResultsRenderer": {
+              "tabs": [
+                {
+                  "tabRenderer": {
+                    "content": {
+                      "musicQueueRenderer": {
+                        "content": {
+                          "playlistPanelRenderer": {
+                            "contents": [
+                              {
+                                "playlistPanelVideoRenderer": {
+                                  "title": { "runs": [ { "text": "As It Was" } ] },
+                                  "videoId": "nujn6wbr-e8",
+                                  "longBylineText": { "runs": [ { "text": "Harry Styles" } ] },
+                                  "thumbnail": { "thumbnails": [ { "url": "https://example.com/radio1.jpg" } ] },
+                                  "lengthText": { "runs": [ { "text": "2:48" } ] }
+                                }
+                              },
+                              {
+                                "playlistPanelVideoRenderer": {
+                                  "title": { "runs": [ { "text": "Watermelon Sugar" } ] },
+                                  "videoId": "KPM_BYl-EaQ",
+                                  "longBylineText": { "runs": [ { "text": "Harry Styles" } ] },
+                                  "thumbnail": { "thumbnails": [ { "url": "https://example.com/radio2.jpg" } ] },
+                                  "lengthText": { "runs": [ { "text": "2:54" } ] }
+                                }
+                              },
+                              {
+                                "playlistPanelVideoRenderer": {
+                                  "title": { "runs": [ { "text": "Viva La Vida" } ] },
+                                  "videoId": "ALsvdSA9tOU",
+                                  "longBylineText": { "runs": [ { "text": "Coldplay" } ] },
+                                  "thumbnail": { "thumbnails": [ { "url": "https://example.com/radio3.jpg" } ] },
+                                  "lengthText": { "runs": [ { "text": "4:01" } ] }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+    """.trimIndent()
+
+    @Test
+    fun getSongRadioReturnsSimilarSongsFromTheUpNextPanel() = runTest {
+        val repository = repositoryWithMockedSearchResponse(fakeRadioNextResponseJson)
+
+        val radio = repository.getSongRadio("nujn6wbr-e8")
+
+        assertEquals(3, radio.size)
+        // First entry is the tapped track itself, matching what the panel
+        // actually returns.
+        assertEquals("nujn6wbr-e8", radio[0].videoId)
+        assertEquals("As It Was", radio[0].title)
+        assertEquals("Harry Styles", radio[0].artist)
+        assertEquals("https://example.com/radio1.jpg", radio[0].thumbnailUrl)
+        assertEquals("2:48", radio[0].duration)
+        assertEquals("KPM_BYl-EaQ", radio[1].videoId)
+        assertEquals("ALsvdSA9tOU", radio[2].videoId)
     }
 }

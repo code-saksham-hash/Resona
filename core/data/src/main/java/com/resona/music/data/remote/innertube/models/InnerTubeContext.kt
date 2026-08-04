@@ -15,3 +15,14 @@ data class ClientInfo(
     val hl: String = "en",
     val gl: String = "US"
 )
+
+/**
+ * The `responseContext` block present on every InnerTube response. Only
+ * [visitorData] is modeled: YouTube reflects back a current visitor token
+ * here (URL-encoded), which the shared visitor store learns so playback's
+ * player requests never carry a stale identity (see PlayerJsRepository).
+ */
+@Serializable
+data class ResponseContext(
+    val visitorData: String? = null
+)

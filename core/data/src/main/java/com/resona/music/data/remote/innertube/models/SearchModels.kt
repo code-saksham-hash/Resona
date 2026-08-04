@@ -24,7 +24,8 @@ data class SearchRequest(
  */
 @Serializable
 data class SearchResponse(
-    val contents: JsonElement? = null
+    val contents: JsonElement? = null,
+    val responseContext: ResponseContext? = null
 )
 
 /** A song result exactly as InnerTube described it, before mapping to the domain [Song][com.resona.music.domain.model.Song]. */

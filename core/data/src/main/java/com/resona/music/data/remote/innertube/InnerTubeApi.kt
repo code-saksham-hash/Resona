@@ -10,6 +10,7 @@ import com.resona.music.data.remote.innertube.models.PlayerRequest
 import com.resona.music.data.remote.innertube.models.PlayerResponse
 import com.resona.music.data.remote.innertube.models.SearchRequest
 import com.resona.music.data.remote.innertube.models.SearchResponse
+import com.resona.music.data.extractor.decipher.PlayerJsRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
@@ -50,11 +51,21 @@ class InnerTubeHttpException(val statusCode: Int) :
  * LOGIN_REQUIRED / UNPLAYABLE for anonymous requests across every client
  * context tested (WEB_REMIX, ANDROID_MUSIC, IOS_MUSIC, ANDROID, MWEB) as of
  * this writing -- Google has been progressively gating anonymous player
- * access across the whole InnerTube ecosystem. See MusicRepositoryImpl for
- * how that failure is surfaced rather than silently swallowed.
+ * access across the whole InnerTube ecosystem. The player requests
+ * themselves live in the extractor package (InnerTubeExtractionClient +
+ * YouTubeStreamExtractor), which key on the visitor token seeded here from
+ * these non-gated endpoints. See MusicRepositoryImpl for how that failure
+ * is surfaced rather than silently swallowed.
  */
 class InnerTubeApi @Inject constructor(
-    private val httpClient: HttpClient
+    private val httpClient: HttpClient,
+    // The app-wide visitor store: every response here hands back a current
+    // visitorData in responseContext, which is seeded so the player request
+    // chain (YouTubeStreamExtractor) never goes out with a stale identity --
+    // YouTube answers stale tokens with LOGIN_REQUIRED on /player, and the
+    // search/browse/next endpoints below are the reliable anonymous source
+    // of fresh ones (the watch page is bot-gated on some IPs).
+    private val visitorRepo: PlayerJsRepository,
 ) {
 
     suspend fun search(query: String): SearchResponse {
@@ -63,7 +74,8 @@ class InnerTubeApi @Inject constructor(
             setBody(SearchRequest(context = webRemixContext(), query = query))
         }
         if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
-        return response.body()
+        val body: SearchResponse = response.body()
+        return body.also { learnVisitor(it.responseContext?.visitorData) }
     }
 
     suspend fun getPlayerResponse(videoId: String): PlayerResponse =
@@ -80,19 +92,27 @@ class InnerTubeApi @Inject constructor(
             setBody(BrowseRequest(context = webRemixContext(), browseId = browseId))
         }
         if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
-        return response.body()
+        val body: BrowseResponse = response.body()
+        return body.also { learnVisitor(it.responseContext?.visitorData) }
     }
 
     /** The "up next" watch panel for [videoId] -- only used for its Lyrics tab
-     *  browseId (see NextResponse.extractLyricsBrowseId in LyricsModels.kt). */
-    suspend fun next(videoId: String): NextResponse {
+     *  browseId (see NextResponse.extractLyricsBrowseId in LyricsModels.kt)
+     *  and, with [playlistId] set to a "RDAMVM<videoId>" radio id, as the
+     *  similar-songs mix (see NextResponse.extractRadioSongs in
+     *  RadioModels.kt). */
+    suspend fun next(videoId: String, playlistId: String? = null): NextResponse {
         val response = httpClient.post("$BASE_URL/next") {
             applyInnerTubeDefaults()
-            setBody(NextRequest(context = webRemixContext(), videoId = videoId))
+            setBody(NextRequest(context = webRemixContext(), videoId = videoId, playlistId = playlistId))
         }
         if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
-        return response.body()
+        val body: NextResponse = response.body()
+        return body.also { learnVisitor(it.responseContext?.visitorData) }
     }
+
+    // Best-effort: a missing/blank token is ignored by PlayerJsRepository.
+    private fun learnVisitor(visitorData: String?) = visitorRepo.seedVisitorData(visitorData)
 
     private fun HttpRequestBuilder.applyInnerTubeDefaults() {
         url {

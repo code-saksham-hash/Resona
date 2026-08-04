@@ -3,6 +3,7 @@ package com.resona.music.playback
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.OptIn
@@ -26,6 +27,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -97,11 +99,23 @@ class PlayerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
-    /** Songs queued for sequential playback. Empty when playing a single track. */
+    /** Songs queued for sequential playback. Empty while a single tapped
+     *  track is playing *and* its similar-songs radio queue hasn't finished
+     *  loading yet (see [attachRadioQueue]). */
     private var queue: List<Song> = emptyList()
 
     /** Index into [queue] for the currently playing song. */
     private var currentQueueIndex: Int = 0
+
+    /** Bumped on every play() so the radio background fetch can tell whether
+     *  it's still the active one -- a stale mix must never attach to a
+     *  different track that superseded it while it was loading. */
+    private var radioGeneration = 0
+
+    /** In-flight background radio fetch for a single-song tap (see
+     *  [attachRadioQueue]) -- cancelled whenever a new play() supersedes it
+     *  so a stale mix can never attach to a different track. */
+    private var radioQueueJob: Job? = null
 
     @Volatile
     private var isTransitioning: Boolean = false
@@ -198,6 +212,21 @@ class PlayerViewModel @Inject constructor(
             queue.indexOfFirst { it.videoId == song.videoId }.coerceAtLeast(0)
         } else 0
 
+        // A single-track tap (artist/playlist screens always pass their full
+        // song list as `queue`) has no queue at all -- the stream should
+        // start playing immediately, not wait on a network fetch. So the
+        // similar-songs radio is fetched in the background and attached as
+        // this track's queue once it lands (see attachRadioQueue). Bump the
+        // generation and cancel any in-flight fetch so a superseding tap
+        // (or the same track tapped twice) can't attach a stale mix.
+        radioGeneration++
+        radioQueueJob?.cancel()
+        radioQueueJob = if (queue.isEmpty()) {
+            viewModelScope.launch { attachRadioQueue(song, radioGeneration) }
+        } else {
+            null
+        }
+
         viewModelScope.launch {
             val controller = controllerReady.await()
 
@@ -287,6 +316,67 @@ class PlayerViewModel @Inject constructor(
                     it.copy(isBuffering = false, error = e.message ?: "Unable to play this track")
                 }
             }
+        }
+    }
+
+    /**
+     * Background half of a single-track tap (see [play]): resolves the
+     * similar-songs radio for [song] and attaches it as this track's queue
+     * once it arrives -- the tapped song itself already got [play]'s full
+     * immediate path (setMediaItem/prepare/play), so nothing here holds up
+     * first-audio. Running as its own coroutine, it only mutates queue state
+     * while it still matches the generation captured at launch; anything
+     * stale (user tapped another track meanwhile) just returns.
+     */
+    private suspend fun attachRadioQueue(song: Song, generation: Int) {
+        val radio = try {
+            musicRepository.getSongRadio(song.videoId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.d(TAG, "attachRadioQueue: no radio for ${song.videoId}: ${e.message}")
+            emptyList()
+        }
+        if (radio.isEmpty() || generation != radioGeneration) return
+
+        val controller = controllerReady.await()
+
+        // The tapped song may be still preparing (play()'s coroutine resolves
+        // the stream concurrently) -- wait briefly for it to be the current
+        // item so the next-dummy is inserted right after it.
+        val radioTimeoutMillis = SystemClock.elapsedRealtime() + RADIO_ATTACH_TIMEOUT_MILLIS
+        while (controller.currentMediaItem?.mediaId != song.videoId &&
+            SystemClock.elapsedRealtime() < radioTimeoutMillis
+        ) {
+            delay(50L)
+            if (generation != radioGeneration) return
+        }
+        if (controller.currentMediaItem?.mediaId != song.videoId) return
+
+        // Radio mix normally leads with the tapped track itself, which
+        // matches the currently-playing media item (index 0) exactly -- but
+        // pin it explicitly and dedupe so index 0 is *always* the tapped
+        // song regardless of how the panel was shaped.
+        this.queue = (listOf(song) + radio).distinctBy { it.videoId }
+        currentQueueIndex = 0
+        _uiState.update { it.copy(queue = this.queue) }
+        Log.d(TAG, "attachRadioQueue: attached ${this.queue.size} songs as queue for ${song.videoId}")
+
+        if (this.queue.size > 1) {
+            val nextSong = this.queue[1]
+            val mediaUri = controller.currentMediaItem?.localConfiguration?.uri ?: return
+            val nextDummy = MediaItem.Builder()
+                .setMediaId("${DUMMY_NEXT}${nextSong.videoId}")
+                .setUri(mediaUri)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(nextSong.title)
+                        .setArtist(nextSong.artist)
+                        .setArtworkUri(nextSong.highResThumbnailUrl.toUri())
+                        .build()
+                )
+                .build()
+            controller.addMediaItem(1, nextDummy)
         }
     }
 
@@ -460,6 +550,10 @@ class PlayerViewModel @Inject constructor(
      *  mini-player's close button dismisses itself with (its visibility is
      *  driven by currentTrack being non-null). */
     fun stop() {
+        // A superseding stop() must not have a stale radio queue land after it.
+        radioGeneration++
+        radioQueueJob?.cancel()
+        radioQueueJob = null
         viewModelScope.launch {
             val controller = controllerReady.await()
             controller.stop()
@@ -483,6 +577,9 @@ class PlayerViewModel @Inject constructor(
     private companion object {
         const val TAG = "PlayerViewModel"
         const val POSITION_UPDATE_MILLIS = 500L
+        // Upper bound on how long a background radio fetch waits for the
+        // tapped song to become the current media item before giving up.
+        const val RADIO_ATTACH_TIMEOUT_MILLIS = 5_000L
         const val DUMMY_NEXT = "__queue_next__"
         const val DUMMY_PREV = "__queue_prev__"
     }

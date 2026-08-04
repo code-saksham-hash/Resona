@@ -15,12 +15,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import javax.inject.Inject
+import javax.inject.Singleton
 
 // Fetches and caches YouTube's player JS (where the sig/n-param transform
 // functions live). From yt-dlp-android (see NOTICE.md), simplified to an
 // in-memory-only cache since a player JS build is only current for hours
 // anyway.
-internal class PlayerJsRepository @Inject constructor(
+//
+// Also owns the app-wide visitor token store. @Singleton: every consumer
+// (stream resolution, InnerTube search/radio, player JS) must read and write
+// the SAME token -- visitorData handed back by any InnerTube response is
+// seeded here so the player request chain never goes out with a stale flag.
+@Singleton
+class PlayerJsRepository @Inject constructor(
     private val httpClient: HttpClient,
     @ApplicationContext private val context: Context? = null,
 ) {
@@ -97,6 +104,10 @@ internal class PlayerJsRepository @Inject constructor(
             visitorData = it
             persistVisitor(it)
         }
+        // responseContext.visitorData in youtube.com/v1 responses arrives
+        // URL-encoded (%3D for '='); ytcfg's does not. Normalizing keeps both
+        // sources comparable and interchangeable when sent back as
+        // X-Goog-Visitor-Id / context.user.visitorData.
 
         return Regex(""""jsUrl"\s*:\s*"(/s/player/[a-f0-9]+/[^"]+base\.js)"""").find(html)?.groupValues?.get(1)
             ?: Regex("""(/s/player/[a-f0-9]+/player_ias\.vflset/[^"]+base\.js)""").find(html)?.groupValues?.get(1)
@@ -116,11 +127,12 @@ internal class PlayerJsRepository @Inject constructor(
     // also kept as the cached one so the whole fallback chain reuses it.
     fun seedVisitorData(token: String?) {
         if (token.isNullOrBlank()) return
+        val normalized = java.net.URLDecoder.decode(token, "UTF-8")
         synchronized(visitorFetchLock) {
-            if (token != visitorData) {
+            if (normalized != visitorData) {
                 lastVisitorDataFetch = System.currentTimeMillis()
-                visitorData = token
-                persistVisitor(token)
+                visitorData = normalized
+                persistVisitor(normalized)
             }
         }
     }
