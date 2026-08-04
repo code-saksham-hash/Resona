@@ -1,6 +1,9 @@
 package com.resona.music.data.extractor.decipher
 
+import android.content.Context
+import android.content.SharedPreferences
 import com.resona.music.domain.repository.StreamCipherRequiredException
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -17,14 +20,27 @@ import javax.inject.Inject
 // functions live). From yt-dlp-android (see NOTICE.md), simplified to an
 // in-memory-only cache since a player JS build is only current for hours
 // anyway.
-internal class PlayerJsRepository @Inject constructor(private val httpClient: HttpClient) {
+internal class PlayerJsRepository @Inject constructor(
+    private val httpClient: HttpClient,
+    @ApplicationContext private val context: Context? = null,
+) {
 
     // Keeps the two most-recently-used player JS texts in memory.
     private val memCache = LinkedHashMap<String, String>(4, 0.75f, true)
 
-    // Scraped once from the first watch page fetched this app session and
-    // reused on every InnerTube request after that -- see currentVisitorData().
-    @Volatile private var visitorData: String? = null
+    // The visitor token survives app restarts (SharedPreferences) so the very
+    // first tap of a session resolves on the first player request instead of
+    // paying the gated-first-attempt penalty every launch. The token is
+    // written through from every learn site (watch-page scrape + gated
+    // response) and read back in-memory on startup.
+    private val prefs: SharedPreferences? by lazy {
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    // Scraped once and reused on every InnerTube request after that -- see
+    // currentVisitorData(). Restored from prefs when this code runs again in a
+    // fresh process.
+    @Volatile private var visitorData: String? = prefs?.getString(PREFS_KEY_VISITOR, null)
 
     @Volatile private var lastVisitorDataFetch = 0L
     @Volatile private var pendingVisitorFetch: Deferred<String?>? = null
@@ -77,7 +93,10 @@ internal class PlayerJsRepository @Inject constructor(private val httpClient: Ht
             header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         }.bodyAsText()
 
-        Regex(""""VISITOR_DATA":"([^"]+)"""").find(html)?.groupValues?.get(1)?.let { visitorData = it }
+        Regex(""""VISITOR_DATA":"([^"]+)"""").find(html)?.groupValues?.get(1)?.let {
+            visitorData = it
+            persistVisitor(it)
+        }
 
         return Regex(""""jsUrl"\s*:\s*"(/s/player/[a-f0-9]+/[^"]+base\.js)"""").find(html)?.groupValues?.get(1)
             ?: Regex("""(/s/player/[a-f0-9]+/player_ias\.vflset/[^"]+base\.js)""").find(html)?.groupValues?.get(1)
@@ -101,8 +120,16 @@ internal class PlayerJsRepository @Inject constructor(private val httpClient: Ht
             if (token != visitorData) {
                 lastVisitorDataFetch = System.currentTimeMillis()
                 visitorData = token
+                persistVisitor(token)
             }
         }
+    }
+
+    // Writes the token through to disk so a later app launch starts with the
+    // visitor already known. Best-effort: prefs are gone when the test JVM
+    // runs without a context, which is fine -- in-memory behavior is unchanged.
+    private fun persistVisitor(token: String) {
+        runCatching { prefs?.edit()?.putString(PREFS_KEY_VISITOR, token)?.apply() }
     }
 
     // sts -- required by some clients for age-restricted videos.
@@ -115,5 +142,8 @@ internal class PlayerJsRepository @Inject constructor(private val httpClient: Ht
         // hours; this bounds background watch-page fetches to a few per session
         // instead of one per track.
         const val VISITOR_DATA_REFRESH_MILLIS = 10 * 60 * 1000L
+
+        const val PREFS_NAME = "resona_visitor"
+        const val PREFS_KEY_VISITOR = "visitor_data"
     }
 }
