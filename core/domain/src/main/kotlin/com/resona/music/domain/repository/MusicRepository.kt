@@ -57,6 +57,12 @@ interface MusicRepository {
      * ranking for that artist instead.
      */
     suspend fun getTopSongsForArtist(artistName: String): List<Song>
+
+    /** The similar-songs mix YouTube Music builds around [videoId] (its
+     *  "song radio"). Backs the auto-built queue that starts playing a
+     *  single tapped track (see PlayerViewModel) -- the tapped song itself
+     *  is included as the first entry. */
+    suspend fun getSongRadio(videoId: String): List<Song>
 }
 
 // A bare url isn't enough -- the CDN rejects requests that don't come from

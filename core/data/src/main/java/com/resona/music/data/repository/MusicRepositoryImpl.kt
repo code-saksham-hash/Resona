@@ -11,6 +11,7 @@ import com.resona.music.data.remote.innertube.models.extractFeaturedPlaylists
 import com.resona.music.data.remote.innertube.models.extractLyricsBrowseId
 import com.resona.music.data.remote.innertube.models.extractLyricsText
 import com.resona.music.data.remote.innertube.models.extractPlaylistSongs
+import com.resona.music.data.remote.innertube.models.extractRadioSongs
 import com.resona.music.data.remote.innertube.models.extractSongs
 import com.resona.music.domain.model.ArtistSpotlight
 import com.resona.music.domain.model.DownloadedSong
@@ -260,6 +261,17 @@ class MusicRepositoryImpl @Inject internal constructor(
         val (ownSongs, other) = results.partition { it.artist.equals(artistName, ignoreCase = true) }
         return (ownSongs + other).distinctBy { it.videoId }.take(MAX_ARTIST_TOP_SONGS)
     }
+
+    override suspend fun getSongRadio(videoId: String): List<Song> =
+        api.next(videoId, playlistId = "RDAMVM$videoId").extractRadioSongs().map { song ->
+            Song(
+                videoId = song.videoId,
+                title = song.title,
+                artist = song.artist,
+                thumbnailUrl = song.thumbnailUrl,
+                duration = song.duration
+            )
+        }
 
     private data class HomeFeedQuery(val id: String, val title: String, val query: String)
 

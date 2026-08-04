@@ -47,11 +47,17 @@ internal class YouTubeStreamExtractor @Inject constructor(
         val (response, winningClient) = try {
             fetchWithFallback(videoId, initialVisitor)
         } catch (e: PlaybackUnavailableException) {
+            // First pass failed: retry once with the freshest token available.
+            // Prefer a token that arrived mid-fail from any source (a gated
+            // client's responseContext leak, the background watch-page fetch,
+            // or a search/radio response seeded through the shared store). If
+            // the first pass went out with a stale persisted token and nothing
+            // refreshed yet, still wait for the in-flight fetch -- its token
+            // is the only way to un-gate a cold start.
             val learned = playerJsRepo.currentVisitorData()
             val token = when {
                 learned != null && learned != initialVisitor -> learned
-                learned == null && initialVisitor == null -> visitorFetch.await()
-                else -> null
+                else -> visitorFetch.await().takeIf { it != null && it != initialVisitor }
             }
             if (token == null) throw e
             Log.d(TAG, "resolveStreamUrl: first attempt gated, retrying chain with a fresh visitor token")
