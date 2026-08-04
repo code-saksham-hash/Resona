@@ -7,8 +7,14 @@ import kotlinx.serialization.Serializable
 // extraction flow needs a couple of fields that one never did.
 @Serializable
 internal data class RawPlayerResponse(
+    val responseContext: RawResponseContext? = null,
     val playabilityStatus: RawPlayabilityStatus? = null,
     val streamingData: RawStreamingData? = null,
+)
+
+@Serializable
+internal data class RawResponseContext(
+    val visitorData: String? = null,
 )
 
 @Serializable
