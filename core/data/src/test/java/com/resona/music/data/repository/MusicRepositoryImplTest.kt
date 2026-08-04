@@ -225,7 +225,8 @@ class MusicRepositoryImplTest {
             songDownloader,
             downloadedSongsStore,
             likedSongsStore,
-            playHistoryStore
+            playHistoryStore,
+            httpClient
         )
     }
 
