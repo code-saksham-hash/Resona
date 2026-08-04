@@ -18,5 +18,6 @@ data class BrowseRequest(
  */
 @Serializable
 data class BrowseResponse(
-    val contents: JsonElement? = null
+    val contents: JsonElement? = null,
+    val responseContext: ResponseContext? = null
 )
