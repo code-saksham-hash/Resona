@@ -7,13 +7,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
@@ -37,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -70,19 +68,22 @@ fun MiniPlayerBar(
     modifier: Modifier = Modifier
 ) {
     // Same artwork Now Playing extracts from, so the two surfaces never
-    // disagree about a track's colors -- see AlbumArtPalette.kt. Only the
-    // glass half (art + title) wears it; transport controls stay neutral
-    // below, on their own solid "concrete" half, regardless of the album.
+    // disagree about a track's colors -- see AlbumArtPalette.kt. The
+    // album's colors wash continuously across the whole bar; transport
+    // buttons stay theme-neutral regardless (see PlaybackControls in
+    // NowPlayingScreen.kt for the same rule).
     val palette = rememberAlbumArtPalette(track.highResThumbnailUrl)
     val pillShape = RoundedCornerShape(50.dp)
-    val glassShape = RoundedCornerShape(topStart = 50.dp, bottomStart = 50.dp)
-    val controlsShape = RoundedCornerShape(topEnd = 50.dp, bottomEnd = 50.dp)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .shadow(elevation = 8.dp, shape = pillShape)
+            .background(
+                Brush.linearGradient(colors = listOf(palette.background, palette.accent)),
+                pillShape
+            )
             .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f), pillShape)
     ) {
         if (error != null) {
@@ -139,27 +140,15 @@ fun MiniPlayerBar(
         }
 
         Row(
-            // Fixed height, not wrap-content -- MiniPlayerBar sits in the
-            // Scaffold's bottomBar slot, which measures with an effectively
-            // unbounded max height. Without an explicit bound here, the
-            // concrete half's fillMaxHeight() below has nothing sane to
-            // resolve against and stretches to fill most of the screen
-            // instead of matching the glass half (same reason Velune's
-            // mini player pins a fixed height before using fillMaxSize
-            // internally, rather than trusting wrap-content).
             modifier = Modifier
                 .fillMaxWidth()
-                .height(68.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Glass half: artwork + title/artist, tinted by the album.
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
-                    .glassPanel(palette, glassShape)
-                    .clickable(onClick = onClick)
-                    .padding(start = 14.dp, end = 10.dp),
+                    .clickable(onClick = onClick),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
@@ -205,59 +194,40 @@ fun MiniPlayerBar(
                 }
             }
 
-            // Seam between the two materials.
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight(0.55f)
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            )
+            IconButton(onClick = onSkipToPrevious, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.SkipPrevious,
+                    contentDescription = "Previous",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
 
-            // Concrete half: transport controls. Deliberately NOT
-            // album-tinted -- a solid, always-neutral surface so playback
-            // controls read the same no matter what's playing.
-            Row(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, controlsShape)
-                    .padding(horizontal = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onSkipToPrevious, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = onTogglePlayPause, modifier = Modifier.size(44.dp)) {
+                if (isPlaying) {
                     Icon(
-                        imageVector = Icons.Filled.SkipPrevious,
-                        contentDescription = "Previous",
+                        painter = painterResource(R.drawable.ic_pause),
+                        contentDescription = "Pause",
                         tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(28.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.PlayArrow,
+                        contentDescription = "Play",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
+            }
 
-                IconButton(onClick = onTogglePlayPause, modifier = Modifier.size(44.dp)) {
-                    if (isPlaying) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_pause),
-                            contentDescription = "Pause",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Outlined.PlayArrow,
-                            contentDescription = "Play",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-
-                IconButton(onClick = onSkipToNext, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.SkipNext,
-                        contentDescription = "Next",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+            IconButton(onClick = onSkipToNext, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.SkipNext,
+                    contentDescription = "Next",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(26.dp)
+                )
             }
         }
     }
