@@ -7,6 +7,12 @@ import androidx.compose.ui.graphics.Color
 
 // The entire palette. Every color used anywhere in the app must be one of
 // these six values -- no hues, no tints, no Material You dynamic color.
+//
+// The one deliberate exception: once a song is playing, :feature:player's
+// mini-player/Now Playing/lyrics surfaces take on that track's album-art
+// colors (see AlbumArtPalette.kt there). It's scoped to that module and
+// falls back to this monochrome scheme whenever a color hasn't been
+// extracted yet -- nothing else in the app should reach for hue.
 val Black = Color(0xFF000000)
 val White = Color(0xFFFFFFFF)
 val Gray900 = Color(0xFF1A1A1A)
