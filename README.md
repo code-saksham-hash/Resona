@@ -13,7 +13,7 @@ Resona is built around a strict module boundary: a pure-Kotlin domain layer, a d
 | Search | Complete | Debounced input, InnerTube results filtered to songs, tap-to-play, loading/empty/error states |
 | Home feed | Complete | Pull-to-refresh, curated sections (recommended/trending/new), artist spotlight carousel, quick-pick genre chips |
 | Now Playing | Complete | High-resolution album art, drag seekbar, transport controls, like/download, queue and lyrics panels, overflow menu |
-| Mini Player | Complete | Pill-shaped glass bar above the bottom nav with marquee title and transport controls |
+| Mini Player | Complete | Pill-shaped bar above the bottom nav, tinted by the playing track's album colors, with marquee title and transport controls |
 | Library | Complete | Liked songs, downloaded songs, featured playlists, pull-to-refresh |
 | Downloads | Complete | Offline audio saved to app storage with atomic temp-file writes |
 | Likes | Complete | JSON-persisted, consistent across every screen |
