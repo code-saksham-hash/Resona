@@ -1,6 +1,6 @@
 # Resona
 
-Open-source, anonymous Android music streaming app. Plays audio from YouTube Music by talking to its InnerTube API directly — no YouTube account, no OAuth, no ads.
+Open-source, anonymous Android music streaming app. Plays audio from YouTube Music by talking to its InnerTube API directly; no YouTube account, no OAuth, no ads.
 
 Resona is built around a strict module boundary: a pure-Kotlin domain layer, a data layer that reverse-engineers YouTube Music's streaming pipeline, and a monochrome Compose UI that never touches networking code.
 
