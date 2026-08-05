@@ -47,5 +47,10 @@ dependencies {
     // Image loading (album art / thumbnails)
     implementation(libs.coil.compose)
 
+    // Dominant-color extraction for the mini-player/Now Playing glass tint
+    // (see AlbumArtPalette.kt) -- the one deliberate exception to :core:ui's
+    // monochrome-only rule, scoped to this module.
+    implementation(libs.androidx.palette)
+
     debugImplementation(libs.androidx.ui.tooling)
 }
