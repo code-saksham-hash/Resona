@@ -3,7 +3,6 @@ package com.resona.music.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,26 +26,37 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.resona.music.domain.stats.formatListeningTime
 
 private data class StatGroup(
     val label: String,
     val value: String,
 )
 
-private val topStats = listOf(
-    StatGroup("Total Plays", "---"),
-    StatGroup("Listening Time", "---"),
-)
-
-private val detailStats = listOf(
-    StatGroup("Unique Tracks", "---"),
-    StatGroup("Favorite Genre", "---"),
-    StatGroup("Top Artist", "---"),
-    StatGroup("Top Track", "---"),
-)
-
 @Composable
-fun StatsScreen(modifier: Modifier = Modifier) {
+fun StatsScreen(
+    modifier: Modifier = Modifier,
+    viewModel: StatsViewModel = hiltViewModel()
+) {
+    val stats by viewModel.stats.collectAsStateWithLifecycle()
+
+    val topStats = listOf(
+        StatGroup("Total Plays", stats.totalPlays.toString()),
+        StatGroup("Listening Time", formatListeningTime(stats.listeningSecondsAllTime)),
+    )
+
+    val detailStats = listOf(
+        StatGroup("Today", formatListeningTime(stats.listeningSecondsToday)),
+        StatGroup("This Week", formatListeningTime(stats.listeningSecondsThisWeek)),
+        StatGroup("Day Streak", "${stats.streakDays} days"),
+        StatGroup("Unique Tracks", stats.uniqueTracks.toString()),
+        StatGroup("Unique Artists", stats.uniqueArtists.toString()),
+        StatGroup("Top Artist", stats.topArtists.firstOrNull()?.first ?: "None yet"),
+        StatGroup("Top Track", stats.topTracks.firstOrNull()?.first?.title ?: "None yet"),
+    )
+
     Column(
         modifier = modifier
             .fillMaxSize()

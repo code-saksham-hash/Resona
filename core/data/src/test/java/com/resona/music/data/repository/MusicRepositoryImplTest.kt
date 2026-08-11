@@ -13,6 +13,7 @@ import com.resona.music.data.extractor.decipher.PlayerJsRepository
 import com.resona.music.data.extractor.decipher.SignatureDecipherer
 import com.resona.music.data.remote.innertube.InnerTubeApi
 import com.resona.music.domain.model.DownloadedSong
+import com.resona.music.domain.model.PlayHistoryEntry
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.StreamSource
 import io.ktor.client.HttpClient
@@ -216,7 +217,7 @@ class MusicRepositoryImplTest {
             override suspend fun toggle(song: Song) = Unit
         }
         val playHistoryStore = object : PlayHistoryStore {
-            override val recentPlays = MutableStateFlow(emptyList<Song>())
+            override val entries = MutableStateFlow(emptyList<PlayHistoryEntry>())
             override suspend fun recordPlay(song: Song) = Unit
         }
         return MusicRepositoryImpl(
