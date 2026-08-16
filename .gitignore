@@ -33,3 +33,5 @@ kls_database.db
 
 # Distributable release builds copied to the project root for sideloading.
 Resona-*-release.apk
+# Release signing keystore (see keystore.properties)
+keystore/
