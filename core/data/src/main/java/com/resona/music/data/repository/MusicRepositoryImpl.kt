@@ -19,6 +19,7 @@ import com.resona.music.domain.model.FeaturedPlaylist
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.HomeFeedSection
 import com.resona.music.domain.model.LyricsLine
+import com.resona.music.domain.model.PlayHistoryEntry
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import com.resona.music.domain.repository.StreamSource
@@ -78,7 +79,7 @@ class MusicRepositoryImpl @Inject internal constructor(
         val trendingQuery = pickQuery(TRENDING_QUERIES, lastTrendingQuery).also { lastTrendingQuery = it }
         val newQuery = pickQuery(NEW_QUERIES, lastNewQuery).also { lastNewQuery = it }
         val querySpecs = listOf(
-            HomeFeedQuery("recommended", "Recommended For You", recommendedQueryFor(playHistoryStore.recentPlays.value)),
+            HomeFeedQuery("recommended", "Recommended For You", recommendedQueryFor(playHistoryStore.entries.value)),
             HomeFeedQuery("trending", "Trending Now", trendingQuery),
             HomeFeedQuery("new", "New For You", newQuery),
         )
@@ -114,8 +115,9 @@ class MusicRepositoryImpl @Inject internal constructor(
     // most-played artists (not always the single #1) for the same reason
     // every other section's query rotates: so a refresh actually looks
     // different instead of repeating the last fetch verbatim.
-    private fun recommendedQueryFor(recentPlays: List<Song>): String {
-        val topArtists = recentPlays
+    private fun recommendedQueryFor(history: List<PlayHistoryEntry>): String {
+        val topArtists = history
+            .map { it.song }
             .filter { it.artist.isNotBlank() }
             .groupingBy { it.artist }
             .eachCount()
@@ -139,6 +141,8 @@ class MusicRepositoryImpl @Inject internal constructor(
     private var lastNewQuery: String? = null
 
     override suspend fun recordPlay(song: Song) = playHistoryStore.recordPlay(song)
+
+    override fun observePlayHistory(): Flow<List<PlayHistoryEntry>> = playHistoryStore.entries
 
     // FEmusic_home's carousels are exactly the "playlist/mix, not individual
     // song" shelves getHomeFeed() above can't use -- but that's precisely
