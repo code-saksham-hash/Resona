@@ -21,7 +21,7 @@ Resona is built around a strict module boundary: a pure-Kotlin domain layer, a d
 | Lyrics | Complete | Timed (karaoke-style) lyrics from LRCLIB with InnerTube plain-text fallback |
 | Queue & skip | Complete | Queue-aware next/previous on both the mini player and Now Playing screen |
 | Artist / Playlist detail | Complete | Artist pages from Home cards; playlist pages from Library |
-| Stats / History tabs | Placeholder | UI present with sample data; not yet wired to real metrics |
+| Stats / History tabs | Complete | Aggregated from on-device play history (listening time, top artists/tracks, streak) |
 
 ## How it works
 

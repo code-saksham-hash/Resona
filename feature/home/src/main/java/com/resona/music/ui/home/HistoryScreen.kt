@@ -1,6 +1,7 @@
 package com.resona.music.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,34 +22,40 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-
-private data class HistoryItem(
-    val title: String,
-    val artist: String,
-    val timeAgo: String,
-)
-
-private val sampleHistory = listOf(
-    HistoryItem("Midnight Dreams", "AELOS", "2 min ago"),
-    HistoryItem("Surface Tension", "KOHL", "15 min ago"),
-    HistoryItem("Echoes of Tomorrow", "OBSCURA", "1 hour ago"),
-    HistoryItem("Neon Pulse", "Synthwave Collective", "3 hours ago"),
-    HistoryItem("Blank Space", "KOHL", "5 hours ago"),
-    HistoryItem("Crystal Cave", "AELOS", "Yesterday"),
-    HistoryItem("Digital Horizons", "OBSCURA", "Yesterday"),
-    HistoryItem("Urban Flow", "Lo-Fi Beats", "2 days ago"),
-    HistoryItem("Deep Blue", "Ambient Waves", "2 days ago"),
-    HistoryItem("Starlight", "Electronic Dreams", "3 days ago"),
-)
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.resona.music.domain.model.PlayHistoryEntry
+import com.resona.music.domain.model.Song
+import com.resona.music.domain.stats.timeAgo
+import kotlinx.coroutines.delay
 
 @Composable
-fun HistoryScreen(modifier: Modifier = Modifier) {
+fun HistoryScreen(
+    modifier: Modifier = Modifier,
+    onSongClick: (Song) -> Unit = {},
+    viewModel: HistoryViewModel = hiltViewModel()
+) {
+    val history by viewModel.history.collectAsStateWithLifecycle()
+    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            nowMillis = System.currentTimeMillis()
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -71,22 +78,45 @@ fun HistoryScreen(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(20.dp))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(sampleHistory) { item ->
-                HistoryRow(item)
+        if (history.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No listening history yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(history) { entry ->
+                    HistoryRow(
+                        entry = entry,
+                        nowMillis = nowMillis,
+                        onClick = { onSongClick(entry.song) }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun HistoryRow(item: HistoryItem) {
+private fun HistoryRow(
+    entry: PlayHistoryEntry,
+    nowMillis: Long,
+    onClick: () -> Unit = {},
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -94,7 +124,7 @@ private fun HistoryRow(item: HistoryItem) {
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF2A2A2A)),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -107,20 +137,22 @@ private fun HistoryRow(item: HistoryItem) {
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.title,
+                text = entry.song.title,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
             )
             Text(
-                text = item.artist,
+                text = entry.song.artist,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
         }
         Text(
-            text = item.timeAgo,
+            // A legacy record has playedAtMillis = 0, which would format as
+            // a timestamp from 1970. Show a neutral label for those instead.
+            text = if (entry.playedAtMillis > 0) timeAgo(entry.playedAtMillis, nowMillis) else "Recently",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         )

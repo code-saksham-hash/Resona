@@ -2,6 +2,7 @@ package com.resona.music.data.history
 
 import android.content.Context
 import android.util.Log
+import com.resona.music.domain.model.PlayHistoryEntry
 import com.resona.music.domain.model.Song
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -22,10 +23,12 @@ import javax.inject.Singleton
 /** Tracks recently-played songs (most-recent-first, capped), persisted to a
  *  small JSON index -- this is what lets "Recommended For You" adapt to what
  *  the user actually plays instead of always being the same static query.
- *  Separate interface so tests can fake it without a live Context -- same
- *  reasoning as JsEngine (see ExtractorModule). */
+ *  Each entry carries the epoch-millis time the play started
+ *  ([PlayHistoryEntry.playedAtMillis]); a value of 0 marks a legacy record
+ *  that predates timestamps. Separate interface so tests can fake it without
+ *  a live Context -- same reasoning as JsEngine (see ExtractorModule). */
 internal interface PlayHistoryStore {
-    val recentPlays: StateFlow<List<Song>>
+    val entries: StateFlow<List<PlayHistoryEntry>>
     suspend fun recordPlay(song: Song)
 }
 
@@ -37,12 +40,14 @@ internal class FilePlayHistoryStore @Inject constructor(
     private val indexFile = File(context.filesDir, "play_history.json")
     private val mutex = Mutex()
 
-    private val _recentPlays = MutableStateFlow(readIndex())
-    override val recentPlays: StateFlow<List<Song>> = _recentPlays.asStateFlow()
+    private val _entries = MutableStateFlow(readIndex())
+    override val entries: StateFlow<List<PlayHistoryEntry>> = _entries.asStateFlow()
 
     override suspend fun recordPlay(song: Song) {
         mutex.withLock {
-            val updated = (listOf(song) + _recentPlays.value.filterNot { it.videoId == song.videoId })
+            val playedAtMillis = System.currentTimeMillis()
+            val entry = PlayHistoryEntry(song = song, playedAtMillis = playedAtMillis)
+            val updated = (listOf(entry) + _entries.value.filterNot { it.song.videoId == song.videoId })
                 .take(MAX_HISTORY_SIZE)
             // Unlike DownloadedSongsStore/LikedSongsStore, a persistence
             // failure here is swallowed rather than left to propagate: this
@@ -54,11 +59,11 @@ internal class FilePlayHistoryStore @Inject constructor(
                 runCatching { writeIndex(updated) }
                     .onFailure { e -> Log.w(TAG, "recordPlay: failed to persist", e) }
             }
-            _recentPlays.value = updated
+            _entries.value = updated
         }
     }
 
-    private fun readIndex(): List<Song> {
+    private fun readIndex(): List<PlayHistoryEntry> {
         if (!indexFile.exists()) return emptyList()
         return runCatching {
             Json.decodeFromString<List<PlayHistoryRecord>>(indexFile.readText()).map { it.toDomain() }
@@ -68,8 +73,8 @@ internal class FilePlayHistoryStore @Inject constructor(
         }
     }
 
-    private fun writeIndex(plays: List<Song>) {
-        indexFile.writeText(Json.encodeToString(plays.map { it.toRecord() }))
+    private fun writeIndex(entries: List<PlayHistoryEntry>) {
+        indexFile.writeText(Json.encodeToString(entries.map { it.toRecord() }))
     }
 
     private companion object {
@@ -85,10 +90,24 @@ private data class PlayHistoryRecord(
     val artist: String,
     val thumbnailUrl: String,
     val duration: String,
+    // Default 0 keeps old JSON files decodable: kotlinx.serialization treats
+    // a property with a default as optional on decode, so records written
+    // before this field existed still load, with 0 marking them as legacy.
+    val playedAtMillis: Long = 0,
 )
 
 private fun PlayHistoryRecord.toDomain() =
-    Song(videoId = videoId, title = title, artist = artist, thumbnailUrl = thumbnailUrl, duration = duration)
+    PlayHistoryEntry(
+        song = Song(videoId = videoId, title = title, artist = artist, thumbnailUrl = thumbnailUrl, duration = duration),
+        playedAtMillis = playedAtMillis,
+    )
 
-private fun Song.toRecord() =
-    PlayHistoryRecord(videoId = videoId, title = title, artist = artist, thumbnailUrl = thumbnailUrl, duration = duration)
+private fun PlayHistoryEntry.toRecord() =
+    PlayHistoryRecord(
+        videoId = song.videoId,
+        title = song.title,
+        artist = song.artist,
+        thumbnailUrl = song.thumbnailUrl,
+        duration = song.duration,
+        playedAtMillis = playedAtMillis,
+    )
