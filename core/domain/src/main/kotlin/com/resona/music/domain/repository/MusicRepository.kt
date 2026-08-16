@@ -4,6 +4,7 @@ import com.resona.music.domain.model.DownloadedSong
 import com.resona.music.domain.model.FeaturedPlaylist
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.LyricsLine
+import com.resona.music.domain.model.PlayHistoryEntry
 import com.resona.music.domain.model.Song
 import kotlinx.coroutines.flow.Flow
 
@@ -15,6 +16,9 @@ interface MusicRepository {
     /** Records that [song] was played -- what lets getHomeFeed()'s "Recommended
      *  For You" section drift toward the user's own listening over time. */
     suspend fun recordPlay(song: Song)
+
+    /** The on-device play history, most-recent-first (capped at 30), including the play timestamp. Feeds the Stats and History screens. */
+    fun observePlayHistory(): Flow<List<PlayHistoryEntry>>
 
     /** Real YouTube Music playlists/mixes to show on the Library screen. */
     suspend fun getFeaturedPlaylists(): List<FeaturedPlaylist>

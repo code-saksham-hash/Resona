@@ -10,4 +10,6 @@ dependencies {
     // MusicRepository exposes Flow (observeDownloadedSongs) -- suspend fun
     // alone needs no coroutines dependency, but Flow does.
     api(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.junit)
 }

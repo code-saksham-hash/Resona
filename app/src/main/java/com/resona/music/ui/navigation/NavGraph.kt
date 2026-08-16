@@ -205,7 +205,7 @@ fun ResonaNavGraph() {
                 popEnterTransition = { bottomNavEnter },
                 popExitTransition = { bottomNavExit },
             ) {
-                HistoryScreen()
+                HistoryScreen(onSongClick = playerViewModel::play)
             }
             composable(
                 ResonaDestination.Library.route,
