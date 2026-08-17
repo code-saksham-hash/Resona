@@ -144,8 +144,8 @@ fun ResonaNavGraph() {
                     onArtistClick = { artist ->
                         navController.navigate(artistDetailRoute(artist.name))
                     },
-                    onStatsClick = {
-                        navController.navigateToTopLevel(ResonaDestination.Stats.route)
+                    onSearchClick = {
+                        navController.navigate(searchRoute(""))
                     },
                     onSearchQuery = { query ->
                         navController.navigate(searchRoute(query))
