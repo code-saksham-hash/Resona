@@ -3,7 +3,11 @@ package com.resona.music.ui.nowplaying
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -66,7 +70,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -86,6 +92,7 @@ import com.resona.music.playback.LyricsState
 import com.resona.music.playback.PlayerUiState
 import com.resona.music.ui.player.AlbumArtBackdrop
 import com.resona.music.ui.player.AlbumArtPalette
+import com.resona.music.ui.player.MiniPlayerBar
 import com.resona.music.ui.player.rememberAlbumArtPalette
 import com.resona.music.ui.theme.ResonaTheme
 
@@ -102,6 +109,7 @@ fun NowPlayingScreen(
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
     onQueueClick: () -> Unit,
+    onSongClick: (Song) -> Unit,
     onDownloadClick: () -> Unit = {},
     onToggleLike: () -> Unit = {},
     onLoadLyrics: () -> Unit = {},
@@ -111,8 +119,7 @@ fun NowPlayingScreen(
     var activeTab by remember { mutableStateOf<BottomTab?>(null) }
 
     val track = uiState.currentTrack
-    // Shared by every pane below so Queue/Lyrics/Player never disagree about
-    // this track's colors -- see AlbumArtPalette.kt.
+    // Shared by every pane below; see AlbumArtPalette.kt.
     val palette = rememberAlbumArtPalette(track?.highResThumbnailUrl)
     val pane = when {
         activeTab == BottomTab.Queue -> NowPlayingPane.Queue
@@ -136,6 +143,7 @@ fun NowPlayingScreen(
                     onQueueClick()
                 },
                 palette = palette,
+                headerTitle = if (activeTab == BottomTab.Queue) "Queue" else null,
                 downloadState = uiState.downloadState,
                 onDownloadClick = onDownloadClick
             )
@@ -145,7 +153,14 @@ fun NowPlayingScreen(
                     NowPlayingPane.Queue -> QueueContent(
                         queue = uiState.queue,
                         currentTrack = track,
+                        currentDurationMs = uiState.duration,
+                        isPlaying = uiState.isPlaying,
                         palette = palette,
+                        onSongClick = onSongClick,
+                        onTogglePlayPause = onTogglePlayPause,
+                        onSkipPrevious = onSkipPrevious,
+                        onSkipNext = onSkipNext,
+                        onMiniPlayerClick = { activeTab = null },
                     )
                     NowPlayingPane.Lyrics -> LyricsContent(
                         lyricsState = uiState.lyricsState,
@@ -313,64 +328,176 @@ private fun PlayerContent(
 private fun QueueContent(
     queue: List<Song>,
     currentTrack: Song?,
+    currentDurationMs: Long,
+    isPlaying: Boolean,
     palette: AlbumArtPalette,
+    onSongClick: (Song) -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipPrevious: () -> Unit,
+    onSkipNext: () -> Unit,
+    onMiniPlayerClick: () -> Unit,
 ) {
-    if (queue.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Text(
-                text = "No upcoming songs",
-                style = MaterialTheme.typography.bodyLarge,
-                color = palette.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
+    Box(modifier = Modifier.fillMaxSize()) {
+        var miniPlayerHeightPx by remember { mutableStateOf(0) }
+        val miniPlayerHeightDp = with(LocalDensity.current) { miniPlayerHeightPx.toDp() }
+
+        if (queue.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 Text(
-                    text = "Up Next",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = palette.onBackground,
-                    modifier = Modifier.padding(vertical = 12.dp)
+                    text = "No upcoming songs",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = palette.onBackground.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.Center)
                 )
             }
-            itemsIndexed(queue) { index, song ->
-                val isCurrent = song.videoId == currentTrack?.videoId
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
+                contentPadding = PaddingValues(bottom = miniPlayerHeightDp + 16.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "${index + 1}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = palette.onBackground.copy(alpha = 0.6f),
-                        modifier = Modifier.width(24.dp)
+                        text = "Up Next",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = palette.onBackground,
+                        modifier = Modifier.padding(vertical = 12.dp)
                     )
-                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                        Text(
-                            text = song.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isCurrent) palette.accent else palette.onBackground,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = song.artist,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = palette.onBackground.copy(alpha = 0.6f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                }
+                itemsIndexed(queue) { _, song ->
+                    val isCurrent = song.videoId == currentTrack?.videoId
+                    val rowShape = RoundedCornerShape(10.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(rowShape)
+                            .then(
+                                if (isCurrent) Modifier
+                                    .background(palette.accent.copy(alpha = 0.14f), rowShape)
+                                    .border(1.dp, palette.accent.copy(alpha = 0.55f), rowShape)
+                                else Modifier
+                            )
+                            .clickable(onClick = { onSongClick(song) })
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        ) {
+                            AsyncImage(
+                                model = song.thumbnailUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                placeholder = ColorPainter(palette.onBackground.copy(alpha = 0.1f)),
+                                error = ColorPainter(palette.onBackground.copy(alpha = 0.1f)),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            if (isCurrent) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.35f))
+                                )
+                                SoundWaves(
+                                    modifier = Modifier.align(Alignment.Center),
+                                    color = Color.White.copy(alpha = 0.95f)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = song.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = palette.onBackground,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = song.artist,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = palette.onBackground.copy(alpha = 0.6f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (song.duration.isNotBlank()) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = song.duration,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = palette.onBackground.copy(alpha = 0.6f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        } else if (isCurrent && currentDurationMs > 0) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = formatDuration(currentDurationMs),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = palette.onBackground.copy(alpha = 0.6f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
+        }
+
+        if (currentTrack != null) {
+            MiniPlayerBar(
+                track = currentTrack,
+                isPlaying = isPlaying,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipToPrevious = onSkipPrevious,
+                onSkipToNext = onSkipNext,
+                onClick = onMiniPlayerClick,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .onSizeChanged { miniPlayerHeightPx = it.height }
+            )
+        }
+    }
+}
+
+/**
+ * Animated equalizer glyph (three staggered pulsing bars) over the
+ * currently playing track's darkened cover.
+ */
+@Composable
+private fun SoundWaves(
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "soundWaves")
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        for (i in 0 until 3) {
+            val scale by transition.animateFloat(
+                initialValue = 0.35f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 320, delayMillis = i * 110),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "wave$i"
+            )
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 1.5.dp)
+                    .size(width = 3.dp, height = 14.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .graphicsLayer { scaleY = scale }
+                    .background(color)
+            )
         }
     }
 }
@@ -430,13 +557,9 @@ private fun LyricsContent(
 }
 
 /**
- * Auto-scrolls so the active line sits centered on screen, with each line
- * easing its own size/color/alpha based on distance from it. Deliberately
- * a persistent LazyColumn rather than a swapped block of text: every line
- * is a single composable that eases smoothly in place as the active index
- * advances, instead of the whole window sliding out and back in -- which
- * reads as a "reload" the instant it repeats every couple of seconds.
- * Same idea as Velune's lyrics view (LazyColumn + animateScrollToItem).
+ * Keeps the active lyric line centered, easing each line's size, color,
+ * and alpha by its distance from the active line. Persistent LazyColumn
+ * so lines ease in place instead of the window re-sliding each cycle.
  */
 @Composable
 private fun SyncedLyricsView(
@@ -457,9 +580,7 @@ private fun SyncedLyricsView(
     LaunchedEffect(currentIndex, viewportHeightPx, lines) {
         if (viewportHeightPx <= 0 || lines.isEmpty()) return@LaunchedEffect
         val centerOffset = -(viewportHeightPx / 2f - halfLineHeightPx).toInt()
-        // A seek can jump many lines at once -- snap close first so the
-        // scroll doesn't visibly race through everything in between, then
-        // ease the rest of the way in like a normal line-to-line advance.
+        // Seeks can jump many lines -- snap close first, then ease the rest.
         val nearestVisible = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
         if (kotlin.math.abs(currentIndex - nearestVisible) > 12) {
             listState.scrollToItem((currentIndex - 2).coerceAtLeast(0), centerOffset)
@@ -486,10 +607,9 @@ private fun SyncedLyricsView(
 }
 
 /**
- * One lyric line. Only [distance] -- how many lines away from the active
- * one -- shapes its look: the active line (0) is large, bold, and in the
- * album's accent color; each step away eases it smaller and fainter, so
- * focus reads as pulled toward whatever's playing right now.
+ * One lyric line; its distance from the active line drives size, weight,
+ * color, and alpha -- active (0) is large, bold, and accent-colored,
+ * fading with distance.
  */
 @Composable
 private fun LyricsSlot(text: String, distance: Int, palette: AlbumArtPalette) {
@@ -538,22 +658,44 @@ private fun BottomActionRow(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = if (queueSize > 0) "Queue ($queueSize)" else "Queue",
-            style = MaterialTheme.typography.labelLarge,
-            color = if (activeTab == BottomTab.Queue) palette.accent else palette.onBackground.copy(alpha = 0.6f),
+        Row(
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .clickable(onClick = onQueueClick)
-        )
-        Text(
-            text = "Lyrics",
-            style = MaterialTheme.typography.labelLarge,
-            color = if (activeTab == BottomTab.Lyrics) palette.accent else palette.onBackground.copy(alpha = 0.6f),
+                .clickable(onClick = onQueueClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_queue),
+                contentDescription = null,
+                tint = if (activeTab == BottomTab.Queue) palette.accent else palette.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (queueSize > 0) "Queue ($queueSize)" else "Queue",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (activeTab == BottomTab.Queue) palette.accent else palette.onBackground.copy(alpha = 0.6f)
+            )
+        }
+        Row(
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .clickable(onClick = onLyricsClick)
-        )
+                .clickable(onClick = onLyricsClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_lyrics),
+                contentDescription = null,
+                tint = if (activeTab == BottomTab.Lyrics) palette.accent else palette.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Lyrics",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (activeTab == BottomTab.Lyrics) palette.accent else palette.onBackground.copy(alpha = 0.6f)
+            )
+        }
     }
 }
 
@@ -562,6 +704,7 @@ private fun NowPlayingTopBar(
     onBack: () -> Unit,
     onQueueClick: () -> Unit,
     palette: AlbumArtPalette,
+    headerTitle: String? = null,
     downloadState: DownloadState = DownloadState.Idle,
     onDownloadClick: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -579,6 +722,16 @@ private fun NowPlayingTopBar(
                 imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                 contentDescription = "Back",
                 tint = palette.onBackground
+            )
+        }
+
+        if (headerTitle != null) {
+            Text(
+                text = headerTitle,
+                style = MaterialTheme.typography.titleLarge,
+                color = palette.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 
@@ -738,12 +891,10 @@ private fun SeekBar(
 }
 
 /**
- * Deliberately theme-colored, not [AlbumArtPalette]-tinted -- transport
- * controls stay the same monochrome black/white regardless of what's
- * playing, same as the mini-player's controls (see MiniPlayerBar.kt) and
- * Velune's fixed `MaterialTheme.colorScheme.primary` border. Only the
- * backdrop, text, seek bar fill, and lyrics highlight take the album's
- * color -- never the buttons.
+ * Deliberately theme-colored, not [AlbumArtPalette]-tinted: transport
+ * controls stay monochrome regardless of the album, matching the
+ * mini-player. Only backdrop, text, seek fill, and lyrics accent take
+ * the album's palette.
  */
 @Composable
 private fun PlaybackControls(
@@ -897,6 +1048,7 @@ private fun NowPlayingScreenPlayingPreview() {
             onSkipNext = {},
             onSkipPrevious = {},
             onQueueClick = {},
+            onSongClick = {},
             onBack = {}
         )
     }
@@ -918,6 +1070,7 @@ private fun NowPlayingScreenPlayingDarkPreview() {
             onSkipNext = {},
             onSkipPrevious = {},
             onQueueClick = {},
+            onSongClick = {},
             onBack = {}
         )
     }
@@ -934,6 +1087,7 @@ private fun NowPlayingScreenEmptyPreview() {
             onSkipNext = {},
             onSkipPrevious = {},
             onQueueClick = {},
+            onSongClick = {},
             onBack = {}
         )
     }

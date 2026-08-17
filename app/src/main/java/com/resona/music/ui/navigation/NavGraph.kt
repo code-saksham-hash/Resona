@@ -124,7 +124,8 @@ fun ResonaNavGraph() {
                                 videoId = track.id,
                                 title = track.title,
                                 artist = track.artist,
-                                thumbnailUrl = track.imageUrl
+                                thumbnailUrl = track.imageUrl,
+                                duration = track.duration
                             )
                         )
                     },
@@ -192,6 +193,7 @@ fun ResonaNavGraph() {
                     // once this route is no longer current -- same idiom the
                     // bottom bar itself uses to switch tabs.
                     onQueueClick = {},
+                    onSongClick = { song -> playerViewModel.play(song, playerUiState.queue) },
                     onDownloadClick = playerViewModel::download,
                     onToggleLike = playerViewModel::toggleLike,
                     onLoadLyrics = playerViewModel::loadLyrics,
