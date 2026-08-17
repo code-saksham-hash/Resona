@@ -112,8 +112,14 @@ class PlayStatsTest {
         val stats = computePlayStats(entries, nowMillis, zone)
 
         assertEquals(4, stats.uniqueArtists)
+        // Thumbnail = the artist's most recently played track.
         assertEquals(
-            listOf("Alpha" to 3, "Beta" to 2, "Zed" to 2, "Gamma" to 1),
+            listOf(
+                ArtistStat("Alpha", "https://example.com/t1.jpg") to 3,
+                ArtistStat("Beta", "https://example.com/t4.jpg") to 2,
+                ArtistStat("Zed", "https://example.com/t6.jpg") to 2,
+                ArtistStat("Gamma", "https://example.com/t8.jpg") to 1,
+            ),
             stats.topArtists
         )
     }

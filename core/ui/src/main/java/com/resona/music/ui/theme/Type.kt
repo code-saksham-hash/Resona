@@ -7,124 +7,149 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// The platform system sans-serif, used everywhere. With no color available
-// for hierarchy, weight and size contrast do that job instead: display/
-// headline/title tiers are bold-to-black, body stays regular, labels sit at
-// medium.
-private val ResonaFontFamily = FontFamily.Default
-
-val MontserratFontFamily = FontFamily(
-    Font(com.resona.music.core.ui.R.font.montserrat_bold, FontWeight.Bold)
+/**
+ * Josefin Sans is the brand face (geometric, elegant): it titles the app.
+ * Bundled as regular + bold statics, so the display and headline tiers use
+ * it; everything below title scale renders in Montserrat instead, which was
+ * tuned for smaller sizes.
+ */
+val JosefinSansFontFamily = FontFamily(
+    Font(com.resona.music.core.ui.R.font.josefin_sans_regular, FontWeight.Normal),
+    Font(com.resona.music.core.ui.R.font.josefin_sans_bold, FontWeight.Bold),
 )
 
-val JosefinSansFontFamily = FontFamily(
-    Font(com.resona.music.core.ui.R.font.josefin_sans_bold, FontWeight.Bold)
+/**
+ * Inter is the industry-standard substitute for the geometric sans-serifs
+ * (Spotify's Circular, Apple's SF Pro) music apps use for section headings.
+ * Bundled as regular + semibold + bold statics.
+ */
+val InterFontFamily = FontFamily(
+    Font(com.resona.music.core.ui.R.font.inter_regular, FontWeight.Normal),
+    Font(com.resona.music.core.ui.R.font.inter_semibold, FontWeight.SemiBold),
+    Font(com.resona.music.core.ui.R.font.inter_bold, FontWeight.Bold),
+)
+
+/** Kept for legacy screens that reference it by name; the live app uses the
+ *  typography scale below. */
+val MontserratFontFamily = FontFamily(
+    Font(com.resona.music.core.ui.R.font.montserrat_regular, FontWeight.Normal),
+    Font(com.resona.music.core.ui.R.font.montserrat_bold, FontWeight.Bold),
+)
+
+// Montserrat is bundled as a variable font spanning the whole weight range
+// (minSdk 26 maps a requested weight onto the variable axis), so a single
+// file backs every weight the scale needs.
+private val Montserrat = FontFamily(
+    Font(com.resona.music.core.ui.R.font.montserrat_regular, FontWeight.Normal),
+    Font(com.resona.music.core.ui.R.font.montserrat_regular, FontWeight.Medium),
+    Font(com.resona.music.core.ui.R.font.montserrat_regular, FontWeight.SemiBold),
+    Font(com.resona.music.core.ui.R.font.montserrat_regular, FontWeight.Bold),
 )
 
 val Typography = Typography(
     displayLarge = TextStyle(
-        fontFamily = ResonaFontFamily,
-        fontWeight = FontWeight.Black,
+        fontFamily = JosefinSansFontFamily,
+        fontWeight = FontWeight.Bold,
         fontSize = 57.sp,
         lineHeight = 64.sp,
         letterSpacing = (-0.25).sp
     ),
     displayMedium = TextStyle(
-        fontFamily = ResonaFontFamily,
-        fontWeight = FontWeight.Black,
+        fontFamily = JosefinSansFontFamily,
+        fontWeight = FontWeight.Bold,
         fontSize = 45.sp,
         lineHeight = 52.sp,
-        letterSpacing = 0.sp
+        letterSpacing = (-0.25).sp
     ),
     displaySmall = TextStyle(
-        fontFamily = ResonaFontFamily,
-        fontWeight = FontWeight.ExtraBold,
+        fontFamily = JosefinSansFontFamily,
+        fontWeight = FontWeight.Bold,
         fontSize = 36.sp,
         lineHeight = 44.sp,
         letterSpacing = 0.sp
     ),
     headlineLarge = TextStyle(
-        fontFamily = ResonaFontFamily,
-        fontWeight = FontWeight.ExtraBold,
+        fontFamily = JosefinSansFontFamily,
+        fontWeight = FontWeight.Bold,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = 0.sp
     ),
     headlineMedium = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = JosefinSansFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 28.sp,
         lineHeight = 36.sp,
         letterSpacing = 0.sp
     ),
     headlineSmall = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = JosefinSansFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 24.sp,
         lineHeight = 32.sp,
         letterSpacing = 0.sp
     ),
     titleLarge = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp
     ),
     titleMedium = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.15.sp
     ),
     titleSmall = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.2.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
-        letterSpacing = 0.25.sp
+        letterSpacing = 0.1.sp
     ),
     bodySmall = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.4.sp
+        letterSpacing = 0.2.sp
     ),
     labelLarge = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
     labelMedium = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.2.sp
     ),
     labelSmall = TextStyle(
-        fontFamily = ResonaFontFamily,
+        fontFamily = Montserrat,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.3.sp
     )
 )
