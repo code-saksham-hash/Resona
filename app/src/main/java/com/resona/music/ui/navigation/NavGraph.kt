@@ -124,7 +124,8 @@ fun ResonaNavGraph() {
                                 videoId = track.id,
                                 title = track.title,
                                 artist = track.artist,
-                                thumbnailUrl = track.imageUrl
+                                thumbnailUrl = track.imageUrl,
+                                duration = track.duration
                             )
                         )
                     },
@@ -143,8 +144,8 @@ fun ResonaNavGraph() {
                     onArtistClick = { artist ->
                         navController.navigate(artistDetailRoute(artist.name))
                     },
-                    onStatsClick = {
-                        navController.navigateToTopLevel(ResonaDestination.Stats.route)
+                    onSearchClick = {
+                        navController.navigate(searchRoute(""))
                     },
                     onSearchQuery = { query ->
                         navController.navigate(searchRoute(query))
@@ -158,7 +159,11 @@ fun ResonaNavGraph() {
                 popEnterTransition = { bottomNavEnter },
                 popExitTransition = { bottomNavExit },
             ) {
-                StatsScreen()
+                StatsScreen(
+                    onArtistClick = { artist ->
+                        navController.navigate(artistDetailRoute(artist))
+                    }
+                )
             }
             composable(
                 route = "${ResonaDestination.Search.route}?query={query}",
@@ -192,6 +197,7 @@ fun ResonaNavGraph() {
                     // once this route is no longer current -- same idiom the
                     // bottom bar itself uses to switch tabs.
                     onQueueClick = {},
+                    onSongClick = { song -> playerViewModel.play(song, playerUiState.queue) },
                     onDownloadClick = playerViewModel::download,
                     onToggleLike = playerViewModel::toggleLike,
                     onLoadLyrics = playerViewModel::loadLyrics,
@@ -217,9 +223,6 @@ fun ResonaNavGraph() {
                 LibraryScreen(
                     onDownloadedSongClick = playerViewModel::play,
                     onLikedSongClick = playerViewModel::play,
-                    onPlaylistClick = { playlist ->
-                        navController.navigate(playlistDetailRoute(playlist.browseId, playlist.title))
-                    },
                     onSearchClick = {
                         navController.navigate(ResonaDestination.Search.route)
                     },

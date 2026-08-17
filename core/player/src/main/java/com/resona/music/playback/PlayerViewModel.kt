@@ -62,7 +62,9 @@ data class PlayerUiState(
 /** [PlayerUiState.downloadState] always describes [PlayerUiState.currentTrack], never a stale one. */
 sealed interface DownloadState {
     data object Idle : DownloadState
-    data object Downloading : DownloadState
+    /** [progress] is null when the server didn't send a Content-Length, so
+     *  the UI can't show a determinate ring -- it falls back to spinning. */
+    data class Downloading(val progress: Float? = null) : DownloadState
     data object Downloaded : DownloadState
     data class Failed(val message: String) : DownloadState
 }
@@ -396,9 +398,13 @@ class PlayerViewModel @Inject constructor(
 
         Log.d(TAG, "download: starting for videoId=${track.videoId} title=${track.title}")
         viewModelScope.launch {
-            _uiState.updateForTrack(track.videoId) { it.copy(downloadState = DownloadState.Downloading) }
+            _uiState.updateForTrack(track.videoId) { it.copy(downloadState = DownloadState.Downloading()) }
             try {
-                val downloaded = musicRepository.downloadSong(track)
+                val downloaded = musicRepository.downloadSong(track) { progress ->
+                    _uiState.updateForTrack(track.videoId) {
+                        it.copy(downloadState = DownloadState.Downloading(progress))
+                    }
+                }
                 Log.d(TAG, "download: succeeded for videoId=${track.videoId}, file=${downloaded.filePath}")
                 _uiState.updateForTrack(track.videoId) { it.copy(downloadState = DownloadState.Downloaded) }
                 Toast.makeText(context, "Downloaded \"${track.title}\"", Toast.LENGTH_SHORT).show()

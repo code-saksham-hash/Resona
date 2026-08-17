@@ -5,6 +5,7 @@ import com.resona.music.domain.model.FeaturedPlaylist
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.PlayHistoryEntry
+import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
 import kotlinx.coroutines.flow.Flow
 
@@ -26,8 +27,10 @@ interface MusicRepository {
     /** The songs inside the playlist identified by [browseId] (see [FeaturedPlaylist.browseId]). */
     suspend fun getPlaylistSongs(browseId: String): List<Song>
 
-    /** Downloads [song]'s audio for offline playback. A no-op if it's already downloaded. */
-    suspend fun downloadSong(song: Song): DownloadedSong
+    /** Downloads [song]'s audio for offline playback. A no-op if it's already
+     *  downloaded. [onProgress] receives the download fraction (0f..1f); it's
+     *  never called when the server omits a Content-Length. */
+    suspend fun downloadSong(song: Song, onProgress: (Float) -> Unit = {}): DownloadedSong
 
     /** All currently-downloaded songs, most-recently-downloaded first. */
     fun observeDownloadedSongs(): Flow<List<DownloadedSong>>
@@ -46,6 +49,12 @@ interface MusicRepository {
 
     /** Whether [videoId] is currently liked. */
     fun isLiked(videoId: String): Boolean
+
+    /** User-created playlists, most-recently-created first. */
+    fun observePlaylists(): Flow<List<Playlist>>
+
+    /** Creates a new, empty playlist named [name] (trimmed) and returns it. */
+    suspend fun createPlaylist(name: String): Playlist
 
     /** [videoId]'s lyrics, or null if InnerTube doesn't have/expose any for it. */
     suspend fun getLyrics(videoId: String): String?

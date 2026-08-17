@@ -18,15 +18,24 @@ import java.util.Locale
  */
 
 /**
+ * One top artist: the name, plus the cover of the artist's most recently
+ * played track so the Stats screen can show real artwork.
+ */
+data class ArtistStat(
+    val name: String,
+    val thumbnailUrl: String,
+)
+
+/**
  * The aggregate result for one history.
  *
  * [listeningSecondsToday], [listeningSecondsThisWeek], and
  * [listeningSecondsAllTime] sum the parsed duration of each play. Legacy
  * entries (playedAtMillis = 0) do not participate.
  *
- * [topArtists] lists artists by play count. Blank artist names do not
- * participate. [topTracks] lists songs by play count. The most recent Song
- * represents each videoId.
+ * [topArtists] lists artists by play count; see [ArtistStat]. Blank artist
+ * names do not participate. [topTracks] lists songs by play count. The most
+ * recent Song represents each videoId.
  */
 data class PlayStats(
     val totalPlays: Int,
@@ -35,7 +44,7 @@ data class PlayStats(
     val listeningSecondsAllTime: Long,
     val uniqueTracks: Int,
     val uniqueArtists: Int,
-    val topArtists: List<Pair<String, Int>>,
+    val topArtists: List<Pair<ArtistStat, Int>>,
     val topTracks: List<Pair<Song, Int>>,
     val streakDays: Int
 )
@@ -97,12 +106,14 @@ fun computePlayStats(
         .distinct()
         .size
 
-    val topArtists = entries.map { it.song.artist }
-        .filter { it.isNotBlank() }
-        .groupingBy { it }
-        .eachCount()
-        .toList()
-        .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+    val topArtists = entries
+        .groupBy { it.song.artist }
+        .filterKeys { it.isNotBlank() }
+        .map { (artist, plays) ->
+            val latestSong = plays.maxBy { it.playedAtMillis }.song
+            ArtistStat(name = artist, thumbnailUrl = latestSong.thumbnailUrl) to plays.size
+        }
+        .sortedWith(compareByDescending<Pair<ArtistStat, Int>> { it.second }.thenBy { it.first.name })
         .take(5)
 
     val topTracks = entries.groupBy { it.song.videoId }

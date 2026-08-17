@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -52,7 +53,7 @@ import coil.compose.AsyncImage
 import com.resona.music.domain.model.ArtistSpotlight
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.Song
-import com.resona.music.ui.theme.JosefinSansFontFamily
+import com.resona.music.ui.theme.InterFontFamily
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
@@ -89,7 +90,7 @@ private val quickPickGenres =
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onSearchQuery: (String) -> Unit = {},
-    onStatsClick: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
@@ -102,7 +103,7 @@ fun HomeScreen(
         uiState = uiState,
         onRefresh = viewModel::refresh,
         onSearchQuery = onSearchQuery,
-        onStatsClick = onStatsClick,
+        onSearchClick = onSearchClick,
         onProfileClick = onProfileClick,
         onAlbumClick = onAlbumClick,
         onArtistClick = onArtistClick,
@@ -117,7 +118,7 @@ private fun HomeScreenContent(
     uiState: HomeUiState,
     onRefresh: () -> Unit = {},
     onSearchQuery: (String) -> Unit = {},
-    onStatsClick: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
@@ -143,7 +144,7 @@ private fun HomeScreenContent(
                 else -> HomeFeedList(
                     feed = feed,
                     onGenreClick = onSearchQuery,
-                    onStatsClick = onStatsClick,
+                    onSearchClick = onSearchClick,
                     onAlbumClick = onAlbumClick,
                     onArtistClick = onArtistClick,
                     onTrackClick = onTrackClick,
@@ -193,7 +194,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier 
 private fun HomeFeedList(
     feed: HomeFeed,
     onGenreClick: (String) -> Unit,
-    onStatsClick: () -> Unit,
+    onSearchClick: () -> Unit,
     onAlbumClick: (HomeAlbum) -> Unit,
     onArtistClick: (HomeArtist) -> Unit,
     onTrackClick: (HomeTrack) -> Unit,
@@ -254,24 +255,32 @@ private fun HomeFeedList(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Don't see what you want here? Go to Stats",
+                    text = "Don't see what you want here? Go to Search",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                Spacer(modifier = Modifier.height(7.dp))
-                Box(
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
                     modifier = Modifier
-                        .clickable(onClick = onStatsClick)
+                        .clickable(onClick = onSearchClick)
                         .background(
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
                             shape = MaterialTheme.shapes.extraLarge
                         )
-                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                        .padding(horizontal = 22.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
                     Text(
-                        text = "EXPLORE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        text = "SEARCH",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                         letterSpacing = 0.4.sp
                     )
                 }
@@ -396,7 +405,7 @@ private fun RecommendedSection(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
+                fontFamily = InterFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -499,7 +508,7 @@ private fun TrendingSection(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
+                fontFamily = InterFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -601,8 +610,7 @@ private fun TopArtistsSection(
                     text = "Popular Artists",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    fontFamily = JosefinSansFontFamily,
-                    fontWeight = FontWeight.Bold
+                    fontFamily = InterFontFamily,
                 )
                 Text(
                     // There's no account/listening history in this app to
@@ -657,7 +665,7 @@ private fun ArtistCard(
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = name,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -683,7 +691,7 @@ private fun NewForYouSection(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
+                fontFamily = InterFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }

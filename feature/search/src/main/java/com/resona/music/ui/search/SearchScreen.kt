@@ -880,15 +880,14 @@ private fun RoundedSearchField(
             if (query.isEmpty()) {
                 Text(
                     text = "Search...",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
                 )
             }
             BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
-                textStyle = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 14.sp,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onSurface
                 ),
                 singleLine = true,
