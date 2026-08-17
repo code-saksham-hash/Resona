@@ -11,6 +11,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,9 +21,14 @@ import javax.inject.Inject
 
 /** Saves a song's resolved audio stream to a local file. Separate interface so
  *  tests can fake it without a live Context -- same reasoning as JsEngine
- *  (see ExtractorModule). */
+ *  (see ExtractorModule). [onProgress] reports download fraction (0f..1f);
+ *  callers that don't care about progress can ignore it. */
 internal interface SongDownloader {
-    suspend fun download(song: Song, streamSource: StreamSource): File
+    suspend fun download(
+        song: Song,
+        streamSource: StreamSource,
+        onProgress: (Float) -> Unit = {},
+    ): File
 }
 
 internal class HttpSongDownloader @Inject constructor(
@@ -30,7 +36,11 @@ internal class HttpSongDownloader @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : SongDownloader {
 
-    override suspend fun download(song: Song, streamSource: StreamSource): File {
+    override suspend fun download(
+        song: Song,
+        streamSource: StreamSource,
+        onProgress: (Float) -> Unit,
+    ): File {
         val musicDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: context.filesDir
         val destination = File(musicDir, "${song.videoId.sanitizeForFileName()}.audio")
         // Written under a temp name and renamed on success so a failed/killed
@@ -40,11 +50,27 @@ internal class HttpSongDownloader @Inject constructor(
 
         val response: HttpResponse = httpClient.get(streamSource.url) {
             header("User-Agent", streamSource.userAgent)
+            // Ask for the whole stream via a range request: servers then
+            // answer with Content-Range "bytes 0-.../TOTAL", which is the one
+            // place the total size survives modern transports -- plain
+            // Content-Length is stripped by HTTP/2 (it travels in DATA frame
+            // headers, not the header map), and over plain HTTP/1.1 it's
+            // frequently absent for chunked media streams.
+            header(HttpHeaders.Range, "bytes=0-")
         }
         Log.d(TAG, "download: response status=${response.status}")
         if (!response.status.isSuccess()) {
             throw IOException("Download failed for ${song.videoId}: HTTP ${response.status.value}")
         }
+        // When the server tells us the size up front (Content-Length), the
+        // progress ring can be determinate; without it the UI falls back to
+        // an indeterminate spinner. Prefer Content-Range's total (see the
+        // Range header comment above) over Content-Length.
+        val totalBytes = response.headers[HttpHeaders.ContentRange]
+            ?.substringAfter('/', missingDelimiterValue = "")
+            ?.toLongOrNull()
+            ?.takeIf { it > 0 }
+            ?: response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
 
         // File writes are blocking -- keep them off whatever dispatcher the
         // caller happens to be on (PlayerViewModel calls this from
@@ -53,6 +79,7 @@ internal class HttpSongDownloader @Inject constructor(
             val dirReady = musicDir.mkdirs() || musicDir.isDirectory
             Log.d(TAG, "download: musicDir=$musicDir dirReady=$dirReady")
             var bytesWritten = 0L
+            var lastReportedPercent = -1
             try {
                 val channel = response.bodyAsChannel()
                 tempFile.outputStream().use { output ->
@@ -63,6 +90,16 @@ internal class HttpSongDownloader @Inject constructor(
                         if (read > 0) {
                             output.write(buffer, 0, read)
                             bytesWritten += read
+                            // Throttle progress callbacks to ~1% steps -- the
+                            // buffer is 8 KiB, so a full report per buffer
+                            // would spam the StateFlow for no visible gain.
+                            if (totalBytes != null && totalBytes > 0) {
+                                val percent = ((bytesWritten * 100) / totalBytes).toInt()
+                                if (percent in 0..100 && percent != lastReportedPercent) {
+                                    lastReportedPercent = percent
+                                    onProgress(percent / 100f)
+                                }
+                            }
                         }
                     }
                 }

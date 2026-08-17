@@ -27,8 +27,10 @@ interface MusicRepository {
     /** The songs inside the playlist identified by [browseId] (see [FeaturedPlaylist.browseId]). */
     suspend fun getPlaylistSongs(browseId: String): List<Song>
 
-    /** Downloads [song]'s audio for offline playback. A no-op if it's already downloaded. */
-    suspend fun downloadSong(song: Song): DownloadedSong
+    /** Downloads [song]'s audio for offline playback. A no-op if it's already
+     *  downloaded. [onProgress] receives the download fraction (0f..1f); it's
+     *  never called when the server omits a Content-Length. */
+    suspend fun downloadSong(song: Song, onProgress: (Float) -> Unit = {}): DownloadedSong
 
     /** All currently-downloaded songs, most-recently-downloaded first. */
     fun observeDownloadedSongs(): Flow<List<DownloadedSong>>

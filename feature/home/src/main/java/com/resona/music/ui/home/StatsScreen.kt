@@ -45,7 +45,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -211,8 +210,7 @@ private fun HeroStat(
     value: String,
     label: String,
     icon: ImageVector,
-    modifier: Modifier = Modifier,
-    valueFontSize: TextUnit = 44.sp
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier,
@@ -228,17 +226,14 @@ private fun HeroStat(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontSize = valueFontSize,
-                fontWeight = FontWeight.Bold
-            ),
+            style = MaterialTheme.typography.displayMedium,
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1
         )
@@ -292,7 +287,7 @@ private fun TopTrackCard(
             ) {
                 Text(
                     text = playCount(plays),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    style = MaterialTheme.typography.labelSmall,
                     color = Color.White
                 )
             }
@@ -300,7 +295,7 @@ private fun TopTrackCard(
         Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = song.title,
-            style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp),
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
@@ -310,7 +305,7 @@ private fun TopTrackCard(
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = song.artist,
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -361,7 +356,7 @@ private fun TopArtistCell(
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = artist.name,
-            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
+            style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
@@ -372,7 +367,7 @@ private fun TopArtistCell(
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = playCount(plays),
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -411,7 +406,7 @@ private fun PeriodStatTile(
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = stat.label,
-            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
             textAlign = TextAlign.Center

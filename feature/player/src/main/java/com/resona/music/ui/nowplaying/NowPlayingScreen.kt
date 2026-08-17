@@ -3,6 +3,7 @@ package com.resona.music.ui.nowplaying
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.DownloadDone
@@ -765,7 +767,7 @@ private fun NowPlayingTopBar(
                     text = {
                         Text(
                             when (downloadState) {
-                                DownloadState.Downloading -> "Downloading…"
+                                is DownloadState.Downloading -> "Downloading…"
                                 DownloadState.Downloaded -> "Downloaded"
                                 else -> "Download"
                             }
@@ -983,37 +985,10 @@ private fun PlaybackControls(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            IconButton(
-                onClick = onDownloadClick,
-                enabled = downloadState !is DownloadState.Downloading && downloadState !is DownloadState.Downloaded,
-                modifier = Modifier.size(44.dp)
-            ) {
-                when (downloadState) {
-                    DownloadState.Downloading -> CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    DownloadState.Downloaded -> Icon(
-                        imageVector = Icons.Outlined.DownloadDone,
-                        contentDescription = "Downloaded",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(26.dp)
-                    )
-                    is DownloadState.Failed -> Icon(
-                        imageVector = Icons.Outlined.Download,
-                        contentDescription = "Download failed, tap to retry",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(26.dp)
-                    )
-                    DownloadState.Idle -> Icon(
-                        imageVector = Icons.Outlined.Download,
-                        contentDescription = "Download",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
+            DownloadButton(
+                downloadState = downloadState,
+                onDownloadClick = onDownloadClick
+            )
         }
     }
 }
@@ -1023,6 +998,95 @@ private fun formatDuration(millis: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%d:%02d".format(minutes, seconds)
+}
+
+@Composable
+private fun DownloadButton(
+    downloadState: DownloadState,
+    onDownloadClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.size(44.dp), contentAlignment = Alignment.Center) {
+        val downloading = downloadState is DownloadState.Downloading
+        val progress = (downloadState as? DownloadState.Downloading)?.progress
+
+        if (downloading) {
+            val animatedProgress by animateFloatAsState(
+                targetValue = progress ?: 0f,
+                animationSpec = tween(durationMillis = 300),
+                label = "downloadProgress"
+            )
+            if (progress != null) {
+                // Determinate ring showing real download progress.
+                CircularProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.size(40.dp),
+                    strokeWidth = 2.5.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
+            } else {
+                // No Content-Length from the server -- spin instead.
+                CircularProgressIndicator(
+                    modifier = Modifier.size(40.dp),
+                    strokeWidth = 2.5.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
+            }
+        }
+
+        IconButton(
+            onClick = onDownloadClick,
+            enabled = !downloading && downloadState !is DownloadState.Downloaded,
+            modifier = Modifier.size(40.dp)
+        ) {
+            when (downloadState) {
+                is DownloadState.Downloading -> DownloadingIcon()
+                DownloadState.Downloaded -> Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "Downloaded",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(26.dp)
+                )
+                is DownloadState.Failed -> Icon(
+                    imageVector = Icons.Outlined.Download,
+                    contentDescription = "Download failed, tap to retry",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(26.dp)
+                )
+                DownloadState.Idle -> Icon(
+                    imageVector = Icons.Outlined.Download,
+                    contentDescription = "Download",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+    }
+}
+
+/** Download icon that breathes (1.0f -> 0.8f scale loop) while the download runs. */
+@Composable
+private fun DownloadingIcon() {
+    val pulse = rememberInfiniteTransition(label = "downloadPulse")
+    val scale by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 550, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "downloadIconScale"
+    )
+    Icon(
+        imageVector = Icons.Outlined.Download,
+        contentDescription = "Downloading…",
+        tint = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .size(26.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+    )
 }
 
 private val previewTrack = Song(

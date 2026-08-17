@@ -39,7 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -186,8 +185,7 @@ private fun HistoryRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = entry.song.title,
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -195,7 +193,7 @@ private fun HistoryRow(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = entry.song.artist,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -207,14 +205,14 @@ private fun HistoryRow(
                 // A legacy record has playedAtMillis = 0, which would format as
                 // a timestamp from 1970. Show a neutral label for those instead.
                 text = if (entry.playedAtMillis > 0) timeAgo(entry.playedAtMillis, nowMillis) else "Recently",
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
             if (entry.song.duration.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = entry.song.duration,
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }

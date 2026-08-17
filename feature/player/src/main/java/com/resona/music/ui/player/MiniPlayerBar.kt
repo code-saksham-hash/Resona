@@ -42,6 +42,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.resona.music.feature.player.R
 import com.resona.music.domain.model.Song
+import com.resona.music.ui.theme.JosefinSansFontFamily
 import com.resona.music.ui.theme.ResonaTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -100,7 +102,10 @@ fun MiniPlayerBar(
         }
 
         val textMeasurer = rememberTextMeasurer()
-        val titleStyle = MaterialTheme.typography.titleSmall
+        val titleStyle = MaterialTheme.typography.titleSmall.copy(
+            fontFamily = JosefinSansFontFamily,
+            fontWeight = FontWeight.Bold
+        )
         val marqueeAnim = remember { Animatable(0f) }
         val containerWidthPx = remember { mutableStateOf(0f) }
         val naturalTextWidthPx = remember { mutableStateOf(0f) }
@@ -175,7 +180,7 @@ fun MiniPlayerBar(
                     val textWidthDp = with(density) { naturalTextWidthPx.value.toDp() }
                     Text(
                         text = track.title,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = titleStyle,
                         color = palette.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Clip,

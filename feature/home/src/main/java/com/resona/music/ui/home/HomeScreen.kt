@@ -52,7 +52,7 @@ import coil.compose.AsyncImage
 import com.resona.music.domain.model.ArtistSpotlight
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.Song
-import com.resona.music.ui.theme.JosefinSansFontFamily
+import com.resona.music.ui.theme.InterFontFamily
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
@@ -396,7 +396,7 @@ private fun RecommendedSection(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
+                fontFamily = InterFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -499,7 +499,7 @@ private fun TrendingSection(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
+                fontFamily = InterFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -601,8 +601,7 @@ private fun TopArtistsSection(
                     text = "Popular Artists",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    fontFamily = JosefinSansFontFamily,
-                    fontWeight = FontWeight.Bold
+                    fontFamily = InterFontFamily,
                 )
                 Text(
                     // There's no account/listening history in this app to
@@ -657,7 +656,7 @@ private fun ArtistCard(
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             text = name,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -683,7 +682,7 @@ private fun NewForYouSection(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
+                fontFamily = InterFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }

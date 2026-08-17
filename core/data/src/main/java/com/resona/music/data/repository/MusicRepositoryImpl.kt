@@ -171,7 +171,7 @@ class MusicRepositoryImpl @Inject internal constructor(
             )
         }
 
-    override suspend fun downloadSong(song: Song): DownloadedSong {
+    override suspend fun downloadSong(song: Song, onProgress: (Float) -> Unit): DownloadedSong {
         downloadedSongsStore.filePathFor(song.videoId)?.let { existingPath ->
             Log.d(TAG, "downloadSong: ${song.videoId} already downloaded at $existingPath")
             return DownloadedSong(song, existingPath)
@@ -179,7 +179,7 @@ class MusicRepositoryImpl @Inject internal constructor(
         Log.d(TAG, "downloadSong: resolving stream for ${song.videoId}")
         val streamSource = getStreamSource(song.videoId)
         Log.d(TAG, "downloadSong: got stream, fetching bytes for ${song.videoId}")
-        val file = songDownloader.download(song, streamSource)
+        val file = songDownloader.download(song, streamSource, onProgress)
         Log.d(TAG, "downloadSong: wrote ${file.absolutePath} (${file.length()} bytes), persisting index")
         downloadedSongsStore.markDownloaded(song, file.absolutePath)
         return DownloadedSong(song, file.absolutePath)

@@ -337,10 +337,10 @@ private fun QuickLinksSection(
     onDownloadsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val likedSubtitle = if (likedCount > 0) "$likedCount tracks" else "Your favorites"
+    val likedSubtitle = "$likedCount tracks"
     val downloadsSubtitle = "$downloadedCount tracks"
     val quickLinks = listOf(
-        QuickLink("liked", "Liked Songs", likedSubtitle, Icons.Filled.Favorite, tint = Color.White),
+        QuickLink("liked", "Liked", likedSubtitle, Icons.Filled.Favorite, tint = Color.White),
         QuickLink("downloads", "Downloads", downloadsSubtitle, Icons.Outlined.DownloadDone),
     )
     val onClicks = mapOf("liked" to onLikedClick, "downloads" to onDownloadsClick)
@@ -393,6 +393,8 @@ private fun QuickLinkCard(
                 text = link.title,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = link.subtitle,

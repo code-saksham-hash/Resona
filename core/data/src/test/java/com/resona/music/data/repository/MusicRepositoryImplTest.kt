@@ -7,6 +7,7 @@ import com.resona.music.data.extractor.JsEngine
 import com.resona.music.data.extractor.YouTubeStreamExtractor
 import com.resona.music.data.history.PlayHistoryStore
 import com.resona.music.data.likes.LikedSongsStore
+import com.resona.music.data.playlists.UserPlaylistsStore
 import com.resona.music.data.extractor.decipher.DecipherService
 import com.resona.music.data.extractor.decipher.NParamDecipherer
 import com.resona.music.data.extractor.decipher.PlayerJsRepository
@@ -14,6 +15,7 @@ import com.resona.music.data.extractor.decipher.SignatureDecipherer
 import com.resona.music.data.remote.innertube.InnerTubeApi
 import com.resona.music.domain.model.DownloadedSong
 import com.resona.music.domain.model.PlayHistoryEntry
+import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.StreamSource
 import io.ktor.client.HttpClient
@@ -203,7 +205,11 @@ class MusicRepositoryImplTest {
         // fake above (the real implementations need a live Context this
         // plain JVM test doesn't have).
         val songDownloader = object : SongDownloader {
-            override suspend fun download(song: Song, streamSource: StreamSource) = File("/unused")
+            override suspend fun download(
+                song: Song,
+                streamSource: StreamSource,
+                onProgress: (Float) -> Unit,
+            ) = File("/unused")
         }
         val downloadedSongsStore = object : DownloadedSongsStore {
             override val downloads = MutableStateFlow(emptyList<DownloadedSong>())
@@ -220,6 +226,14 @@ class MusicRepositoryImplTest {
             override val entries = MutableStateFlow(emptyList<PlayHistoryEntry>())
             override suspend fun recordPlay(song: Song) = Unit
         }
+        val userPlaylistsStore = object : UserPlaylistsStore {
+            override val playlists = MutableStateFlow(emptyList<Playlist>())
+            override suspend fun createPlaylist(name: String) = Playlist(
+                id = "playlist_test",
+                name = name,
+                createdAtMillis = 0L
+            )
+        }
         return MusicRepositoryImpl(
             InnerTubeApi(httpClient, PlayerJsRepository(httpClient)),
             streamExtractor,
@@ -227,6 +241,7 @@ class MusicRepositoryImplTest {
             downloadedSongsStore,
             likedSongsStore,
             playHistoryStore,
+            userPlaylistsStore,
             httpClient
         )
     }
