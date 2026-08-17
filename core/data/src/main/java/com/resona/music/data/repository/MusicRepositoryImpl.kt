@@ -6,6 +6,7 @@ import com.resona.music.data.download.SongDownloader
 import com.resona.music.data.extractor.YouTubeStreamExtractor
 import com.resona.music.data.history.PlayHistoryStore
 import com.resona.music.data.likes.LikedSongsStore
+import com.resona.music.data.playlists.UserPlaylistsStore
 import com.resona.music.data.remote.innertube.InnerTubeApi
 import com.resona.music.data.remote.innertube.models.extractFeaturedPlaylists
 import com.resona.music.data.remote.innertube.models.extractLyricsBrowseId
@@ -20,6 +21,7 @@ import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.HomeFeedSection
 import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.PlayHistoryEntry
+import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import com.resona.music.domain.repository.StreamSource
@@ -39,6 +41,7 @@ class MusicRepositoryImpl @Inject internal constructor(
     private val downloadedSongsStore: DownloadedSongsStore,
     private val likedSongsStore: LikedSongsStore,
     private val playHistoryStore: PlayHistoryStore,
+    private val userPlaylistsStore: UserPlaylistsStore,
     private val httpClient: HttpClient,
 ) : MusicRepository {
 
@@ -193,6 +196,10 @@ class MusicRepositoryImpl @Inject internal constructor(
     override fun observeLikedSongs(): Flow<List<Song>> = likedSongsStore.likedSongs
 
     override fun isLiked(videoId: String): Boolean = likedSongsStore.isLiked(videoId)
+
+    override fun observePlaylists(): Flow<List<Playlist>> = userPlaylistsStore.playlists
+
+    override suspend fun createPlaylist(name: String): Playlist = userPlaylistsStore.createPlaylist(name)
 
     override suspend fun getLyrics(videoId: String): String? {
         val lyricsBrowseId = runCatching { api.next(videoId).extractLyricsBrowseId() }.getOrNull()

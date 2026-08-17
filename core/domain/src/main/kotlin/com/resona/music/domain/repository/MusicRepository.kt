@@ -5,6 +5,7 @@ import com.resona.music.domain.model.FeaturedPlaylist
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.PlayHistoryEntry
+import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
 import kotlinx.coroutines.flow.Flow
 
@@ -46,6 +47,12 @@ interface MusicRepository {
 
     /** Whether [videoId] is currently liked. */
     fun isLiked(videoId: String): Boolean
+
+    /** User-created playlists, most-recently-created first. */
+    fun observePlaylists(): Flow<List<Playlist>>
+
+    /** Creates a new, empty playlist named [name] (trimmed) and returns it. */
+    suspend fun createPlaylist(name: String): Playlist
 
     /** [videoId]'s lyrics, or null if InnerTube doesn't have/expose any for it. */
     suspend fun getLyrics(videoId: String): String?

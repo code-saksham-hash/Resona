@@ -159,7 +159,11 @@ fun ResonaNavGraph() {
                 popEnterTransition = { bottomNavEnter },
                 popExitTransition = { bottomNavExit },
             ) {
-                StatsScreen()
+                StatsScreen(
+                    onArtistClick = { artist ->
+                        navController.navigate(artistDetailRoute(artist))
+                    }
+                )
             }
             composable(
                 route = "${ResonaDestination.Search.route}?query={query}",
@@ -219,9 +223,6 @@ fun ResonaNavGraph() {
                 LibraryScreen(
                     onDownloadedSongClick = playerViewModel::play,
                     onLikedSongClick = playerViewModel::play,
-                    onPlaylistClick = { playlist ->
-                        navController.navigate(playlistDetailRoute(playlist.browseId, playlist.title))
-                    },
                     onSearchClick = {
                         navController.navigate(ResonaDestination.Search.route)
                     },
