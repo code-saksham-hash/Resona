@@ -280,7 +280,7 @@ private fun PlayerContent(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = track.artist,
+                    text = track.displayArtist,
                     style = MaterialTheme.typography.titleMedium,
                     color = palette.onBackground.copy(alpha = 0.7f),
                     maxLines = 1,
@@ -421,7 +421,7 @@ private fun QueueContent(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = song.artist,
+                                text = song.displayArtist,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = palette.onBackground.copy(alpha = 0.6f),
                                 maxLines = 1,

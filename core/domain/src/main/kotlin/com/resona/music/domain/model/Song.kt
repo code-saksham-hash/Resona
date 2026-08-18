@@ -3,10 +3,13 @@ package com.resona.music.domain.model
 data class Song(
     val videoId: String,
     val title: String,
+    // "" when InnerTube omitted the artist run entirely for this row (e.g. a
+    // search result whose artist matches the search query itself -- see
+    // extractSongs()). Render [displayArtist], not this, so that never shows
+    // up as a blank line.
     val artist: String,
     val thumbnailUrl: String,
-    // "" when InnerTube didn't report one for this row (e.g. omitted when the
-    // search query already names the artist -- see extractSongs()).
+    // "" when InnerTube didn't report a duration for this row.
     val duration: String = ""
 ) {
     val highResThumbnailUrl: String
@@ -19,4 +22,7 @@ data class Song(
             }
             return "https://i.ytimg.com/vi/$videoId/maxresdefault.jpg"
         }
+
+    val displayArtist: String
+        get() = artist.ifBlank { "Unknown Artist" }
 }
