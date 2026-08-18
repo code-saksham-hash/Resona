@@ -223,6 +223,9 @@ fun ResonaNavGraph() {
                 LibraryScreen(
                     onDownloadedSongClick = playerViewModel::play,
                     onLikedSongClick = playerViewModel::play,
+                    onUserPlaylistClick = { playlist ->
+                        navController.navigate(playlistDetailRoute(playlist.id, playlist.name))
+                    },
                     onSearchClick = {
                         navController.navigate(ResonaDestination.Search.route)
                     },
