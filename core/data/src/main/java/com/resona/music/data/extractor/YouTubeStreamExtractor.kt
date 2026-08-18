@@ -32,7 +32,22 @@ internal class YouTubeStreamExtractor @Inject constructor(
         InnerTubeClientConfig.WEB,
     )
 
-    suspend fun resolveStreamUrl(videoId: String): StreamSource {
+    suspend fun resolveStreamUrl(videoId: String, excludedClients: Set<String> = emptySet()): StreamSource {
+        // A client that self-reports a format as resolvable (status OK, a
+        // format url present) can still have the CDN flatly reject that url
+        // once the player actually opens it (403, surfaces as "source
+        // error") -- that's only observable after this function returns, so
+        // a caller retrying after that happens passes the failed client back
+        // in here to skip it, instead of landing on the exact same client
+        // and the same doomed url again.
+        val availableClients = clientChain.filterNot { it.clientName in excludedClients }
+        if (availableClients.isEmpty()) {
+            throw PlaybackUnavailableException(
+                status = "ALL_CLIENTS_EXCLUDED",
+                reasonText = "Every client in the fallback chain already produced a url the CDN rejected."
+            )
+        }
+
         // Seed a stable visitor identity without blocking: the first attempt
         // goes out with whatever token is already cached, and if it gets gated
         // (every client in the chain returns no playable audio -- the "PO token
@@ -45,7 +60,7 @@ internal class YouTubeStreamExtractor @Inject constructor(
         val visitorFetch = playerJsRepo.ensureVisitorData(videoId)
 
         val (response, winningClient) = try {
-            fetchWithFallback(videoId, initialVisitor)
+            fetchWithFallback(videoId, initialVisitor, availableClients)
         } catch (e: PlaybackUnavailableException) {
             // First pass failed: retry once with the freshest token available.
             // Prefer a token that arrived mid-fail from any source (a gated
@@ -61,7 +76,7 @@ internal class YouTubeStreamExtractor @Inject constructor(
             }
             if (token == null) throw e
             Log.d(TAG, "resolveStreamUrl: first attempt gated, retrying chain with a fresh visitor token")
-            fetchWithFallback(videoId, token)
+            fetchWithFallback(videoId, token, availableClients)
         }
 
         val audioFormats = response.streamingData
@@ -94,7 +109,7 @@ internal class YouTubeStreamExtractor @Inject constructor(
         for (format in audioFormats) {
             try {
                 val url = decipherService.buildPlayableUrl(format, resolvedPlayerJsUrl)
-                return StreamSource(url = url, userAgent = winningClient.userAgent)
+                return StreamSource(url = url, userAgent = winningClient.userAgent, clientName = winningClient.clientName)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -110,6 +125,7 @@ internal class YouTubeStreamExtractor @Inject constructor(
     private suspend fun fetchWithFallback(
         videoId: String,
         visitorData: String?,
+        clients: List<InnerTubeClientConfig>,
     ): Pair<RawPlayerResponse, InnerTubeClientConfig> {
         var lastStatus = "UNKNOWN"
         var lastReason = "No client in the fallback chain was tried."
@@ -130,8 +146,8 @@ internal class YouTubeStreamExtractor @Inject constructor(
         // the multi-MB player JS.
         var playerJsUrl: String? = null
         var signatureTimestamp: Int? = null
-        val firstClient = clientChain.first()
-        for (config in clientChain) {
+        val firstClient = clients.first()
+        for (config in clients) {
             if (config.includeSignatureTimestamp && signatureTimestamp == null && playerJsUrl == null) {
                 playerJsUrl = runCatching { playerJsRepo.fetchPlayerJsUrl(videoId) }.getOrNull()
                 signatureTimestamp = playerJsUrl?.let { url ->

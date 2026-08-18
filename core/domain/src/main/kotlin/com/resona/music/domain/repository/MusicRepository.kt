@@ -11,7 +11,10 @@ import kotlinx.coroutines.flow.Flow
 
 interface MusicRepository {
     suspend fun search(query: String): List<Song>
-    suspend fun getStreamSource(videoId: String): StreamSource
+    /** [excludedClients] (InnerTube client names, e.g. "ANDROID_VR") are skipped in the
+     *  fallback chain -- for a retry after the CDN itself rejected a previous resolution's
+     *  url, not a resolve-time failure (see [StreamSource.clientName]). */
+    suspend fun getStreamSource(videoId: String, excludedClients: Set<String> = emptySet()): StreamSource
     suspend fun getHomeFeed(): HomeFeed
 
     /** Records that [song] was played -- what lets getHomeFeed()'s "Recommended
@@ -108,10 +111,17 @@ interface MusicRepository {
 }
 
 // A bare url isn't enough -- the CDN rejects requests that don't come from
-// the same client identity (userAgent) that resolved it.
+// the same client identity (userAgent) that resolved it. clientName is the
+// InnerTube client (e.g. "ANDROID_VR") that resolved this url -- a caller
+// retrying after the CDN itself rejects the url (not a resolve-time
+// failure) needs it to exclude that client next time, since a client that
+// self-reports a format as resolvable can still have the CDN flatly 403 it,
+// and re-resolving without excluding it just lands on the same client and
+// the same doomed url again.
 data class StreamSource(
     val url: String,
     val userAgent: String,
+    val clientName: String,
 )
 
 // InnerTube reported a video as unplayable right now -- sign-in required,
