@@ -71,8 +71,8 @@ class MusicRepositoryImpl @Inject internal constructor(
         return songs.map { if (it.artist.isBlank()) it.copy(artist = fallbackArtist) else it }
     }
 
-    override suspend fun getStreamSource(videoId: String): StreamSource =
-        streamExtractor.resolveStreamUrl(videoId)
+    override suspend fun getStreamSource(videoId: String, excludedClients: Set<String>): StreamSource =
+        streamExtractor.resolveStreamUrl(videoId, excludedClients)
 
     // There's no logged-in session anywhere in this app, so InnerTube's own
     // browse/FEmusic_home feed has nothing personalized to return -- tried
@@ -198,7 +198,7 @@ class MusicRepositoryImpl @Inject internal constructor(
             return DownloadedSong(song, existingPath)
         }
         Log.d(TAG, "downloadSong: resolving stream for ${song.videoId}")
-        val streamSource = getStreamSource(song.videoId)
+        val streamSource = getStreamSource(song.videoId, excludedClients = emptySet())
         Log.d(TAG, "downloadSong: got stream, fetching bytes for ${song.videoId}")
         val file = songDownloader.download(song, streamSource, onProgress)
         Log.d(TAG, "downloadSong: wrote ${file.absolutePath} (${file.length()} bytes), persisting index")

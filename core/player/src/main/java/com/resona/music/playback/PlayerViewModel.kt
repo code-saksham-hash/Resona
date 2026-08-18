@@ -127,6 +127,14 @@ class PlayerViewModel @Inject constructor(
      *  Reset whenever [play] starts a genuinely different track. */
     private var streamRetryCount = 0
 
+    /** InnerTube client names (see [StreamSource.clientName]) already tried for the
+     *  current track and proven to produce a url the CDN then rejected. A client
+     *  self-reporting a format as resolvable doesn't mean the CDN will actually
+     *  serve it -- confirmed live: the same client resolves the same doomed url
+     *  every time, so a retry that doesn't exclude it just repeats the failure
+     *  instead of walking the fallback chain. Reset alongside [streamRetryCount]. */
+    private val excludedClients = mutableSetOf<String>()
+
     private val controllerFuture = MediaController.Builder(
         context,
         SessionToken(context, ComponentName(context, PlayerService::class.java))
@@ -172,18 +180,18 @@ class PlayerViewModel @Inject constructor(
                         val isCurrentTrackStream = track != null &&
                             controller.currentMediaItem?.mediaId == track.videoId
                         // A format url InnerTube marked resolvable can still get
-                        // flatly rejected by the CDN (403, "source error") when
-                        // the client identity that requested it hasn't picked up
-                        // a fully warmed-up visitor token yet -- see
-                        // PlayerJsRepository. That's only observable here, once
-                        // the player actually opens the connection, so this is
-                        // the one place it can be caught. Re-running play()
-                        // re-resolves from scratch through the whole client
-                        // fallback chain, which usually succeeds once some
-                        // request in the meantime has warmed the token up.
-                        // Capped, and scoped to IO errors only, so a genuinely
-                        // broken/unplayable video still surfaces an error
-                        // instead of retrying forever.
+                        // flatly rejected by the CDN (403, "source error") -- and
+                        // confirmed live (logcat), it's not a one-off: the same
+                        // client resolves the exact same doomed url every time, so
+                        // re-resolving without excluding it just repeats the same
+                        // failure. play() already added this track's client to
+                        // excludedClients when it resolved the url now failing, so
+                        // re-running it walks the fallback chain onto a different
+                        // client instead. That's only observable here, once the
+                        // player actually opens the connection, so this is the one
+                        // place it can be caught. Capped, and scoped to IO errors
+                        // only, so a genuinely broken/unplayable video still
+                        // surfaces an error instead of retrying forever.
                         if (track != null && isCurrentTrackStream &&
                             error.errorCode in RETRYABLE_ERROR_CODES &&
                             streamRetryCount < MAX_STREAM_RETRIES
@@ -248,6 +256,7 @@ class PlayerViewModel @Inject constructor(
     fun play(song: Song, queue: List<Song> = emptyList()) {
         if (song.videoId != _uiState.value.currentTrack?.videoId) {
             streamRetryCount = 0
+            excludedClients.clear()
         }
         this.queue = queue
         currentQueueIndex = if (queue.isNotEmpty()) {
@@ -294,7 +303,12 @@ class PlayerViewModel @Inject constructor(
                 val mediaUri = if (downloadedFilePath != null) {
                     Uri.fromFile(File(downloadedFilePath))
                 } else {
-                    val streamSource = musicRepository.getStreamSource(song.videoId)
+                    val streamSource = musicRepository.getStreamSource(song.videoId, excludedClients)
+                    // Recorded regardless of what happens next: if this client's url
+                    // does get rejected (onPlayerError below, or a caller further up
+                    // retrying after this whole play() throws), a retry must not land
+                    // on it again -- see excludedClients' kdoc.
+                    excludedClients += streamSource.clientName
                     // has to happen before prepare()/play() or ExoPlayer opens
                     // the connection with the wrong user agent and gets rejected
                     httpDataSourceFactory.setUserAgent(streamSource.userAgent)
@@ -647,11 +661,11 @@ class PlayerViewModel @Inject constructor(
         const val DUMMY_NEXT = "__queue_next__"
         const val DUMMY_PREV = "__queue_prev__"
 
-        // See onPlayerError. A couple of quick retries covers a cold-start
-        // gated token; a short delay before each one gives an in-flight
-        // background visitor-token fetch (PlayerJsRepository.ensureVisitorData)
-        // a beat to land first.
-        const val MAX_STREAM_RETRIES = 2
+        // See onPlayerError/excludedClients: each retry walks to a different
+        // client in YouTubeStreamExtractor's 6-client fallback chain, so 4
+        // covers all but one of them before giving up. STREAM_RETRY_DELAY_MILLIS
+        // is just pacing between attempts, not load-bearing for correctness.
+        const val MAX_STREAM_RETRIES = 4
         const val STREAM_RETRY_DELAY_MILLIS = 600L
         // The whole ERROR_CODE_IO_* family (2000-2008) -- a gated/rejected
         // request doesn't always fail as a clean "403 status" IOException.
