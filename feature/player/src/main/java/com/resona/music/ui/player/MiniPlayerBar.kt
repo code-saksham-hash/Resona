@@ -190,7 +190,7 @@ fun MiniPlayerBar(
                             .offset { IntOffset(x = marqueeAnim.value.roundToInt(), y = 0) }
                     )
                     Text(
-                        text = track.artist,
+                        text = track.displayArtist,
                         style = MaterialTheme.typography.bodySmall,
                         color = palette.onBackground.copy(alpha = 0.7f),
                         maxLines = 1,

@@ -171,7 +171,10 @@ class MusicRepositoryImplTest {
     }
     """.trimIndent()
 
-    private fun repositoryWithMockedSearchResponse(json: String): MusicRepositoryImpl {
+    private fun repositoryWithMockedSearchResponse(
+        json: String,
+        recentPlays: List<Song> = emptyList()
+    ): MusicRepositoryImpl {
         val mockEngine = MockEngine {
             respond(
                 content = json,
@@ -223,7 +226,7 @@ class MusicRepositoryImplTest {
             override suspend fun toggle(song: Song) = Unit
         }
         val playHistoryStore = object : PlayHistoryStore {
-            override val entries = MutableStateFlow(emptyList<PlayHistoryEntry>())
+            override val entries = MutableStateFlow(recentPlays.map { PlayHistoryEntry(song = it, playedAtMillis = 0L) })
             override suspend fun recordPlay(song: Song) = Unit
         }
         val userPlaylistsStore = object : UserPlaylistsStore {
@@ -336,6 +339,26 @@ class MusicRepositoryImplTest {
         assertEquals("Instant Crush", song.title)
         assertEquals("5:38", song.duration)
         assertEquals("", song.artist)
+    }
+
+    @Test
+    fun getHomeFeedFillsInRecommendedArtistOmittedByInnerTube() = runTest {
+        // One artist dominates recentPlays, so recommendedQueryFor has a
+        // single candidate ("Daft Punk radio") -- no random() involved, so
+        // this is deterministic. The mocked response is reused for every
+        // section's search (MockEngine ignores the request), so trending/new
+        // get the exact same blank-artist row back with no hint to fix it.
+        val repository = repositoryWithMockedSearchResponse(
+            json = songWithDurationButNoArtistJson,
+            recentPlays = listOf(Song("prior1", "One More Time", "Daft Punk", ""))
+        )
+
+        val feed = repository.getHomeFeed()
+
+        val recommended = feed.sections.first { it.id == "recommended" }.songs.first()
+        assertEquals("Daft Punk", recommended.artist)
+        val trending = feed.sections.first { it.id == "trending" }.songs.first()
+        assertEquals("", trending.artist)
     }
 
     // Shape trimmed from a live next() response fetched with

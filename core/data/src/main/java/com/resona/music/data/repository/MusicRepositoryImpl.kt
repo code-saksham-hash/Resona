@@ -56,6 +56,18 @@ class MusicRepositoryImpl @Inject internal constructor(
             )
         }
 
+    // Same as search(), but for callers that already know every result
+    // "should" be by a single named artist (right now, just getHomeFeed's
+    // recommended section, whose query literally *is* an artist's name) --
+    // that's exactly the condition under which InnerTube omits the artist run
+    // (see extractSongs()), so a blank result here can be safely attributed
+    // to fallbackArtist instead of an unrelated song showing no artist at all.
+    private suspend fun search(query: String, fallbackArtist: String?): List<Song> {
+        val songs = search(query)
+        if (fallbackArtist == null) return songs
+        return songs.map { if (it.artist.isBlank()) it.copy(artist = fallbackArtist) else it }
+    }
+
     override suspend fun getStreamSource(videoId: String): StreamSource =
         streamExtractor.resolveStreamUrl(videoId)
 
@@ -81,15 +93,16 @@ class MusicRepositoryImpl @Inject internal constructor(
     override suspend fun getHomeFeed(): HomeFeed = coroutineScope {
         val trendingQuery = pickQuery(TRENDING_QUERIES, lastTrendingQuery).also { lastTrendingQuery = it }
         val newQuery = pickQuery(NEW_QUERIES, lastNewQuery).also { lastNewQuery = it }
+        val recommended = recommendedQueryFor(playHistoryStore.entries.value)
         val querySpecs = listOf(
-            HomeFeedQuery("recommended", "Recommended For You", recommendedQueryFor(playHistoryStore.entries.value)),
+            HomeFeedQuery("recommended", "Recommended For You", recommended.query, recommended.artistHint),
             HomeFeedQuery("trending", "Trending Now", trendingQuery),
             HomeFeedQuery("new", "New For You", newQuery),
         )
 
         val sectionResults = querySpecs.map { spec ->
             async {
-                spec to runCatching { search(spec.query) }.getOrElse { e ->
+                spec to runCatching { search(spec.query, spec.fallbackArtist) }.getOrElse { e ->
                     Log.d(TAG, "getHomeFeed: '${spec.query}' failed: ${e.message}")
                     emptyList()
                 }
@@ -118,7 +131,7 @@ class MusicRepositoryImpl @Inject internal constructor(
     // most-played artists (not always the single #1) for the same reason
     // every other section's query rotates: so a refresh actually looks
     // different instead of repeating the last fetch verbatim.
-    private fun recommendedQueryFor(history: List<PlayHistoryEntry>): String {
+    private fun recommendedQueryFor(history: List<PlayHistoryEntry>): RecommendedQuery {
         val topArtists = history
             .map { it.song }
             .filter { it.artist.isNotBlank() }
@@ -127,9 +140,14 @@ class MusicRepositoryImpl @Inject internal constructor(
             .entries
             .sortedByDescending { it.value }
             .take(MAX_RECOMMENDED_ARTIST_CANDIDATES)
-            .map { "${it.key} radio" }
+            .map { "${it.key}$ARTIST_RADIO_SUFFIX" }
         val pool = topArtists.ifEmpty { RECOMMENDED_FALLBACK_QUERIES }
-        return pickQuery(pool, lastRecommendedQuery).also { lastRecommendedQuery = it }
+        val query = pickQuery(pool, lastRecommendedQuery).also { lastRecommendedQuery = it }
+        // Only the artist-radio pool names a single artist to fall back to --
+        // the fallback pool ("today's top hits" etc.) spans many artists at
+        // once, so a blank row there is left alone rather than mislabeled.
+        val artistHint = query.removeSuffix(ARTIST_RADIO_SUFFIX).takeIf { it != query }
+        return RecommendedQuery(query, artistHint)
     }
 
     // Avoids immediately repeating the same query two refreshes in a row
@@ -284,7 +302,14 @@ class MusicRepositoryImpl @Inject internal constructor(
             )
         }
 
-    private data class HomeFeedQuery(val id: String, val title: String, val query: String)
+    private data class HomeFeedQuery(
+        val id: String,
+        val title: String,
+        val query: String,
+        val fallbackArtist: String? = null
+    )
+
+    private data class RecommendedQuery(val query: String, val artistHint: String?)
 
     private companion object {
         const val TAG = "MusicRepositoryImpl"
@@ -292,6 +317,7 @@ class MusicRepositoryImpl @Inject internal constructor(
         const val MAX_ARTIST_TOP_SONGS = 5
         const val MAX_RECOMMENDED_ARTIST_CANDIDATES = 3
         const val FEATURED_PLAYLISTS_BROWSE_ID = "FEmusic_home"
+        const val ARTIST_RADIO_SUFFIX = " radio"
 
         // One of these is picked at random per section per getHomeFeed()
         // call (see pickQuery) -- plain synonyms/rephrasings of the same

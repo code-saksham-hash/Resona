@@ -299,7 +299,7 @@ private fun HomeFeed.titleFor(sectionId: String, fallback: String): String =
 private fun Song.toHomeAlbum() = HomeAlbum(
     id = videoId,
     title = title,
-    subtitle = artist,
+    subtitle = displayArtist,
     imageUrl = highResThumbnailUrl,
     videoId = videoId
 )
@@ -308,7 +308,7 @@ private fun Song.toHomeTrack(index: Int) = HomeTrack(
     id = videoId,
     number = index + 1,
     title = title,
-    artist = artist,
+    artist = displayArtist,
     duration = duration,
     imageUrl = highResThumbnailUrl
 )
