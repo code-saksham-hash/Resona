@@ -76,6 +76,24 @@ interface MusicRepository {
      *  single tapped track (see PlayerViewModel) -- the tapped song itself
      *  is included as the first entry. */
     suspend fun getSongRadio(videoId: String): List<Song>
+
+    /** Explicitly-submitted search queries, most-recently-submitted first. */
+    fun observeSearchHistory(): Flow<List<String>>
+
+    /**
+     * Records [query] as a submitted search -- call once per explicit
+     * submission (the keyboard's search action, tapping a history entry),
+     * never on every keystroke of a live query. Re-submitting a query
+     * already in history (case-insensitively) just moves it back to the
+     * front instead of duplicating it.
+     */
+    suspend fun recordSearch(query: String)
+
+    /** Removes a single entry from search history. */
+    suspend fun removeSearchHistoryEntry(query: String)
+
+    /** Clears search history entirely. */
+    suspend fun clearSearchHistory()
 }
 
 // A bare url isn't enough -- the CDN rejects requests that don't come from

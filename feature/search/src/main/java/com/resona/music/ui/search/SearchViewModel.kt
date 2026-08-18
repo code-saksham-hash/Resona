@@ -10,11 +10,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -42,6 +44,11 @@ class SearchViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Empty)
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
+    /** Recent searches, most-recently-submitted first -- what the Search
+     *  screen shows in place of results while [query] is blank. */
+    val searchHistory: StateFlow<List<String>> = musicRepository.observeSearchHistory()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     init {
         viewModelScope.launch {
             _query
@@ -62,6 +69,31 @@ class SearchViewModel @Inject constructor(
 
     fun retry() {
         viewModelScope.launch { performSearch(_query.value) }
+    }
+
+    /**
+     * Runs [query] right away (skipping the debounce) and records it to
+     * search history. This is the screen's only "explicit submission"
+     * gesture -- the keyboard's search action and tapping a history entry
+     * both funnel through it -- as opposed to the live-as-you-type search
+     * above, which never touches history.
+     */
+    fun submitSearch(query: String = _query.value) {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) return
+        _query.value = trimmed
+        viewModelScope.launch {
+            musicRepository.recordSearch(trimmed)
+            performSearch(trimmed)
+        }
+    }
+
+    fun removeHistoryEntry(query: String) {
+        viewModelScope.launch { musicRepository.removeSearchHistoryEntry(query) }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch { musicRepository.clearSearchHistory() }
     }
 
     private suspend fun performSearch(query: String) {

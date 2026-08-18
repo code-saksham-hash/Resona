@@ -5,6 +5,7 @@ import com.resona.music.data.download.DownloadedSongsStore
 import com.resona.music.data.download.SongDownloader
 import com.resona.music.data.extractor.YouTubeStreamExtractor
 import com.resona.music.data.history.PlayHistoryStore
+import com.resona.music.data.history.SearchHistoryStore
 import com.resona.music.data.likes.LikedSongsStore
 import com.resona.music.data.playlists.UserPlaylistsStore
 import com.resona.music.data.remote.innertube.InnerTubeApi
@@ -42,6 +43,7 @@ class MusicRepositoryImpl @Inject internal constructor(
     private val likedSongsStore: LikedSongsStore,
     private val playHistoryStore: PlayHistoryStore,
     private val userPlaylistsStore: UserPlaylistsStore,
+    private val searchHistoryStore: SearchHistoryStore,
     private val httpClient: HttpClient,
 ) : MusicRepository {
 
@@ -301,6 +303,14 @@ class MusicRepositoryImpl @Inject internal constructor(
                 duration = song.duration
             )
         }
+
+    override fun observeSearchHistory(): Flow<List<String>> = searchHistoryStore.recentSearches
+
+    override suspend fun recordSearch(query: String) = searchHistoryStore.record(query)
+
+    override suspend fun removeSearchHistoryEntry(query: String) = searchHistoryStore.remove(query)
+
+    override suspend fun clearSearchHistory() = searchHistoryStore.clear()
 
     private data class HomeFeedQuery(
         val id: String,

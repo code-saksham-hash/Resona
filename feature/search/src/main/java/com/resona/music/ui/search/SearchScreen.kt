@@ -919,6 +919,7 @@ fun SearchPage(
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -953,10 +954,10 @@ fun SearchPage(
                 onQueryChange = viewModel::onQueryChange,
                 onSearch = {
                     // Search already runs on a debounce as the user types;
-                    // this just lets pressing the keyboard's search key jump
-                    // the queue and dismiss the keyboard, instead of doing
-                    // nothing as it did before.
-                    viewModel.retry()
+                    // this submits it as an explicit search instead (jumps
+                    // the queue, saves it to history) and dismisses the
+                    // keyboard.
+                    viewModel.submitSearch()
                     keyboardController?.hide()
                 },
                 modifier = Modifier
@@ -971,7 +972,12 @@ fun SearchPage(
                 .weight(1f)
         ) {
             if (query.isBlank()) {
-                // Search history or blank state
+                SearchHistorySection(
+                    history = searchHistory,
+                    onQueryClick = viewModel::submitSearch,
+                    onRemove = viewModel::removeHistoryEntry,
+                    onClearAll = viewModel::clearHistory
+                )
             } else {
                 val state = uiState
                 when (state) {
@@ -1007,6 +1013,100 @@ fun SearchPage(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SearchHistorySection(
+    history: List<String>,
+    onQueryClick: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onClearAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        if (history.isEmpty()) {
+            Text(
+                text = "Your recent searches will show up here",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 32.dp)
+            )
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 17.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Recent Searches",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Text(
+                        text = "Clear all",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.clickable(onClick = onClearAll)
+                    )
+                }
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(history, key = { it }) { pastQuery ->
+                        SearchHistoryRow(
+                            query = pastQuery,
+                            onClick = { onQueryClick(pastQuery) },
+                            onRemove = { onRemove(pastQuery) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchHistoryRow(
+    query: String,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 17.dp, end = 5.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Text(
+            text = query,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "Remove \"$query\" from search history",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }

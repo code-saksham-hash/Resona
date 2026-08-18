@@ -6,6 +6,7 @@ import com.resona.music.data.extractor.InnerTubeExtractionClient
 import com.resona.music.data.extractor.JsEngine
 import com.resona.music.data.extractor.YouTubeStreamExtractor
 import com.resona.music.data.history.PlayHistoryStore
+import com.resona.music.data.history.SearchHistoryStore
 import com.resona.music.data.likes.LikedSongsStore
 import com.resona.music.data.playlists.UserPlaylistsStore
 import com.resona.music.data.extractor.decipher.DecipherService
@@ -237,6 +238,12 @@ class MusicRepositoryImplTest {
                 createdAtMillis = 0L
             )
         }
+        val searchHistoryStore = object : SearchHistoryStore {
+            override val recentSearches = MutableStateFlow(emptyList<String>())
+            override suspend fun record(query: String) = Unit
+            override suspend fun remove(query: String) = Unit
+            override suspend fun clear() = Unit
+        }
         return MusicRepositoryImpl(
             InnerTubeApi(httpClient, PlayerJsRepository(httpClient)),
             streamExtractor,
@@ -245,6 +252,7 @@ class MusicRepositoryImplTest {
             likedSongsStore,
             playHistoryStore,
             userPlaylistsStore,
+            searchHistoryStore,
             httpClient
         )
     }
