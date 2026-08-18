@@ -122,6 +122,11 @@ class PlayerViewModel @Inject constructor(
     @Volatile
     private var isTransitioning: Boolean = false
 
+    /** How many times the current track has been auto-retried after a
+     *  retryable playback error (see [Player.Listener.onPlayerError] below).
+     *  Reset whenever [play] starts a genuinely different track. */
+    private var streamRetryCount = 0
+
     private val controllerFuture = MediaController.Builder(
         context,
         SessionToken(context, ComponentName(context, PlayerService::class.java))
@@ -163,6 +168,38 @@ class PlayerViewModel @Inject constructor(
                             "onPlayerError: errorCode=${error.errorCodeName}, message=${error.message}",
                             error.cause
                         )
+                        val track = _uiState.value.currentTrack
+                        val isCurrentTrackStream = track != null &&
+                            controller.currentMediaItem?.mediaId == track.videoId
+                        // A format url InnerTube marked resolvable can still get
+                        // flatly rejected by the CDN (403, "source error") when
+                        // the client identity that requested it hasn't picked up
+                        // a fully warmed-up visitor token yet -- see
+                        // PlayerJsRepository. That's only observable here, once
+                        // the player actually opens the connection, so this is
+                        // the one place it can be caught. Re-running play()
+                        // re-resolves from scratch through the whole client
+                        // fallback chain, which usually succeeds once some
+                        // request in the meantime has warmed the token up.
+                        // Capped, and scoped to IO errors only, so a genuinely
+                        // broken/unplayable video still surfaces an error
+                        // instead of retrying forever.
+                        if (track != null && isCurrentTrackStream &&
+                            error.errorCode in RETRYABLE_ERROR_CODES &&
+                            streamRetryCount < MAX_STREAM_RETRIES
+                        ) {
+                            streamRetryCount++
+                            Log.d(
+                                TAG,
+                                "onPlayerError: retrying ${track.videoId} " +
+                                    "(attempt $streamRetryCount/$MAX_STREAM_RETRIES)"
+                            )
+                            viewModelScope.launch {
+                                delay(STREAM_RETRY_DELAY_MILLIS)
+                                play(track, queue)
+                            }
+                            return
+                        }
                         _uiState.update {
                             it.copy(isBuffering = false, error = error.message ?: "Playback error")
                         }
@@ -209,6 +246,9 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun play(song: Song, queue: List<Song> = emptyList()) {
+        if (song.videoId != _uiState.value.currentTrack?.videoId) {
+            streamRetryCount = 0
+        }
         this.queue = queue
         currentQueueIndex = if (queue.isNotEmpty()) {
             queue.indexOfFirst { it.videoId == song.videoId }.coerceAtLeast(0)
@@ -588,5 +628,17 @@ class PlayerViewModel @Inject constructor(
         const val RADIO_ATTACH_TIMEOUT_MILLIS = 5_000L
         const val DUMMY_NEXT = "__queue_next__"
         const val DUMMY_PREV = "__queue_prev__"
+
+        // See onPlayerError. A couple of quick retries covers a cold-start
+        // gated token; a short delay before each one gives an in-flight
+        // background visitor-token fetch (PlayerJsRepository.ensureVisitorData)
+        // a beat to land first.
+        const val MAX_STREAM_RETRIES = 2
+        const val STREAM_RETRY_DELAY_MILLIS = 600L
+        val RETRYABLE_ERROR_CODES = setOf(
+            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+        )
     }
 }
