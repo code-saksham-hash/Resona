@@ -354,6 +354,24 @@ class PlayerViewModel @Inject constructor(
             } catch (e: Exception) {
                 isTransitioning = false
                 Log.d(TAG, "play: failed to resolve/prepare stream", e)
+                // getStreamSource() can fail outright -- every client in the
+                // fallback chain gated, or every format's signature failed to
+                // decipher -- before ExoPlayer ever gets a MediaItem to try,
+                // so onPlayerError's retry never gets a chance to run. Same
+                // retry budget as onPlayerError (shared streamRetryCount):
+                // this is the exact "no stream at all" counterpart to that
+                // one's "stream url the CDN then rejected".
+                if (streamRetryCount < MAX_STREAM_RETRIES) {
+                    streamRetryCount++
+                    Log.d(
+                        TAG,
+                        "play: retrying ${song.videoId} (attempt $streamRetryCount/$MAX_STREAM_RETRIES) " +
+                            "after resolve failure: ${e.message}"
+                    )
+                    delay(STREAM_RETRY_DELAY_MILLIS)
+                    play(song, queue)
+                    return@launch
+                }
                 _uiState.update {
                     it.copy(isBuffering = false, error = e.message ?: "Unable to play this track")
                 }
@@ -635,10 +653,16 @@ class PlayerViewModel @Inject constructor(
         // a beat to land first.
         const val MAX_STREAM_RETRIES = 2
         const val STREAM_RETRY_DELAY_MILLIS = 600L
-        val RETRYABLE_ERROR_CODES = setOf(
-            PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-        )
+        // The whole ERROR_CODE_IO_* family (2000-2008) -- a gated/rejected
+        // request doesn't always fail as a clean "403 status" IOException.
+        // Media3 only assigns BAD_HTTP_STATUS when the failure is a
+        // HttpDataSource.InvalidResponseCodeException specifically; a
+        // connection the CDN drops or resets mid-read (which is exactly how
+        // some anti-abuse rejections behave) surfaces as the generic
+        // ERROR_CODE_IO_UNSPECIFIED instead, which a narrower code-by-code
+        // set would silently let through unretried.
+        val RETRYABLE_ERROR_CODES =
+            (PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
+                .toSet()
     }
 }
