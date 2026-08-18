@@ -91,6 +91,26 @@ fun BrowseResponse.extractPlaylistSongs(): List<InnerTubeSong> {
     return results
 }
 
+/**
+ * Walks a single playlist's browse response for its own title
+ * (musicResponsiveHeaderRenderer.title), for a caller that needs to name a
+ * playlist after its source rather than just list its tracks (see
+ * MusicRepositoryImpl.importPlaylistFromUrl). Same defensive recursive walk
+ * as extractPlaylistSongs, verified against a live playlist browse response.
+ */
+fun BrowseResponse.extractPlaylistTitle(): String? = contents?.let { findPlaylistTitle(it) }
+
+private fun findPlaylistTitle(element: JsonElement): String? = when (element) {
+    is JsonObject -> {
+        val ownTitle = element["musicResponsiveHeaderRenderer"]?.jsonObject
+            ?.get("title")?.jsonObject?.get("runs")?.jsonArray
+            ?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
+        ownTitle ?: element.values.firstNotNullOfOrNull { findPlaylistTitle(it) }
+    }
+    is JsonArray -> element.firstNotNullOfOrNull { findPlaylistTitle(it) }
+    else -> null
+}
+
 private fun walkForPlaylistTracks(element: JsonElement, results: MutableList<InnerTubeSong>) {
     when (element) {
         is JsonObject -> {

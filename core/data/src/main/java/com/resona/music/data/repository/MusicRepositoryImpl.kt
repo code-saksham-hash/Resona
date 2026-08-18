@@ -13,6 +13,7 @@ import com.resona.music.data.remote.innertube.models.extractFeaturedPlaylists
 import com.resona.music.data.remote.innertube.models.extractLyricsBrowseId
 import com.resona.music.data.remote.innertube.models.extractLyricsText
 import com.resona.music.data.remote.innertube.models.extractPlaylistSongs
+import com.resona.music.data.remote.innertube.models.extractPlaylistTitle
 import com.resona.music.data.remote.innertube.models.extractRadioSongs
 import com.resona.music.data.remote.innertube.models.extractSongs
 import com.resona.music.domain.model.ArtistSpotlight
@@ -221,6 +222,46 @@ class MusicRepositoryImpl @Inject internal constructor(
 
     override suspend fun createPlaylist(name: String): Playlist = userPlaylistsStore.createPlaylist(name)
 
+    override suspend fun importPlaylistFromUrl(url: String): Playlist {
+        val playlistId = extractPlaylistId(url)
+            ?: throw IllegalArgumentException("That doesn't look like a YouTube playlist link.")
+        val browseId = if (playlistId.startsWith("VL")) playlistId else "VL$playlistId"
+        val response = api.browse(browseId)
+        val songs = response.extractPlaylistSongs().map { song ->
+            Song(
+                videoId = song.videoId,
+                title = song.title,
+                artist = song.artist,
+                thumbnailUrl = song.thumbnailUrl,
+                duration = song.duration
+            )
+        }
+        // A playlist InnerTube can't actually show anonymously (private,
+        // sign-in required, deleted, or just a bad/mistyped id) still comes
+        // back HTTP 200 with an empty/absent contents tree rather than a
+        // clean error -- verified live -- so an empty song list is the
+        // signal to treat this as a failure, not a real 0-track playlist.
+        if (songs.isEmpty()) {
+            throw IllegalStateException("This playlist is empty, private, or requires signing in to view.")
+        }
+        val title = response.extractPlaylistTitle()?.takeIf { it.isNotBlank() } ?: "Imported Playlist"
+        return userPlaylistsStore.createPlaylist(title, songs)
+    }
+
+    // Accepts a playlist share url (youtube.com/playlist?list=..., music.
+    // youtube.com/playlist?list=..., youtube.com/watch?v=...&list=...,
+    // youtu.be/...?list=...) or a bare playlist id pasted directly.
+    // Hand-rolled regex rather than android.net.Uri: this needs to behave
+    // the same way in MusicRepositoryImplTest's plain-JVM tests as on-device,
+    // and Uri.parse() returns null under this module's isReturnDefaultValues
+    // test setting (see core/data/build.gradle.kts) instead of actually
+    // parsing anything.
+    private fun extractPlaylistId(input: String): String? {
+        val trimmed = input.trim()
+        val fromUrl = PLAYLIST_URL_LIST_PARAM_REGEX.find(trimmed)?.groupValues?.get(1)
+        return fromUrl ?: trimmed.takeIf { BARE_PLAYLIST_ID_REGEX.matches(it) }
+    }
+
     override suspend fun getLyrics(videoId: String): String? {
         val lyricsBrowseId = runCatching { api.next(videoId).extractLyricsBrowseId() }.getOrNull()
         if (lyricsBrowseId == null) {
@@ -328,6 +369,13 @@ class MusicRepositoryImpl @Inject internal constructor(
         const val MAX_RECOMMENDED_ARTIST_CANDIDATES = 3
         const val FEATURED_PLAYLISTS_BROWSE_ID = "FEmusic_home"
         const val ARTIST_RADIO_SUFFIX = " radio"
+
+        // "list=" wins whether it's the first query param (.../playlist?list=PLxxx)
+        // or a later one (.../watch?v=xxx&list=PLxxx) -- verified live for both
+        // youtube.com and music.youtube.com share links.
+        val PLAYLIST_URL_LIST_PARAM_REGEX = Regex("""[?&]list=([\w-]+)""")
+        // Fallback for a bare id pasted with no url around it at all.
+        val BARE_PLAYLIST_ID_REGEX = Regex("""^[\w-]{10,}$""")
 
         // One of these is picked at random per section per getHomeFeed()
         // call (see pickQuery) -- plain synonyms/rephrasings of the same

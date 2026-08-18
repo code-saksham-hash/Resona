@@ -24,8 +24,10 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,6 +81,7 @@ fun LibraryScreen(
     modifier: Modifier = Modifier,
     onDownloadedSongClick: (Song) -> Unit = {},
     onLikedSongClick: (Song) -> Unit = {},
+    onUserPlaylistClick: (Playlist) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel()
@@ -85,17 +89,21 @@ fun LibraryScreen(
     val downloadedSongs by viewModel.downloadedSongs.collectAsStateWithLifecycle()
     val likedSongs by viewModel.likedSongs.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val importState by viewModel.importState.collectAsStateWithLifecycle()
 
     LibraryScreenContent(
         downloadedSongs = downloadedSongs,
         likedSongs = likedSongs,
         playlists = playlists,
+        importState = importState,
         onDownloadedSongClick = onDownloadedSongClick,
         onLikedSongClick = onLikedSongClick,
         onDeleteDownload = { song -> viewModel.deleteDownload(song.videoId) },
         onUnlike = viewModel::unlike,
         onCreatePlaylist = viewModel::createPlaylist,
-        onUserPlaylistClick = {},
+        onImportPlaylist = viewModel::importPlaylist,
+        onAcknowledgeImportResult = viewModel::acknowledgeImportResult,
+        onUserPlaylistClick = onUserPlaylistClick,
         onSearchClick = onSearchClick,
         onProfileClick = onProfileClick,
         modifier = modifier
@@ -108,11 +116,14 @@ private fun LibraryScreenContent(
     downloadedSongs: List<DownloadedSong> = emptyList(),
     likedSongs: List<Song> = emptyList(),
     playlists: List<Playlist> = emptyList(),
+    importState: ImportPlaylistState = ImportPlaylistState.Idle,
     onDownloadedSongClick: (Song) -> Unit = {},
     onLikedSongClick: (Song) -> Unit = {},
     onDeleteDownload: (Song) -> Unit = {},
     onUnlike: (Song) -> Unit = {},
     onCreatePlaylist: (String) -> Unit = {},
+    onImportPlaylist: (String) -> Unit = {},
+    onAcknowledgeImportResult: () -> Unit = {},
     onUserPlaylistClick: (Playlist) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -121,7 +132,24 @@ private fun LibraryScreenContent(
     var isRefreshing by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importUrl by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+
+    // Reacts to the ViewModel's side of an in-flight import instead of the
+    // dialog owning success/failure itself, since the import survives a
+    // config change (it's driven by viewModelScope) and this needs to catch
+    // up whenever that finishes, not just right after the button is tapped.
+    LaunchedEffect(importState) {
+        when (importState) {
+            is ImportPlaylistState.Success -> {
+                showImportDialog = false
+                importUrl = ""
+                onAcknowledgeImportResult()
+            }
+            else -> Unit
+        }
+    }
 
     if (showCreatePlaylistDialog) {
         AlertDialog(
@@ -195,6 +223,100 @@ private fun LibraryScreenContent(
         )
     }
 
+    if (showImportDialog) {
+        val isImporting = importState is ImportPlaylistState.Importing
+        AlertDialog(
+            onDismissRequest = {
+                if (!isImporting) {
+                    importUrl = ""
+                    showImportDialog = false
+                    onAcknowledgeImportResult()
+                }
+            },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            icon = {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Link,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            },
+            title = {
+                Text(
+                    text = "Import from YouTube",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = importUrl,
+                        onValueChange = { importUrl = it },
+                        label = { Text("Playlist link") },
+                        placeholder = { Text("https://youtube.com/playlist?list=...") },
+                        singleLine = true,
+                        enabled = !isImporting,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            cursorColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    if (importState is ImportPlaylistState.Failed) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = importState.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { onImportPlaylist(importUrl.trim()) },
+                    enabled = importUrl.isNotBlank() && !isImporting,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isImporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text("Import", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isImporting,
+                    onClick = {
+                        importUrl = ""
+                        showImportDialog = false
+                        onAcknowledgeImportResult()
+                    }
+                ) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        )
+    }
+
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = {
@@ -220,7 +342,10 @@ private fun LibraryScreenContent(
                     .weight(1f)
             ) {
                 item(key = "header") {
-                    LibraryHeader(onCreatePlaylist = { showCreatePlaylistDialog = true })
+                    LibraryHeader(
+                        onCreatePlaylist = { showCreatePlaylistDialog = true },
+                        onImportPlaylist = { showImportDialog = true }
+                    )
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
                 item(key = "quicklinks") {
@@ -302,6 +427,7 @@ private fun LibraryTopBar(
 @Composable
 private fun LibraryHeader(
     onCreatePlaylist: () -> Unit = {},
+    onImportPlaylist: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -318,6 +444,15 @@ private fun LibraryHeader(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
+        Icon(
+            imageVector = Icons.Outlined.Link,
+            contentDescription = "Import playlist from YouTube",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .size(24.dp)
+                .clickable(onClick = onImportPlaylist)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
         Icon(
             imageVector = Icons.Outlined.Add,
             contentDescription = "Create playlist",

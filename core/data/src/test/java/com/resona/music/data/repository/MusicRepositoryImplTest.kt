@@ -232,10 +232,11 @@ class MusicRepositoryImplTest {
         }
         val userPlaylistsStore = object : UserPlaylistsStore {
             override val playlists = MutableStateFlow(emptyList<Playlist>())
-            override suspend fun createPlaylist(name: String) = Playlist(
+            override suspend fun createPlaylist(name: String, songs: List<Song>) = Playlist(
                 id = "playlist_test",
                 name = name,
-                createdAtMillis = 0L
+                createdAtMillis = 0L,
+                songs = songs
             )
         }
         val searchHistoryStore = object : SearchHistoryStore {
@@ -444,5 +445,116 @@ class MusicRepositoryImplTest {
         assertEquals("2:48", radio[0].duration)
         assertEquals("KPM_BYl-EaQ", radio[1].videoId)
         assertEquals("ALsvdSA9tOU", radio[2].videoId)
+    }
+
+    // Shape trimmed from a live browse("VL<playlistId>") response (fetched
+    // directly against InnerTube to confirm this, since the app had no
+    // playlist-title parsing to verify it against before): the header
+    // renderer carrying the playlist's own title lives under
+    // twoColumnBrowseResultsRenderer.tabs[...], as a sibling of
+    // secondaryContents.sectionListRenderer...musicPlaylistShelfRenderer.contents[],
+    // which is where the actual track rows live.
+    private val fakePlaylistBrowseResponseJson = """
+    {
+      "contents": {
+        "twoColumnBrowseResultsRenderer": {
+          "tabs": [
+            {
+              "tabRenderer": {
+                "content": {
+                  "sectionListRenderer": {
+                    "contents": [
+                      {
+                        "musicResponsiveHeaderRenderer": {
+                          "title": { "runs": [ { "text": "My Imported Mix" } ] }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "secondaryContents": {
+            "sectionListRenderer": {
+              "contents": [
+                {
+                  "musicPlaylistShelfRenderer": {
+                    "contents": [
+                      {
+                        "musicResponsiveListItemRenderer": {
+                          "flexColumns": [
+                            {
+                              "musicResponsiveListItemFlexColumnRenderer": {
+                                "text": {
+                                  "runs": [
+                                    {
+                                      "text": "Imported Track",
+                                      "navigationEndpoint": { "watchEndpoint": { "videoId": "impVid1" } }
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "musicResponsiveListItemFlexColumnRenderer": {
+                                "text": {
+                                  "runs": [
+                                    { "text": "Imported Artist" },
+                                    { "text": " • " },
+                                    { "text": "3:33" }
+                                  ]
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+    """.trimIndent()
+
+    @Test
+    fun importPlaylistFromUrlCreatesALocalPlaylistNamedAndPopulatedFromTheSource() = runTest {
+        val repository = repositoryWithMockedSearchResponse(fakePlaylistBrowseResponseJson)
+
+        val playlist = repository.importPlaylistFromUrl(
+            "https://music.youtube.com/watch?v=xyz&list=PLOHoVaTp8R7dWeCQrKfh7a1a_Gu6KvfWP"
+        )
+
+        assertEquals("My Imported Mix", playlist.name)
+        assertEquals(1, playlist.songs.size)
+        assertEquals("impVid1", playlist.songs.first().videoId)
+        assertEquals("Imported Track", playlist.songs.first().title)
+        assertEquals("Imported Artist", playlist.songs.first().artist)
+        assertEquals("3:33", playlist.songs.first().duration)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun importPlaylistFromUrlRejectsAUrlWithNoRecognizablePlaylistId() = runTest {
+        val repository = repositoryWithMockedSearchResponse(fakePlaylistBrowseResponseJson)
+
+        repository.importPlaylistFromUrl("https://example.com/not-a-youtube-link")
+    }
+
+    // Shape verified live: an inaccessible browseId (private, requires
+    // signing in, deleted, or just malformed) comes back HTTP 200 but with
+    // no "contents" key at all, rather than a clean 4xx.
+    private val fakeUnavailablePlaylistBrowseResponseJson = """
+    { "responseContext": {}, "trackingParams": "unused" }
+    """.trimIndent()
+
+    @Test(expected = IllegalStateException::class)
+    fun importPlaylistFromUrlThrowsWhenThePlaylistHasNoAccessibleTracks() = runTest {
+        val repository = repositoryWithMockedSearchResponse(fakeUnavailablePlaylistBrowseResponseJson)
+
+        repository.importPlaylistFromUrl("https://www.youtube.com/playlist?list=PLdoesnotexist12345")
     }
 }

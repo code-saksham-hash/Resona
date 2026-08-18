@@ -56,6 +56,17 @@ interface MusicRepository {
     /** Creates a new, empty playlist named [name] (trimmed) and returns it. */
     suspend fun createPlaylist(name: String): Playlist
 
+    /**
+     * Imports a YouTube/YouTube Music playlist from its share [url] (a
+     * youtube.com/playlist, music.youtube.com/playlist, watch?v=...&list=...,
+     * or youtu.be link -- or a bare playlist id pasted directly) as a new
+     * on-device playlist, named after and pre-populated with the source
+     * playlist's songs. Throws if [url] doesn't contain a recognizable
+     * playlist id, or if InnerTube can't browse it (private, requires
+     * signing in, deleted).
+     */
+    suspend fun importPlaylistFromUrl(url: String): Playlist
+
     /** [videoId]'s lyrics, or null if InnerTube doesn't have/expose any for it. */
     suspend fun getLyrics(videoId: String): String?
 

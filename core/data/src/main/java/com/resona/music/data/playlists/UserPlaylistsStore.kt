@@ -25,7 +25,7 @@ import javax.inject.Singleton
  *  it without a live Context -- same reasoning as LikesModule/LikedSongsStore. */
 internal interface UserPlaylistsStore {
     val playlists: StateFlow<List<Playlist>>
-    suspend fun createPlaylist(name: String): Playlist
+    suspend fun createPlaylist(name: String, songs: List<Song> = emptyList()): Playlist
 }
 
 @Singleton
@@ -39,14 +39,14 @@ internal class FileUserPlaylistsStore @Inject constructor(
     private val _playlists = MutableStateFlow(readIndex())
     override val playlists: StateFlow<List<Playlist>> = _playlists.asStateFlow()
 
-    override suspend fun createPlaylist(name: String): Playlist {
+    override suspend fun createPlaylist(name: String, songs: List<Song>): Playlist {
         val now = System.currentTimeMillis()
-        val playlist = Playlist(id = "playlist_$now", name = name.trim(), createdAtMillis = now)
+        val playlist = Playlist(id = "playlist_$now", name = name.trim(), createdAtMillis = now, songs = songs)
         mutex.withLock {
             val updated = listOf(playlist) + _playlists.value
             withContext(Dispatchers.IO) { writeIndex(updated) }
             _playlists.value = updated
-            Log.d(TAG, "createPlaylist: '${playlist.name}' total=${updated.size}")
+            Log.d(TAG, "createPlaylist: '${playlist.name}' total=${updated.size} songs=${songs.size}")
         }
         return playlist
     }
