@@ -53,34 +53,34 @@ class GitHubAppUpdateRepository @Inject internal constructor(
      *  by everyone behind the same NAT -- re-checking on every app launch
      *  would burn through that fast for no reason, since a new release lands
      *  at most a few times a month. The last known answer is cached and
-     *  reused until it's a day old, successful or not, so a network hiccup
-     *  doesn't turn into a retry storm either. */
+     *  reused until it's a day old. Only a successful check starts that
+     *  clock -- a failed one (no network at that moment, GitHub briefly
+     *  down) shouldn't cost a real day's wait when it wasn't a deliberate
+     *  cooldown, just try again next launch. */
     private suspend fun latestRelease(): AppUpdateInfo? {
         val now = System.currentTimeMillis()
         val lastChecked = prefs.getLong(KEY_LAST_CHECKED, 0L)
-        val cachedVersion = prefs.getString(KEY_LATEST_VERSION, null)
 
-        if (now - lastChecked < CHECK_INTERVAL_MILLIS) {
-            return cachedVersion?.let {
-                AppUpdateInfo(
-                    versionName = it,
-                    releaseUrl = prefs.getString(KEY_LATEST_URL, "").orEmpty(),
-                    releaseNotes = prefs.getString(KEY_LATEST_NOTES, null),
-                )
-            }
-        }
+        if (now - lastChecked < CHECK_INTERVAL_MILLIS) return cachedRelease()
 
-        val fetched = fetchLatestRelease()
-        prefs.edit().apply {
-            putLong(KEY_LAST_CHECKED, now)
-            if (fetched != null) {
-                putString(KEY_LATEST_VERSION, fetched.versionName)
-                putString(KEY_LATEST_URL, fetched.releaseUrl)
-                putString(KEY_LATEST_NOTES, fetched.releaseNotes)
-            }
-        }.apply()
+        val fetched = fetchLatestRelease() ?: return cachedRelease()
+        prefs.edit()
+            .putLong(KEY_LAST_CHECKED, now)
+            .putString(KEY_LATEST_VERSION, fetched.versionName)
+            .putString(KEY_LATEST_URL, fetched.releaseUrl)
+            .putString(KEY_LATEST_NOTES, fetched.releaseNotes)
+            .apply()
         return fetched
     }
+
+    private fun cachedRelease(): AppUpdateInfo? =
+        prefs.getString(KEY_LATEST_VERSION, null)?.let {
+            AppUpdateInfo(
+                versionName = it,
+                releaseUrl = prefs.getString(KEY_LATEST_URL, "").orEmpty(),
+                releaseNotes = prefs.getString(KEY_LATEST_NOTES, null),
+            )
+        }
 
     private suspend fun fetchLatestRelease(): AppUpdateInfo? = runCatching {
         val response = httpClient.get(RELEASES_URL) {
