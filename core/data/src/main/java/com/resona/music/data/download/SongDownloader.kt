@@ -82,13 +82,15 @@ internal class HttpSongDownloader @Inject constructor(
                                 throw IOException("Download failed for ${song.videoId}: HTTP ${response.status.value}")
                             }
                             // Got the first slice fine, but a later one was not
-                            // honored. Measured this same wall on the playback
-                            // side too: past a certain point, the source stops
-                            // answering for this url no matter how the request
-                            // is shaped, even on a fresh connection. Surfacing
-                            // that plainly beats quietly keeping a partial file
-                            // around that looks downloaded but will cut out
-                            // partway through when played back offline.
+                            // honored. Ought to be rare now that resolving goes
+                            // through a client the CDN doesn't cut off past the
+                            // first megabyte (see YouTubeStreamExtractor), but
+                            // if a video ever resolves through one of the more
+                            // heavily-watched clients anyway, this can still
+                            // happen. Surfacing it plainly beats quietly keeping
+                            // a partial file around that looks downloaded but
+                            // will cut out partway through when played back
+                            // offline.
                             throw IOException(
                                 "Could only save part of ${song.videoId}: got $bytesWritten of " +
                                     "${totalBytes ?: "an unknown number of"} bytes before the source stopped answering."

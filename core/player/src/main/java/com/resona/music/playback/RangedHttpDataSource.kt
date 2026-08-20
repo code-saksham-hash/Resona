@@ -27,15 +27,15 @@ import androidx.media3.datasource.TransferListener
  * to keep that request from ever going out, and to keep every later
  * request under the same ceiling.
  *
- * One honest limitation: this only fixes the "never starts at all"
- * failure. Asking for bytes starting partway through the file, once the
- * first range is used up, isn't reliably honored either, even with a
- * brand new token, based on the same day's testing. When that happens,
- * ExoPlayer sees it as a normal playback error, and PlayerViewModel's
- * existing retry recovers by resolving the track again from scratch. That
- * can sound like a long track jumping back to the beginning once or twice
- * rather than continuing smoothly, and it's worth another look if that
- * turns out to be common on a real phone rather than just this test setup.
+ * At the time this was written, asking for bytes starting partway through
+ * the file, once the first range was used up, wasn't reliably honored
+ * either, even with a brand new token. That turned out to be about which
+ * InnerTube client resolved the url, not something request shaping alone
+ * could fix (see `YouTubeStreamExtractor`'s client chain for the actual
+ * fix). Kept as-is since it's still correct and cheap insurance: if a
+ * video ever resolves through one of the clients that does hit that
+ * ceiling, this still keeps the first request from failing outright, and
+ * PlayerViewModel's retry still recovers the rest.
  *
  * [open] always issues a bounded request comfortably under the ceiling
  * (see [RANGE_SIZE_BYTES]), and [read] opens the next one once the current

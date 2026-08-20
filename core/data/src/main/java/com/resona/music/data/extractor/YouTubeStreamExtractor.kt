@@ -19,11 +19,13 @@ internal class YouTubeStreamExtractor @Inject constructor(
     private val playerJsRepo: PlayerJsRepository,
     private val decipherService: DecipherService,
 ) {
-    // ANDROID_VR first: yt-dlp's own default, no PO token required, returns direct
-    // stream URLs as of this writing. The rest are tried in roughly the order
-    // yt-dlp-android found most to least likely to work anonymously; WEB is last
-    // since it needs a signatureTimestamp and is the most likely to demand a PO token.
+    // VISIONOS first: see its kdoc in InnerTubeClientConfig for why it's ahead
+    // of the usual ANDROID_VR default now. The rest are tried in roughly the
+    // order yt-dlp-android found most to least likely to work anonymously;
+    // WEB is last since it needs a signatureTimestamp and is the most likely
+    // to demand a PO token.
     private val clientChain = listOf(
+        InnerTubeClientConfig.VISIONOS,
         InnerTubeClientConfig.ANDROID_VR,
         InnerTubeClientConfig.ANDROID,
         InnerTubeClientConfig.TVHTML5_SIMPLY_EMBEDDED,

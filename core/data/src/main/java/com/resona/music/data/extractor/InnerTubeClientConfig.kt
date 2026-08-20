@@ -22,6 +22,23 @@ internal sealed class InnerTubeClientConfig(
 ) {
     open fun dynamicBodyFields(videoId: String): String = ""
 
+    // Measured directly against the CDN (2026-08-20/21, four different videos):
+    // ANDROID_VR and IOS below are the two best known "no PO token needed"
+    // clients, which most likely means they're also the two anti-abuse
+    // enforcement watches hardest, since every scraping tool documents them
+    // the same way. Requesting the same byte ranges that got flatly rejected
+    // through those two, through this client instead, succeeded every time,
+    // covering entire files past 3 MB with nothing held back. Tried first
+    // for that reason, ahead of the usual default.
+    object VISIONOS : InnerTubeClientConfig(
+        clientName = "VISIONOS",
+        clientNumber = "101",
+        clientVersion = "0.1",
+        userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+        extraClientFields = """"osName": "visionOS", "osVersion": "1.3.21O771", "deviceMake": "Apple", "deviceModel": "RealityDevice14,1",""",
+        usePlaybackContext = true,
+    )
+
     // yt-dlp default: android_vr (no PO token required, returns direct stream URLs).
     // Deliberately no params/apiKey -- yt-dlp sends neither for android_vr, and adding
     // either causes YouTube to route the request differently and return UNPLAYABLE.
