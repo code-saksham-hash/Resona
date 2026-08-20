@@ -115,3 +115,116 @@ This was a deliberate choice to keep the diff to "move files, fix the
 handful of resource imports that crossed a module boundary" rather than
 rewriting every import in the codebase; a full package rename is possible
 later but is a separate, much larger change.
+
+## How playback actually works
+
+Resona has no server and no official API key. Every song comes directly
+from YouTube's own private JSON API, InnerTube, the same one youtube.com
+and the YouTube apps use internally. There is no login and no persistent
+account, just a single anonymous session identity that gets minted the
+first time it's needed.
+
+### Resolving a stream
+
+Tapping a song does not hand ExoPlayer a URL that was sitting around
+somewhere. It triggers a live resolve, right before playback starts:
+
+```mermaid
+sequenceDiagram
+    participant UI as Now Playing UI
+    participant VM as PlayerViewModel
+    participant Repo as MusicRepository
+    participant Extractor as YouTubeStreamExtractor
+    participant InnerTube as YouTube InnerTube API
+    participant Service as PlayerService (ExoPlayer)
+    participant CDN as YouTube's video CDN
+
+    UI->>VM: play(song)
+    VM->>Repo: getStreamSource(videoId)
+    Repo->>Extractor: resolveStreamUrl(videoId)
+    loop client fallback chain
+        Extractor->>InnerTube: /player request as one client identity
+        InnerTube-->>Extractor: playable formats, or gated/rejected
+    end
+    Extractor-->>VM: a playable url, tied to whichever client resolved it
+    VM->>Service: new MediaItem, prepare, play
+    Service->>CDN: fetch audio bytes
+    CDN-->>UI: sound
+```
+
+`YouTubeStreamExtractor` (`:core:data`) tries a short list of InnerTube
+client identities in order (an Android VR client first, then plain
+Android, a TV embed, iOS, mobile web, and full web, in that order) because
+anonymous, keyless access to YouTube isn't guaranteed for any single one
+of them. Which clients actually work anonymously shifts over time as
+YouTube tightens or loosens access, so the list is a fallback chain, not a
+single fixed choice. Whichever client succeeds also decides the
+User-Agent the player has to send afterward, since a stream url is tied to
+the client that resolved it.
+
+Every one of those requests carries a visitor identity, an anonymous token
+YouTube hands out to anyone browsing without an account. It's cached and
+reused for the whole session rather than re-minted per request, since
+constantly showing up as a brand new first-time visitor is itself a
+signal anti-abuse systems watch for.
+
+### Why playback retries instead of just failing
+
+Two things can go wrong after a url resolves successfully:
+
+- The chosen visitor identity can turn out to be one YouTube's systems
+  don't trust, in which case the CDN will refuse to serve the file it
+  just told the client it could have.
+- A request can ask for more of the file than that identity is currently
+  allowed, which the CDN also refuses.
+
+Either way, ExoPlayer sees an HTTP error, not Resona's own code, since
+resolving the url and actually fetching its bytes are two separate steps
+against two different parts of YouTube's infrastructure. When that
+happens, `PlayerViewModel` mints a replacement visitor identity and
+re-resolves the track from scratch rather than simply giving up, capped
+at a handful of attempts so a genuinely unplayable video still surfaces a
+real error instead of retrying forever.
+
+### Fetching in small pieces, not one big request
+
+The CDN only reliably serves a small amount of a file, roughly the first
+megabyte, from the very start of a request. Asking for the whole file in
+one open-ended request, which is what a media player normally does, gets
+rejected outright. Asking for a small bounded slice starting at byte zero
+works fine.
+
+`RangedHttpDataSource` (`:core:player`) exists because of this: instead of
+one unbounded request, it always asks for a modest byte range and quietly
+opens the next one as playback needs more.
+
+```mermaid
+graph TD
+    A[ExoPlayer wants more of the stream] --> B[RangedHttpDataSource]
+    B --> C[Request a small bounded byte range]
+    C --> D{CDN response}
+    D -->|"206, more file left"| E[Serve those bytes; request the next range once they run out]
+    D -->|403| F[Surface as a playback error]
+    F --> G[PlayerViewModel retries: new visitor identity, re-resolve, restart from the beginning]
+```
+
+This is also why a couple of things behave the way they do rather than
+the way a typical streaming app's would:
+
+- **Seeking is capped to what's already buffered.** Jumping to a point in
+  the song that hasn't been fetched yet would mean opening a new
+  connection partway into the file, which is exactly the kind of request
+  the CDN doesn't honor. Dragging past the buffered point clamps back to
+  it instead of silently failing.
+- **A retry restarts the track from the beginning**, rather than resuming
+  from wherever it stopped, for the same reason: resuming from the middle
+  needs that same kind of mid-file request.
+- **Downloading a song for offline playback can save only the first
+  slice reliably.** The same request pattern that limits streaming limits
+  a full download too, so a download that can't complete fails with a
+  clear error and deletes the partial file rather than keeping a copy that
+  would cut off partway through when played back later.
+
+None of this is unique to Resona. It follows from how YouTube's anonymous,
+keyless access is currently enforced, and any client resolving streams the
+same way, official or not, runs into the same ceiling.
