@@ -42,7 +42,7 @@ another `:feature:*` module or on `:core:data` directly.
 |---|---|---|---|
 | `:app` | Android application | everything | `MainActivity`, `ResonaApplication`, `NavGraph`/`Destinations`, the three Hilt `@Module`s (`AppModule`, `NetworkModule`, `RepositoryModule`) |
 | `:core:domain` | Kotlin/JVM (no Android) | — | `Song`, `HomeFeed`/`HomeFeedSection`/`ArtistSpotlight`, `DownloadedSong`, `MusicRepository` interface, `StreamSource`, `PlaybackUnavailableException`/`StreamCipherRequiredException` |
-| `:core:data` | Android library | `:core:domain` | InnerTube/Ktor networking (`InnerTubeApi`, response models), `MusicRepositoryImpl`, `extractor/` (stream URL resolution -- see `NOTICE.md`), and `download/` (`SongDownloader`, `DownloadedSongsStore` -- fetches and persists offline copies of a resolved stream). Room would live here too if/when it's added. |
+| `:core:data` | Android library | `:core:domain` | InnerTube/Ktor networking (`InnerTubeApi`, response models), `MusicRepositoryImpl`, `extractor/` (stream URL resolution, see `NOTICE.md`), and `download/` (`SongDownloader`, `DownloadedSongsStore`, which fetch and persist offline copies of a resolved stream). Room would live here too if or when it's added. |
 | `:core:player` | Android library | `:core:domain` | `PlayerService` (ExoPlayer + MediaSession foreground service), `PlayerViewModel`/`PlayerUiState`/`DownloadState`, `PlaybackDataSourceModule` |
 | `:core:ui` | Android library (Compose) | — | Theme, colors, typography, shapes, shared composables (`ResonaFilledButton`, `ResonaOutlinedButton`, `ResonaPlaceholderScreenContent`) |
 | `:feature:home` | Android library (Compose) | `:core:domain`, `:core:ui` | `HomeScreen`, `HomeViewModel` |
@@ -50,8 +50,8 @@ another `:feature:*` module or on `:core:data` directly.
 | `:feature:player` | Android library (Compose) | `:core:domain`, `:core:ui`, `:core:player` | `NowPlayingScreen`, `MiniPlayerBar` |
 | `:feature:library` | Android library (Compose) | `:core:domain`, `:core:ui` | `LibraryScreen`, `LibraryViewModel` |
 
-`:core:domain` is a plain `kotlin("jvm")` module, not an Android library --
-it cannot reference `android.*` or `androidx.*` at all, which is what
+`:core:domain` is a plain `kotlin("jvm")` module, not an Android library,
+so it cannot reference `android.*` or `androidx.*` at all. That's what
 actually enforces "zero Android framework dependencies" rather than just
 documenting it.
 
@@ -62,10 +62,10 @@ documenting it.
    `MusicRepositoryImpl`, `InnerTubeApi`, or anything network/database-shaped.
    Gradle enforces this the same way it enforces any other missing
    dependency: if a `:feature:*` module tries to import something from
-   `:core:data`, it won't compile until someone adds that dependency edge --
+   `:core:data`, it won't compile until someone adds that dependency edge,
    which should be a deliberate, reviewable decision, not an accident.
 2. **`:core:domain` has zero Android dependencies**, enforced by it being a
-   `kotlin("jvm")` module rather than `com.android.library` -- there's no
+   `kotlin("jvm")` module rather than `com.android.library`. There's no
    Android SDK on its compile classpath to accidentally depend on.
 3. **Only `:app` wires domain interfaces to their concrete implementations.**
    `RepositoryModule` (binds `MusicRepositoryImpl` to `MusicRepository`) and
@@ -89,7 +89,7 @@ documenting it.
      binds `JsEngine` to `WebViewJsEngine`, and `download/DownloadModule.kt`
      binds `SongDownloader`/`DownloadedSongsStore` to their implementations.
      Neither breaks the rule above because none of the four are a
-     domain-to-data seam -- they're not domain concepts at all, just internal
+     domain-to-data seam. They're not domain concepts at all, just internal
      details of how `:core:data` resolves a stream URL or persists a
      downloaded file, and no feature module or `:app` code ever needs to see
      them. The rule is really about keeping the domain/implementation
@@ -98,14 +98,14 @@ documenting it.
    - `:core:player` similarly has `PlaybackDataSourceModule.kt`, providing a
      single `@Singleton DefaultHttpDataSource.Factory` shared by
      `PlayerService` (which builds ExoPlayer with it) and `PlayerViewModel`
-     (which updates its User-Agent per track -- see `StreamSource`'s kdoc in
+     (which updates its User-Agent per track, see `StreamSource`'s kdoc in
      `:core:domain` for why a bare URL isn't enough to actually stream from
      YouTube's CDN). Same reasoning as `ExtractorModule`: a Media3 plumbing
      detail, not a domain-to-data seam.
 
 ## Package names vs. module paths
 
-Kotlin package names were **not** renamed as part of this split --
+Kotlin package names were **not** renamed as part of this split.
 `com.resona.music.domain.model.Song` still lives at that same package, just
 physically inside `:core:domain` now instead of `:app`. Only each module's
 Gradle/AGP `namespace` (used for that module's own generated `R` class) is
@@ -228,3 +228,52 @@ the way a typical streaming app's would:
 None of this is unique to Resona. It follows from how YouTube's anonymous,
 keyless access is currently enforced, and any client resolving streams the
 same way, official or not, runs into the same ceiling.
+
+### The ceiling, measured precisely, and what's been tried against it
+
+"Roughly the first megabyte" is not a guess. Testing one resolved url
+directly, a request for the first 1.05 MB or so comes back with exactly
+those bytes every time; a request for anything past about 1.08 MB of that
+same url, a bigger explicit range or no range at all, comes back an
+immediate rejection with zero bytes, every time. Same url, same identity,
+same client. Only the size of the window asked for changes the outcome.
+
+Several ways of trying to get past that point have been tested directly,
+not just reasoned about:
+
+- **Minting a brand new visitor identity before asking again** changes
+  whether the file resolves at all in the first place, but not how far
+  into it a single identity can read. Two unlucky identities in a row used
+  to permanently lock a track out of its only two working clients for the
+  rest of a retry budget; that specific bug is fixed, but the underlying
+  ceiling itself is untouched by identity freshness.
+- **Reusing one open connection for the next slice, instead of opening a
+  new one,** makes no difference. The rejection isn't about connections
+  looking suspicious; it happens the same way either way.
+- **Spacing requests further apart in time** doesn't help either, which
+  rules out a simple request-rate limit as the explanation.
+- **Aligning a request to the file's own real internal structure** doesn't
+  help. These audio files are DASH-fragmented WebM with a genuine index
+  (a `Cues` element) describing exactly where each chunk of real audio
+  starts. Parsing that index by hand and requesting from an actual,
+  verified chunk boundary behaves identically to picking an arbitrary
+  offset: still rejected.
+- **A real proof-of-origin token**, the same kind of cryptographic
+  attestation Google's own apps present for exactly this kind of request,
+  generated through the real challenge-and-mint process rather than a
+  fake stand-in, and confirmed to be genuinely valid before testing it,
+  still didn't move the ceiling once actually tried end to end.
+
+None of that proves no working answer exists, only that every angle tried
+so far has come back negative. Two possibilities remain open: this is
+simply how anonymous access to this CDN is enforced everywhere right now,
+or it's specific to how much automated traffic the network this was all
+tested from has generated (a lot, across a long testing session). Telling
+those two apart needs a real phone on an ordinary residential or mobile
+connection doing ordinary listening, which hasn't been confirmed either
+way yet.
+
+This is also the real reason a retry restarts a track from the beginning
+instead of resuming from wherever it stopped: resuming needs exactly the
+kind of request that gets rejected, so restarting from a fresh resolve is
+the one thing that's actually confirmed to work.
