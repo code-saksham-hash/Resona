@@ -122,6 +122,15 @@ class PlayerViewModel @Inject constructor(
      *  so a stale mix can never attach to a different track. */
     private var radioQueueJob: Job? = null
 
+    /** The scheduled retry from a source error (either [Player.Listener.onPlayerError]
+     *  or [play]'s own resolve-failure catch), if one is currently pending. Found live:
+     *  tapping skip/previous (or any other new play()) while this was still waiting out
+     *  its retry delay didn't stop it, since it wasn't tracked anywhere. It would still
+     *  fire afterward and call play() on the track the user had already left, silently
+     *  undoing the skip a moment later. Cancelled whenever a new play() supersedes it,
+     *  the same reason [radioQueueJob] is. */
+    private var retryJob: Job? = null
+
     @Volatile
     private var isTransitioning: Boolean = false
 
@@ -228,7 +237,7 @@ class PlayerViewModel @Inject constructor(
                                 "onPlayerError: retrying ${track.videoId} " +
                                     "(attempt $streamRetryCount/$MAX_STREAM_RETRIES)"
                             )
-                            viewModelScope.launch {
+                            retryJob = viewModelScope.launch {
                                 musicRepository.refreshStreamIdentity()
                                 delay(STREAM_RETRY_DELAY_MILLIS)
                                 play(track, queue)
@@ -285,6 +294,11 @@ class PlayerViewModel @Inject constructor(
             streamRetryCount = 0
             excludedClients.clear()
         }
+        // A source-error retry schedules itself a beat in the future (see
+        // retryJob's kdoc). If the user skips or taps another track before
+        // that beat is up, this stops it from firing afterward and quietly
+        // undoing the skip by calling play() on the track they just left.
+        retryJob?.cancel()
         this.queue = queue
         currentQueueIndex = if (queue.isNotEmpty()) {
             queue.indexOfFirst { it.videoId == song.videoId }.coerceAtLeast(0)
@@ -415,9 +429,11 @@ class PlayerViewModel @Inject constructor(
                         "play: retrying ${song.videoId} (attempt $streamRetryCount/$MAX_STREAM_RETRIES) " +
                             "after resolve failure: ${e.message}"
                     )
-                    musicRepository.refreshStreamIdentity()
-                    delay(STREAM_RETRY_DELAY_MILLIS)
-                    play(song, queue)
+                    retryJob = viewModelScope.launch {
+                        musicRepository.refreshStreamIdentity()
+                        delay(STREAM_RETRY_DELAY_MILLIS)
+                        play(song, queue)
+                    }
                     return@launch
                 }
                 _uiState.update {
@@ -701,10 +717,13 @@ class PlayerViewModel @Inject constructor(
      *  mini-player's close button dismisses itself with (its visibility is
      *  driven by currentTrack being non-null). */
     fun stop() {
-        // A superseding stop() must not have a stale radio queue land after it.
+        // A superseding stop() must not have a stale radio queue, or a
+        // pending source-error retry, land after it.
         radioGeneration++
         radioQueueJob?.cancel()
         radioQueueJob = null
+        retryJob?.cancel()
+        retryJob = null
         viewModelScope.launch {
             val controller = controllerReady.await()
             controller.stop()
