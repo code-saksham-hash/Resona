@@ -20,6 +20,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.resona.music.domain.model.LyricsLine
+import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,8 +31,10 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -537,6 +540,29 @@ class PlayerViewModel @Inject constructor(
                 Log.w(TAG, "toggleLike: failed for videoId=${track.videoId}, reverting", e)
                 _uiState.updateForTrack(track.videoId) { it.copy(isLiked = !it.isLiked) }
                 Toast.makeText(context, "Couldn't update Liked Songs", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /** The user's on-device playlists, for the Now Playing overflow menu's
+     *  "Add to playlist" picker. */
+    val playlists: StateFlow<List<Playlist>> = musicRepository.observePlaylists()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Adds [PlayerUiState.currentTrack] to [playlistId]. A no-op if nothing's
+     *  playing or the track's already in that playlist (see
+     *  [MusicRepository.addSongToPlaylist]). */
+    fun addCurrentTrackToPlaylist(playlistId: String) {
+        val track = _uiState.value.currentTrack ?: return
+        viewModelScope.launch {
+            try {
+                musicRepository.addSongToPlaylist(playlistId, track)
+                Toast.makeText(context, "Added to playlist", Toast.LENGTH_SHORT).show()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "addCurrentTrackToPlaylist: failed for videoId=${track.videoId}", e)
+                Toast.makeText(context, "Couldn't add to playlist", Toast.LENGTH_SHORT).show()
             }
         }
     }

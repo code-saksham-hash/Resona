@@ -1,5 +1,6 @@
 package com.resona.music.ui.nowplaying
 
+import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -51,10 +53,12 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -62,6 +66,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -79,6 +84,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,6 +93,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.resona.music.domain.model.LyricsLine
+import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
 import com.resona.music.feature.player.R
 import com.resona.music.playback.DownloadState
@@ -115,10 +122,13 @@ fun NowPlayingScreen(
     onDownloadClick: () -> Unit = {},
     onToggleLike: () -> Unit = {},
     onLoadLyrics: () -> Unit = {},
+    playlists: List<Playlist> = emptyList(),
+    onAddToPlaylist: (playlistId: String) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var activeTab by remember { mutableStateOf<BottomTab?>(null) }
+    val context = LocalContext.current
 
     val track = uiState.currentTrack
     // Shared by every pane below; see AlbumArtPalette.kt.
@@ -145,9 +155,27 @@ fun NowPlayingScreen(
                     onQueueClick()
                 },
                 palette = palette,
-                headerTitle = if (activeTab == BottomTab.Queue) "Queue" else null,
+                headerTitle = when (activeTab) {
+                    BottomTab.Queue -> "Queue"
+                    BottomTab.Lyrics -> "Lyrics"
+                    null -> null
+                },
                 downloadState = uiState.downloadState,
-                onDownloadClick = onDownloadClick
+                onDownloadClick = onDownloadClick,
+                playlists = playlists,
+                onAddToPlaylist = onAddToPlaylist,
+                onShareClick = {
+                    if (track != null) {
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(
+                                Intent.EXTRA_TEXT,
+                                "${track.title} - ${track.displayArtist}\nhttps://youtu.be/${track.videoId}"
+                            )
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, null))
+                    }
+                }
             )
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -709,9 +737,13 @@ private fun NowPlayingTopBar(
     headerTitle: String? = null,
     downloadState: DownloadState = DownloadState.Idle,
     onDownloadClick: () -> Unit = {},
+    playlists: List<Playlist> = emptyList(),
+    onAddToPlaylist: (playlistId: String) -> Unit = {},
+    onShareClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var overflowExpanded by remember { mutableStateOf(false) }
+    var showPlaylistPicker by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -761,7 +793,10 @@ private fun NowPlayingTopBar(
             ) {
                 DropdownMenuItem(
                     text = { Text("Add to playlist") },
-                    onClick = { overflowExpanded = false }
+                    onClick = {
+                        overflowExpanded = false
+                        showPlaylistPicker = true
+                    }
                 )
                 DropdownMenuItem(
                     text = {
@@ -781,11 +816,96 @@ private fun NowPlayingTopBar(
                 )
                 DropdownMenuItem(
                     text = { Text("Share") },
-                    onClick = { overflowExpanded = false }
+                    onClick = {
+                        overflowExpanded = false
+                        onShareClick()
+                    }
                 )
             }
         }
     }
+
+    if (showPlaylistPicker) {
+        AddToPlaylistDialog(
+            playlists = playlists,
+            onPlaylistSelected = {
+                onAddToPlaylist(it)
+                showPlaylistPicker = false
+            },
+            onDismiss = { showPlaylistPicker = false }
+        )
+    }
+}
+
+/** Matches the AlertDialog styling LibraryScreen's playlist dialogs already
+ *  establish (24dp-rounded surfaceContainerHigh sheet, 48dp icon badge) --
+ *  same visual language, one more place it shows up. */
+@Composable
+private fun AddToPlaylistDialog(
+    playlists: List<Playlist>,
+    onPlaylistSelected: (playlistId: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_queue),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        title = { Text("Add to playlist") },
+        text = {
+            if (playlists.isEmpty()) {
+                Text(
+                    text = "No playlists yet -- create one from your Library first.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                    itemsIndexed(playlists) { _, playlist ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onPlaylistSelected(playlist.id) }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.LibraryMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = playlist.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
 }
 
 @Composable

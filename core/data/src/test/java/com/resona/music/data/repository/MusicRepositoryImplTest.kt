@@ -238,6 +238,7 @@ class MusicRepositoryImplTest {
                 createdAtMillis = 0L,
                 songs = songs
             )
+            override suspend fun addSongToPlaylist(playlistId: String, song: Song) = Unit
         }
         val searchHistoryStore = object : SearchHistoryStore {
             override val recentSearches = MutableStateFlow(emptyList<String>())

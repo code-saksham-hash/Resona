@@ -67,6 +67,10 @@ interface MusicRepository {
     /** Creates a new, empty playlist named [name] (trimmed) and returns it. */
     suspend fun createPlaylist(name: String): Playlist
 
+    /** Adds [song] to the playlist identified by [playlistId]. A no-op if
+     *  it's already in that playlist. */
+    suspend fun addSongToPlaylist(playlistId: String, song: Song)
+
     /**
      * Imports a YouTube/YouTube Music playlist from its share [url] (a
      * youtube.com/playlist, music.youtube.com/playlist, watch?v=...&list=...,
