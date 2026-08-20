@@ -1,6 +1,8 @@
 package com.resona.music.ui.home
 
+import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -19,9 +21,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +58,7 @@ import coil.compose.AsyncImage
 import com.resona.music.domain.model.ArtistSpotlight
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.Song
+import com.resona.music.domain.repository.AppUpdateInfo
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
@@ -102,6 +108,7 @@ fun HomeScreen(
     HomeScreenContent(
         uiState = uiState,
         onRefresh = viewModel::refresh,
+        onDismissUpdate = viewModel::dismissUpdate,
         onSearchQuery = onSearchQuery,
         onSearchClick = onSearchClick,
         onProfileClick = onProfileClick,
@@ -117,6 +124,7 @@ fun HomeScreen(
 private fun HomeScreenContent(
     uiState: HomeUiState,
     onRefresh: () -> Unit = {},
+    onDismissUpdate: () -> Unit = {},
     onSearchQuery: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -132,6 +140,14 @@ private fun HomeScreenContent(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             HomeTopBar(onSearchQuery = onSearchQuery, onProfileClick = onProfileClick)
+
+            uiState.updateInfo?.let { info ->
+                UpdateAvailableBanner(
+                    info = info,
+                    onDismiss = onDismissUpdate,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)
+                )
+            }
 
             val feed = uiState.feed
             when {
@@ -151,6 +167,53 @@ private fun HomeScreenContent(
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 )
             }
+        }
+    }
+}
+
+/**
+ * Dismissible, monochrome banner for a newer release than the one running.
+ * Resona isn't distributed through anything that could push an update
+ * itself, so this is the entire mechanism -- a link out to the GitHub
+ * release, opened in whatever browser is installed.
+ */
+@Composable
+private fun UpdateAvailableBanner(
+    info: AppUpdateInfo,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Resona ${info.versionName} is available",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            NocturneOutlinedButton(
+                text = "View release",
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl))
+                    context.startActivity(intent)
+                },
+                borderColor = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        IconButton(onClick = onDismiss) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "Dismiss",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
