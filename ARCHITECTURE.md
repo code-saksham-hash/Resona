@@ -188,15 +188,10 @@ real error instead of retrying forever.
 
 ### Fetching in small pieces, not one big request
 
-The CDN only reliably serves a small amount of a file, roughly the first
-megabyte, from the very start of a request. Asking for the whole file in
-one open-ended request, which is what a media player normally does, gets
-rejected outright. Asking for a small bounded slice starting at byte zero
-works fine.
-
-`RangedHttpDataSource` (`:core:player`) exists because of this: instead of
-one unbounded request, it always asks for a modest byte range and quietly
-opens the next one as playback needs more.
+Progressive playback still fetches in bounded byte ranges rather than one
+open-ended request, via `RangedHttpDataSource` (`:core:player`): it asks
+for a modest range and quietly opens the next one as playback needs more,
+instead of the single unbounded request ExoPlayer would otherwise make.
 
 ```mermaid
 graph TD
@@ -208,72 +203,42 @@ graph TD
     F --> G[PlayerViewModel retries: new visitor identity, re-resolve, restart from the beginning]
 ```
 
-This is also why a couple of things behave the way they do rather than
-the way a typical streaming app's would:
+### A CDN ceiling that turned out to be about the client, not the request
 
-- **Seeking is capped to what's already buffered.** Jumping to a point in
-  the song that hasn't been fetched yet would mean opening a new
-  connection partway into the file, which is exactly the kind of request
-  the CDN doesn't honor. Dragging past the buffered point clamps back to
-  it instead of silently failing.
-- **A retry restarts the track from the beginning**, rather than resuming
-  from wherever it stopped, for the same reason: resuming from the middle
-  needs that same kind of mid-file request.
-- **Downloading a song for offline playback can save only the first
-  slice reliably.** The same request pattern that limits streaming limits
-  a full download too, so a download that can't complete fails with a
-  clear error and deletes the partial file rather than keeping a copy that
-  would cut off partway through when played back later.
+For a while, requests past roughly the first megabyte of a resolved url
+were getting flatly rejected, no matter how the request was shaped: fresh
+visitor identity, a reused connection instead of a new one, spacing
+requests further apart, even aligning a request to the file's own real
+internal chunk boundaries (these audio files are DASH-fragmented WebM
+with a genuine index describing exactly where each chunk starts) or
+attaching a real, correctly-generated cryptographic proof-of-origin
+token. None of it moved the ceiling. Seeking past the buffered point,
+resuming a track after a drop instead of restarting it, and finishing a
+full download all ran into the same wall.
 
-None of this is unique to Resona. It follows from how YouTube's anonymous,
-keyless access is currently enforced, and any client resolving streams the
-same way, official or not, runs into the same ceiling.
+What actually explained it: the two clients tried first (an Android VR
+client and an iOS client) are the two best known "no login, no PO token
+needed" identities in the whole YouTube-reverse-engineering space, which
+most likely means they're also the two identities anti-abuse enforcement
+watches hardest, since every scraping tool documents them the same way.
+Requesting the exact same byte ranges that were getting rejected, through
+a far less common client identity instead, worked cleanly every time,
+across multiple different videos, covering entire files with nothing
+held back.
 
-### The ceiling, measured precisely, and what's been tried against it
+`YouTubeStreamExtractor`'s client chain now tries that client first (see
+`InnerTubeClientConfig` in `:core:data` for which one and the measurements
+behind it). Confirmed live afterward: a track played continuously for
+three minutes straight through the point that used to fail every time,
+scrubbing forward far past whatever was already buffered landed cleanly
+with no stall, and a full download completed in one pass with no rejected
+range anywhere.
 
-"Roughly the first megabyte" is not a guess. Testing one resolved url
-directly, a request for the first 1.05 MB or so comes back with exactly
-those bytes every time; a request for anything past about 1.08 MB of that
-same url, a bigger explicit range or no range at all, comes back an
-immediate rejection with zero bytes, every time. Same url, same identity,
-same client. Only the size of the window asked for changes the outcome.
-
-Several ways of trying to get past that point have been tested directly,
-not just reasoned about:
-
-- **Minting a brand new visitor identity before asking again** changes
-  whether the file resolves at all in the first place, but not how far
-  into it a single identity can read. Two unlucky identities in a row used
-  to permanently lock a track out of its only two working clients for the
-  rest of a retry budget; that specific bug is fixed, but the underlying
-  ceiling itself is untouched by identity freshness.
-- **Reusing one open connection for the next slice, instead of opening a
-  new one,** makes no difference. The rejection isn't about connections
-  looking suspicious; it happens the same way either way.
-- **Spacing requests further apart in time** doesn't help either, which
-  rules out a simple request-rate limit as the explanation.
-- **Aligning a request to the file's own real internal structure** doesn't
-  help. These audio files are DASH-fragmented WebM with a genuine index
-  (a `Cues` element) describing exactly where each chunk of real audio
-  starts. Parsing that index by hand and requesting from an actual,
-  verified chunk boundary behaves identically to picking an arbitrary
-  offset: still rejected.
-- **A real proof-of-origin token**, the same kind of cryptographic
-  attestation Google's own apps present for exactly this kind of request,
-  generated through the real challenge-and-mint process rather than a
-  fake stand-in, and confirmed to be genuinely valid before testing it,
-  still didn't move the ceiling once actually tried end to end.
-
-None of that proves no working answer exists, only that every angle tried
-so far has come back negative. Two possibilities remain open: this is
-simply how anonymous access to this CDN is enforced everywhere right now,
-or it's specific to how much automated traffic the network this was all
-tested from has generated (a lot, across a long testing session). Telling
-those two apart needs a real phone on an ordinary residential or mobile
-connection doing ordinary listening, which hasn't been confirmed either
-way yet.
-
-This is also the real reason a retry restarts a track from the beginning
-instead of resuming from wherever it stopped: resuming needs exactly the
-kind of request that gets rejected, so restarting from a fresh resolve is
-the one thing that's actually confirmed to work.
+None of the mechanisms above were wasted effort. The ranged fetching, the
+retry-with-a-fresh-identity logic, and the exclusion-clearing fix are all
+still exactly what recovers a track if a video ever resolves through one
+of the more heavily-watched clients anyway (a genuinely gated video, or a
+future tightening that catches up with today's better client too, since
+which identities anonymous access still favors is exactly the kind of
+thing that shifts over time). They just aren't the whole story for why a
+track fails, the client choice was.

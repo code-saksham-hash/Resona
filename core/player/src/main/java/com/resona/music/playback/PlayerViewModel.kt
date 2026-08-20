@@ -626,29 +626,27 @@ class PlayerViewModel @Inject constructor(
     }
 
     /**
-     * Seeking past what's already buffered means the player has to open a
-     * new connection partway into the file, and that request gets rejected
-     * by the source every time, measured directly while chasing this same
-     * failure on the playback side (see RangedHttpDataSource's kdoc). Before
-     * this clamp, dragging the scrubber past the buffered point looked like
-     * it worked for a moment and then silently jumped back to 0:00 once the
-     * rejection came back and the existing retry logic restarted the track
-     * from the beginning. Clamping to bufferedPosition keeps the seek inside
-     * what's already been fetched, so it actually lands where asked instead
-     * of failing invisibly a second later.
+     * This used to clamp to [Player.getBufferedPosition] and toast an
+     * explanation, because seeking past what was buffered meant opening a
+     * new connection partway into the file, and that request got rejected
+     * by the source every time under the client Resona resolved streams
+     * through back then. Switching which client resolves the stream first
+     * (see [InnerTubeClientConfig] in `:core:data`) turned out to fix that
+     * at the source: confirmed directly, requesting arbitrary byte ranges
+     * deep into a file no longer gets rejected at all. Verified live here
+     * too afterward, dragging the scrubber far ahead of the buffered point
+     * now lands cleanly with no stall and no reversion, so the clamp was
+     * removed rather than kept as unneeded belt-and-suspenders.
      */
     fun seekTo(positionMs: Long) {
         viewModelScope.launch {
             val controller = controllerReady.await()
-            val clamped = positionMs.coerceIn(0L, controller.bufferedPosition.coerceAtLeast(0L))
-            if (clamped < positionMs) {
-                Toast.makeText(context, "Can't skip past what's loaded yet", Toast.LENGTH_SHORT).show()
-            }
-            controller.seekTo(clamped)
+            val target = positionMs.coerceAtLeast(0L)
+            controller.seekTo(target)
             // Applied optimistically so the elapsed-time label snaps to the
             // released position immediately, instead of waiting up to
             // POSITION_UPDATE_MILLIS for the poll loop to catch up.
-            _uiState.update { it.copy(position = clamped) }
+            _uiState.update { it.copy(position = target) }
         }
     }
 
