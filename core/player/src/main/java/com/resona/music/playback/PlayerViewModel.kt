@@ -192,6 +192,14 @@ class PlayerViewModel @Inject constructor(
                         // place it can be caught. Capped, and scoped to IO errors
                         // only, so a genuinely broken/unplayable video still
                         // surfaces an error instead of retrying forever.
+                        //
+                        // Walking the client chain alone isn't enough, though: the
+                        // CDN's PO token verdict is keyed on the anonymous visitor
+                        // identity, not the client, so every client in the chain
+                        // can be riding the same flagged token and 403 the same
+                        // way. refreshStreamIdentity() mints a replacement before
+                        // the retry re-resolves, so this doesn't just cycle
+                        // through clients that were never going to work either.
                         if (track != null && isCurrentTrackStream &&
                             error.errorCode in RETRYABLE_ERROR_CODES &&
                             streamRetryCount < MAX_STREAM_RETRIES
@@ -203,6 +211,7 @@ class PlayerViewModel @Inject constructor(
                                     "(attempt $streamRetryCount/$MAX_STREAM_RETRIES)"
                             )
                             viewModelScope.launch {
+                                musicRepository.refreshStreamIdentity()
                                 delay(STREAM_RETRY_DELAY_MILLIS)
                                 play(track, queue)
                             }

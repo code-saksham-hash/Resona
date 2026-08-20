@@ -74,6 +74,8 @@ class MusicRepositoryImpl @Inject internal constructor(
     override suspend fun getStreamSource(videoId: String, excludedClients: Set<String>): StreamSource =
         streamExtractor.resolveStreamUrl(videoId, excludedClients)
 
+    override suspend fun refreshStreamIdentity() = streamExtractor.refreshVisitorIdentity()
+
     // There's no logged-in session anywhere in this app, so InnerTube's own
     // browse/FEmusic_home feed has nothing personalized to return -- tried
     // live, it comes back as two generic playlist shelves plus a "sign in to

@@ -2,12 +2,18 @@ package com.resona.music.data.extractor.decipher
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
+import com.resona.music.data.extractor.InnerTubeClientConfig
 import com.resona.music.domain.repository.StreamCipherRequiredException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -144,6 +150,61 @@ class PlayerJsRepository @Inject constructor(
         runCatching { prefs?.edit()?.putString(PREFS_KEY_VISITOR, token)?.apply() }
     }
 
+    /**
+     * Drops [flagged] and mints a replacement, for when *playback* itself got
+     * rejected by the CDN after a resolve that looked fine -- YouTube's PO
+     * token verdict is keyed on the visitor identity the /player call
+     * carried, not the video or the InnerTube client, so that only shows up
+     * once bytes are actually requested and resolution itself never sees it
+     * (see PlayerViewModel.onPlayerError). Only clears the cache if [flagged]
+     * is still current, so a concurrently-learned good token isn't
+     * clobbered. Best-effort: never throws, safe to call speculatively.
+     */
+    suspend fun remintVisitorData(flagged: String?): String? {
+        synchronized(visitorFetchLock) {
+            if (visitorData != flagged) {
+                Log.d(TAG, "remintVisitorData: $flagged already superseded, current token stands")
+                return visitorData
+            }
+            visitorData = null
+            lastVisitorDataFetch = System.currentTimeMillis()
+        }
+        runCatching { prefs?.edit()?.remove(PREFS_KEY_VISITOR)?.apply() }
+        mintVisitorDataViaApi()?.let {
+            Log.d(TAG, "remintVisitorData: minted a replacement via visitor_id API (len=${it.length})")
+            visitorData = it
+            persistVisitor(it)
+            return it
+        }
+        // Fallback: fetchPlayerJsUrl sets/persists visitorData itself as a
+        // side effect when its ytcfg scrape succeeds.
+        runCatching { fetchPlayerJsUrl(REMINT_VIDEO_ID) }
+        Log.d(
+            TAG,
+            if (visitorData != null) "remintVisitorData: API mint failed, watch-page fallback succeeded"
+            else "remintVisitorData: API mint and watch-page fallback both failed"
+        )
+        return visitorData
+    }
+
+    // Dedicated visitor_id InnerTube endpoint: a few hundred bytes and one
+    // round trip, versus fetchPlayerJsUrl's ~1.5MB watch-page scrape --
+    // remintVisitorData needs a fast mint with no specific video in hand.
+    // visitorData in this response is URL-encoded (%3D for the base64
+    // padding); the /player payload wants it raw.
+    private suspend fun mintVisitorDataViaApi(): String? = runCatching {
+        val body = httpClient.post("https://www.youtube.com/youtubei/v1/visitor_id?prettyPrint=false") {
+            contentType(ContentType.Application.Json)
+            header("User-Agent", InnerTubeClientConfig.WEB.userAgent)
+            setBody(
+                """{"context":{"client":{"clientName":"WEB","clientVersion":"${InnerTubeClientConfig.WEB.clientVersion}","hl":"en","gl":"US"}}}"""
+            )
+        }.bodyAsText()
+        Regex(""""visitorData"\s*:\s*"([^"]+)"""").find(body)?.groupValues?.get(1)
+            ?.replace("%3D", "=")?.replace("%3d", "=")
+            ?.takeIf { it.isNotBlank() }
+    }.getOrNull()
+
     // sts -- required by some clients for age-restricted videos.
     fun extractSignatureTimestamp(playerJs: String): Int? =
         Regex("""(?:signatureTimestamp|sts)\s*[=:]\s*(\d{5,6})""")
@@ -155,7 +216,14 @@ class PlayerJsRepository @Inject constructor(
         // instead of one per track.
         const val VISITOR_DATA_REFRESH_MILLIS = 10 * 60 * 1000L
 
+        const val TAG = "PlayerJsRepository"
+
         const val PREFS_NAME = "resona_visitor"
         const val PREFS_KEY_VISITOR = "visitor_data"
+
+        // "Me at the zoo" -- the first video ever uploaded to YouTube, kept
+        // public indefinitely. remintVisitorData's watch-page fallback needs
+        // *some* always-available video id, not one tied to what's playing.
+        const val REMINT_VIDEO_ID = "jNQXAC9IVRw"
     }
 }
