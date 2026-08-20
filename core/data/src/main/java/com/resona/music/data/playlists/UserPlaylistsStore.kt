@@ -26,6 +26,10 @@ import javax.inject.Singleton
 internal interface UserPlaylistsStore {
     val playlists: StateFlow<List<Playlist>>
     suspend fun createPlaylist(name: String, songs: List<Song> = emptyList()): Playlist
+
+    /** Appends [song] to [playlistId]'s song list. A no-op if it's already
+     *  in that playlist, or if [playlistId] doesn't match any playlist. */
+    suspend fun addSongToPlaylist(playlistId: String, song: Song)
 }
 
 @Singleton
@@ -49,6 +53,22 @@ internal class FileUserPlaylistsStore @Inject constructor(
             Log.d(TAG, "createPlaylist: '${playlist.name}' total=${updated.size} songs=${songs.size}")
         }
         return playlist
+    }
+
+    override suspend fun addSongToPlaylist(playlistId: String, song: Song) {
+        mutex.withLock {
+            val target = _playlists.value.find { it.id == playlistId } ?: run {
+                Log.w(TAG, "addSongToPlaylist: no playlist with id=$playlistId")
+                return
+            }
+            if (target.songs.any { it.videoId == song.videoId }) return
+            val updated = _playlists.value.map {
+                if (it.id == playlistId) it.copy(songs = it.songs + song) else it
+            }
+            withContext(Dispatchers.IO) { writeIndex(updated) }
+            _playlists.value = updated
+            Log.d(TAG, "addSongToPlaylist: added '${song.title}' to '${target.name}'")
+        }
     }
 
     private fun readIndex(): List<Playlist> {

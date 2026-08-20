@@ -251,6 +251,8 @@ fun ResonaNavGraph() {
                     onDownloadClick = playerViewModel::download,
                     onToggleLike = playerViewModel::toggleLike,
                     onLoadLyrics = playerViewModel::loadLyrics,
+                    playlists = playerViewModel.playlists.collectAsStateWithLifecycle().value,
+                    onAddToPlaylist = playerViewModel::addCurrentTrackToPlaylist,
                     onBack = { navController.popBackStack() }
                 )
             }
