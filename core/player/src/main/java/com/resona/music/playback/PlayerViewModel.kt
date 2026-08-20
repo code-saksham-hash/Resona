@@ -127,12 +127,23 @@ class PlayerViewModel @Inject constructor(
      *  Reset whenever [play] starts a genuinely different track. */
     private var streamRetryCount = 0
 
-    /** InnerTube client names (see [StreamSource.clientName]) already tried for the
-     *  current track and proven to produce a url the CDN then rejected. A client
-     *  self-reporting a format as resolvable doesn't mean the CDN will actually
-     *  serve it -- confirmed live: the same client resolves the same doomed url
-     *  every time, so a retry that doesn't exclude it just repeats the failure
-     *  instead of walking the fallback chain. Reset alongside [streamRetryCount]. */
+    /** InnerTube client names (see [StreamSource.clientName]) that already
+     *  produced a url the CDN rejected *under the current visitor identity*.
+     *  A client self-reporting a format as resolvable doesn't mean the CDN
+     *  will actually serve it, and re-resolving with the same client and the
+     *  same identity just reproduces the same doomed url -- so within one
+     *  identity, skipping a client that already failed is the only way a
+     *  retry actually tries something different.
+     *
+     *  Cleared every time the identity itself gets reminted (see the retry
+     *  sites below), though: a logcat trace of a real failure end to end
+     *  showed the CDN's verdict tracks the visitor identity, not the client,
+     *  so a client excluded under a now-discarded identity is worth trying
+     *  again under the new one. Without this reset, two unlucky identities
+     *  in a row permanently locked a track out of the only clients that ever
+     *  return a directly playable url, and every retry after that was spent
+     *  on clients that were never going to work anonymously either -- the
+     *  track just never played. Reset alongside [streamRetryCount]. */
     private val excludedClients = mutableSetOf<String>()
 
     private val controllerFuture = MediaController.Builder(
@@ -180,31 +191,35 @@ class PlayerViewModel @Inject constructor(
                         val isCurrentTrackStream = track != null &&
                             controller.currentMediaItem?.mediaId == track.videoId
                         // A format url InnerTube marked resolvable can still get
-                        // flatly rejected by the CDN (403, "source error") -- and
-                        // confirmed live (logcat), it's not a one-off: the same
-                        // client resolves the exact same doomed url every time, so
-                        // re-resolving without excluding it just repeats the same
-                        // failure. play() already added this track's client to
-                        // excludedClients when it resolved the url now failing, so
-                        // re-running it walks the fallback chain onto a different
-                        // client instead. That's only observable here, once the
-                        // player actually opens the connection, so this is the one
-                        // place it can be caught. Capped, and scoped to IO errors
-                        // only, so a genuinely broken/unplayable video still
-                        // surfaces an error instead of retrying forever.
+                        // flatly rejected by the CDN (403, "source error") once the
+                        // player actually opens it -- only observable here, so this
+                        // is the one place it can be caught. Capped, and scoped to
+                        // IO errors only, so a genuinely broken/unplayable video
+                        // still surfaces an error instead of retrying forever.
                         //
-                        // Walking the client chain alone isn't enough, though: the
-                        // CDN's PO token verdict is keyed on the anonymous visitor
-                        // identity, not the client, so every client in the chain
-                        // can be riding the same flagged token and 403 the same
-                        // way. refreshStreamIdentity() mints a replacement before
-                        // the retry re-resolves, so this doesn't just cycle
-                        // through clients that were never going to work either.
+                        // Tracing one of these failures through logcat end to end
+                        // showed the rejection isn't really about the client at
+                        // all: the CDN's verdict is keyed on the anonymous visitor
+                        // identity that resolved the url, and it can go either way
+                        // per identity no matter which client asked.
+                        // refreshStreamIdentity() mints a replacement before the
+                        // retry re-resolves -- and the exclusion list is wiped
+                        // right here too, because an exclusion recorded against
+                        // the identity we're about to throw away doesn't mean
+                        // anything once it's gone. Leaving it in place was the
+                        // actual bug: once
+                        // the two clients that ever hand back a directly playable
+                        // url had each failed once, they stayed excluded for the
+                        // rest of the track's retry budget even after a brand new
+                        // identity made them worth trying again, so every retry
+                        // after that was burned on clients that don't work
+                        // anonymously at all and the track just sat there.
                         if (track != null && isCurrentTrackStream &&
                             error.errorCode in RETRYABLE_ERROR_CODES &&
                             streamRetryCount < MAX_STREAM_RETRIES
                         ) {
                             streamRetryCount++
+                            excludedClients.clear()
                             Log.d(
                                 TAG,
                                 "onPlayerError: retrying ${track.videoId} " +
@@ -383,14 +398,21 @@ class PlayerViewModel @Inject constructor(
                 // so onPlayerError's retry never gets a chance to run. Same
                 // retry budget as onPlayerError (shared streamRetryCount):
                 // this is the exact "no stream at all" counterpart to that
-                // one's "stream url the CDN then rejected".
+                // one's "stream url the CDN then rejected" -- and the same
+                // root cause too, just caught one step earlier. Every client
+                // in the chain coming back with no playable audio is what a
+                // bad visitor identity looks like at resolve time, so this
+                // reminds one and clears the exclusion list before retrying,
+                // for the same reason onPlayerError does (see its comment).
                 if (streamRetryCount < MAX_STREAM_RETRIES) {
                     streamRetryCount++
+                    excludedClients.clear()
                     Log.d(
                         TAG,
                         "play: retrying ${song.videoId} (attempt $streamRetryCount/$MAX_STREAM_RETRIES) " +
                             "after resolve failure: ${e.message}"
                     )
+                    musicRepository.refreshStreamIdentity()
                     delay(STREAM_RETRY_DELAY_MILLIS)
                     play(song, queue)
                     return@launch
@@ -670,10 +692,11 @@ class PlayerViewModel @Inject constructor(
         const val DUMMY_NEXT = "__queue_next__"
         const val DUMMY_PREV = "__queue_prev__"
 
-        // See onPlayerError/excludedClients: each retry walks to a different
-        // client in YouTubeStreamExtractor's 6-client fallback chain, so 4
-        // covers all but one of them before giving up. STREAM_RETRY_DELAY_MILLIS
-        // is just pacing between attempts, not load-bearing for correctness.
+        // See onPlayerError/excludedClients: each retry mints a fresh visitor
+        // identity and gets a clean shot at the whole client chain again, so
+        // this is really "how many different identities are worth trying"
+        // rather than a client count. STREAM_RETRY_DELAY_MILLIS is just
+        // pacing between attempts, not load-bearing for correctness.
         const val MAX_STREAM_RETRIES = 4
         const val STREAM_RETRY_DELAY_MILLIS = 600L
         // The whole ERROR_CODE_IO_* family (2000-2008) -- a gated/rejected
