@@ -1,32 +1,47 @@
 package com.resona.music.ui.navigation
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -265,40 +280,106 @@ fun ResonaNavGraph() {
     }
 }
 
+/** Spring shared by every size/position morph in the pill nav -- snappy and
+ *  non-bouncy, since a visible bounce on a tab you tap constantly reads as
+ *  sluggish rather than lively. Generic since it drives a Dp, an IntSize
+ *  (expand/shrink, content size), and a Float (fade) at different call sites. */
+private fun <T> navMorphSpec(): androidx.compose.animation.core.FiniteAnimationSpec<T> =
+    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+private val navColorSpec = tween<Color>(200)
+
 @Composable
 private fun ResonaBottomBar(navController: NavHostController, currentRoute: String?) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(0.5.dp)
-                .background(Color.White.copy(alpha = 0.1f))
-                .align(Alignment.TopCenter)
-        )
-        NavigationBar(
-            containerColor = Color.Black.copy(alpha = 0.7f),
-            tonalElevation = 0.dp
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(bottom = 20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = Color.Black.copy(alpha = 0.7f),
+            border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
         ) {
-            bottomNavDestinations.forEach { destination ->
-                val selected = currentRoute == destination.route
-                NavigationBarItem(
-                    selected = selected,
-                    onClick = { navController.navigateToTopLevel(destination.route) },
-                    icon = {
-                        Icon(
-                            imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
-                            contentDescription = destination.label
-                        )
-                    },
-                    label = { Text(destination.label) },
-                    colors = NavigationBarItemDefaults.colors(
-                        indicatorColor = Color.White.copy(alpha = 0.12f),
-                        selectedIconColor = Color.White,
-                        unselectedIconColor = Color.White.copy(alpha = 0.4f),
-                        selectedTextColor = Color.White,
-                        unselectedTextColor = Color.White.copy(alpha = 0.4f)
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                bottomNavDestinations.forEach { destination ->
+                    val selected = currentRoute == destination.route
+                    NavPillItem(
+                        label = destination.label,
+                        icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                        selected = selected,
+                        onClick = { navController.navigateToTopLevel(destination.route) }
                     )
-                )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One tab of the floating pill nav: icon-only circle when unselected, morphs
+ * into a wider pill with the label alongside the icon when selected. Colors
+ * stay within the app's monochrome white-on-black-glass palette -- same
+ * tones the old flat NavigationBar used, just applied per-pill instead of as
+ * one static indicator.
+ */
+@Composable
+private fun NavPillItem(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val horizontalPadding by animateDpAsState(
+        targetValue = if (selected) 20.dp else 12.dp,
+        animationSpec = navMorphSpec(),
+        label = "navPillPadding"
+    )
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) Color.White.copy(alpha = 0.14f) else Color.Transparent,
+        animationSpec = navColorSpec,
+        label = "navPillContainer"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) Color.White else Color.White.copy(alpha = 0.4f),
+        animationSpec = navColorSpec,
+        label = "navPillContent"
+    )
+    Surface(
+        selected = selected,
+        onClick = onClick,
+        shape = CircleShape,
+        color = containerColor,
+        contentColor = contentColor,
+        modifier = Modifier.height(48.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = horizontalPadding)
+                .animateContentSize(animationSpec = navMorphSpec()),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(24.dp))
+            AnimatedVisibility(
+                visible = selected,
+                enter = fadeIn(navMorphSpec()) + expandHorizontally(navMorphSpec()),
+                exit = fadeOut(navMorphSpec()) + shrinkHorizontally(navMorphSpec())
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
