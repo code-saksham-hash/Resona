@@ -583,14 +583,30 @@ class PlayerViewModel @Inject constructor(
         update { if (it.currentTrack?.videoId == videoId) block(it) else it }
     }
 
+    /**
+     * Seeking past what's already buffered means the player has to open a
+     * new connection partway into the file, and that request gets rejected
+     * by the source every time, measured directly while chasing this same
+     * failure on the playback side (see RangedHttpDataSource's kdoc). Before
+     * this clamp, dragging the scrubber past the buffered point looked like
+     * it worked for a moment and then silently jumped back to 0:00 once the
+     * rejection came back and the existing retry logic restarted the track
+     * from the beginning. Clamping to bufferedPosition keeps the seek inside
+     * what's already been fetched, so it actually lands where asked instead
+     * of failing invisibly a second later.
+     */
     fun seekTo(positionMs: Long) {
         viewModelScope.launch {
             val controller = controllerReady.await()
-            controller.seekTo(positionMs)
+            val clamped = positionMs.coerceIn(0L, controller.bufferedPosition.coerceAtLeast(0L))
+            if (clamped < positionMs) {
+                Toast.makeText(context, "Can't skip past what's loaded yet", Toast.LENGTH_SHORT).show()
+            }
+            controller.seekTo(clamped)
             // Applied optimistically so the elapsed-time label snaps to the
             // released position immediately, instead of waiting up to
             // POSITION_UPDATE_MILLIS for the poll loop to catch up.
-            _uiState.update { it.copy(position = positionMs.coerceAtLeast(0L)) }
+            _uiState.update { it.copy(position = clamped) }
         }
     }
 

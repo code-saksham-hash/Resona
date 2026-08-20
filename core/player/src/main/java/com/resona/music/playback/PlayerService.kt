@@ -7,6 +7,7 @@ import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -51,8 +52,25 @@ class PlayerService : MediaSessionService() {
         super.onCreate()
 
         val dataSourceFactory = DefaultDataSource.Factory(this, RangedHttpDataSource.Factory(httpDataSourceFactory))
+        // The default LoadControl waits for 2.5 seconds of buffered audio
+        // before it will start playback at all, which was most of the delay
+        // between tapping a song and actually hearing it. Audio is cheap to
+        // buffer compared to video, and RangedHttpDataSource's first request
+        // already lands well under a second on a normal connection, so
+        // there's little to protect against by waiting that long up front.
+        // Kept a bit more cautious after a rebuffer, since that already
+        // means something along the way is struggling.
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                /* bufferForPlaybackMs = */ 500,
+                /* bufferForPlaybackAfterRebufferMs = */ 1_500
+            )
+            .build()
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(dataSourceFactory))
+            .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
