@@ -13,7 +13,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +40,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -80,6 +85,17 @@ private val slideExit = slideOutHorizontally { -it } + fadeOut(animationSpec = n
 private val slidePopEnter = slideInHorizontally { -it } + fadeIn(animationSpec = navAnimSpec)
 private val slidePopExit = slideOutHorizontally { it } + fadeOut(animationSpec = navAnimSpec)
 
+// For the bottom chrome (mini-player + nav pill) showing/hiding -- shorter
+// and vertical, since this is UI chrome sliding out of the way rather than a
+// screen navigating past it. Without this the whole bottom bar was popping
+// in/out on a bare `if`, a hard cut against the screen content sliding
+// smoothly behind it.
+private val chromeAnimSpec = tween<Float>(300)
+private val chromeEnter = fadeIn(animationSpec = chromeAnimSpec) +
+    slideInVertically(animationSpec = tween(300)) { it / 2 }
+private val chromeExit = fadeOut(animationSpec = chromeAnimSpec) +
+    slideOutVertically(animationSpec = tween(300)) { it / 2 }
+
 @Composable
 fun ResonaNavGraph() {
     val navController = rememberNavController()
@@ -103,19 +119,38 @@ fun ResonaNavGraph() {
             Column(modifier = Modifier.imePadding()) {
                 // Redundant next to the full player, so it's hidden on that
                 // screen specifically rather than gated on currentTrack alone.
-                if (currentRoute != ResonaDestination.NowPlaying.route) {
-                    playerUiState.currentTrack?.let { track ->
-                        MiniPlayerBar(
-                            track = track,
-                            isPlaying = playerUiState.isPlaying,
-                            modifier = Modifier.offset(y = (-20).dp),
-                            onTogglePlayPause = playerViewModel::togglePlayPause,
-                            onSkipToPrevious = playerViewModel::skipToPrevious,
-                            onSkipToNext = playerViewModel::skipToNext,
-                            onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) }
-                        )
+                AnimatedVisibility(
+                    visible = currentRoute != ResonaDestination.NowPlaying.route,
+                    enter = chromeEnter,
+                    exit = chromeExit
+                ) {
+                    Column {
+                        // Read through lastTrack, not currentTrack directly, so
+                        // the exit animation below has a track to render while
+                        // it slides away instead of the content vanishing out
+                        // from under it the instant currentTrack goes null.
+                        var lastTrack by remember { mutableStateOf<Song?>(null) }
+                        playerUiState.currentTrack?.let { lastTrack = it }
+
+                        AnimatedVisibility(
+                            visible = playerUiState.currentTrack != null,
+                            enter = chromeEnter,
+                            exit = chromeExit
+                        ) {
+                            lastTrack?.let { track ->
+                                MiniPlayerBar(
+                                    track = track,
+                                    isPlaying = playerUiState.isPlaying,
+                                    modifier = Modifier.offset(y = (-20).dp),
+                                    onTogglePlayPause = playerViewModel::togglePlayPause,
+                                    onSkipToPrevious = playerViewModel::skipToPrevious,
+                                    onSkipToNext = playerViewModel::skipToNext,
+                                    onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) }
+                                )
+                            }
+                        }
+                        ResonaBottomBar(navController, currentRoute)
                     }
-                    ResonaBottomBar(navController, currentRoute)
                 }
             }
         }
