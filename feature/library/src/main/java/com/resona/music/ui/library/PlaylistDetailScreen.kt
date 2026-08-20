@@ -37,7 +37,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.resona.music.domain.model.Song
-import com.resona.music.ui.theme.JosefinSansFontFamily
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.ResonaTheme
 
@@ -85,9 +84,8 @@ private fun PlaylistDetailScreenContent(
             }
             Text(
                 text = title.ifBlank { "Playlist" },
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

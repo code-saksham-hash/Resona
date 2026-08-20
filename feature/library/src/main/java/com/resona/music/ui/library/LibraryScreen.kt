@@ -63,7 +63,6 @@ import kotlinx.coroutines.launch
 import com.resona.music.domain.model.DownloadedSong
 import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
-import com.resona.music.ui.theme.JosefinSansFontFamily
 import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaSearchEntryBar
 import com.resona.music.ui.theme.ResonaTheme
@@ -440,8 +439,6 @@ private fun LibraryHeader(
             text = "Your Library",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.primary,
-            fontFamily = JosefinSansFontFamily,
-            fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
         Icon(
@@ -612,10 +609,8 @@ private fun DownloadedSongsSection(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Downloaded",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontFamily = JosefinSansFontFamily,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary
             )
         }
 
