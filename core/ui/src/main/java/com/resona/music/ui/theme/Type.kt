@@ -36,6 +36,30 @@ val MontserratFontFamily = FontFamily(
     Font(com.resona.music.core.ui.R.font.montserrat_bold, FontWeight.Bold),
 )
 
+/**
+ * The three voices in this app, and where each belongs:
+ * - **Josefin Sans** (`displayX`/`headlineX` below) -- page-level titles: a
+ *   screen's own name ("Your Library", an artist/playlist name), the song
+ *   title on Now Playing. The brand voice; used sparingly, once per screen.
+ * - **Inter** ([SectionHeaderTextStyle]) -- section headers *within* a
+ *   screen that has several ("Recommended For You", "Trending Now"). Same
+ *   weight class as a headline but a plainer face, so it doesn't compete
+ *   with the page's own Josefin title above it.
+ * - **Montserrat** (`titleX`/`bodyX`/`labelX` below) -- everything else:
+ *   list rows, buttons, captions, anything read at length.
+ *
+ * Reach for one of these three named styles instead of specifying
+ * `fontFamily` inline -- an inline override is how the app ends up with a
+ * fourth, undocumented voice by accident.
+ */
+val SectionHeaderTextStyle = TextStyle(
+    fontFamily = InterFontFamily,
+    fontWeight = FontWeight.Bold,
+    fontSize = 24.sp,
+    lineHeight = 32.sp,
+    letterSpacing = 0.sp
+)
+
 // Montserrat is bundled as a variable font spanning the whole weight range
 // (minSdk 26 maps a requested weight onto the variable axis), so a single
 // file backs every weight the scale needs.

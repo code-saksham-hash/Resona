@@ -53,12 +53,12 @@ import coil.compose.AsyncImage
 import com.resona.music.domain.model.ArtistSpotlight
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.Song
-import com.resona.music.ui.theme.InterFontFamily
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.NocturneSurface
 import com.resona.music.ui.theme.ResonaLogoIcon
 import com.resona.music.ui.theme.ResonaSearchEntryBar
 import com.resona.music.ui.theme.ResonaTheme
+import com.resona.music.ui.theme.SectionHeaderTextStyle
 
 data class HomeAlbum(
     val id: String,
@@ -403,10 +403,8 @@ private fun RecommendedSection(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontFamily = InterFontFamily,
-                fontWeight = FontWeight.Bold
+                style = SectionHeaderTextStyle,
+                color = MaterialTheme.colorScheme.primary
             )
         }
 
@@ -506,10 +504,8 @@ private fun TrendingSection(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontFamily = InterFontFamily,
-                fontWeight = FontWeight.Bold
+                style = SectionHeaderTextStyle,
+                color = MaterialTheme.colorScheme.primary
             )
         }
 
@@ -608,9 +604,8 @@ private fun TopArtistsSection(
             Column {
                 Text(
                     text = "Popular Artists",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = SectionHeaderTextStyle,
                     color = MaterialTheme.colorScheme.primary,
-                    fontFamily = InterFontFamily,
                 )
                 Text(
                     // There's no account/listening history in this app to
@@ -689,10 +684,8 @@ private fun NewForYouSection(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontFamily = InterFontFamily,
-                fontWeight = FontWeight.Bold
+                style = SectionHeaderTextStyle,
+                color = MaterialTheme.colorScheme.primary
             )
         }
 
