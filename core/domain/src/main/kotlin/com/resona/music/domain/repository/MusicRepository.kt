@@ -15,6 +15,14 @@ interface MusicRepository {
      *  fallback chain -- for a retry after the CDN itself rejected a previous resolution's
      *  url, not a resolve-time failure (see [StreamSource.clientName]). */
     suspend fun getStreamSource(videoId: String, excludedClients: Set<String> = emptySet()): StreamSource
+
+    /** Call when the CDN itself rejected an already-resolved stream url (not a
+     *  resolve-time failure) -- see [StreamSource]'s kdoc. The anonymous session
+     *  identity behind the resolve may be flagged; mints a replacement so the
+     *  next getStreamSource() call has a chance to draw an unflagged one.
+     *  Best-effort and safe to call speculatively; never throws. */
+    suspend fun refreshStreamIdentity()
+
     suspend fun getHomeFeed(): HomeFeed
 
     /** Records that [song] was played -- what lets getHomeFeed()'s "Recommended

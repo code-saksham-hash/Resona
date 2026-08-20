@@ -122,6 +122,16 @@ internal class YouTubeStreamExtractor @Inject constructor(
         )
     }
 
+    // Called when the CDN itself rejected an already-resolved url (not a
+    // resolve-time failure) -- see PlayerViewModel.onPlayerError. Every
+    // client in clientChain rides the same visitorData, so a client that
+    // resolved a doomed url isn't the problem; the anonymous identity behind
+    // it might be. Best-effort passthrough: playerJsRepo.remintVisitorData
+    // never throws.
+    suspend fun refreshVisitorIdentity() {
+        playerJsRepo.remintVisitorData(playerJsRepo.currentVisitorData())
+    }
+
     private suspend fun fetchWithFallback(
         videoId: String,
         visitorData: String?,
