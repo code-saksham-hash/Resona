@@ -124,7 +124,9 @@ fun HistoryScreen(
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = 24.dp),
+                // Clears the floating bottom chrome (pill nav, plus the
+                // mini-player when a track is playing).
+                contentPadding = PaddingValues(bottom = 160.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(history, key = { it.song.videoId }) { entry ->

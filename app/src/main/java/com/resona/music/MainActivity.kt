@@ -37,7 +37,8 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            ResonaTheme {
+            // Resona is dark-only -- no light theme, no user-facing toggle.
+            ResonaTheme(darkTheme = true) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     ResonaNavGraph()
                 }

@@ -34,8 +34,13 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
+    // rememberLauncherForActivityResult, for the shared voice-search launcher
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.core)
+    // The shared top bar's download/settings/voice-search icons aren't in
+    // the core icon set.
+    implementation(libs.androidx.material.icons.extended)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

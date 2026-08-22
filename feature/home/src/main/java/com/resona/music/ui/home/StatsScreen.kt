@@ -190,7 +190,9 @@ fun StatsScreen(
             EmptyStateCard()
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        // Clears the floating bottom chrome (pill nav, plus the mini-player
+        // when a track is playing).
+        Spacer(modifier = Modifier.height(160.dp))
     }
 }
 

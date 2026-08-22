@@ -54,10 +54,17 @@ on purpose so frontend changes can't accidentally break it. This includes:
 ## Design system rule
 
 Every color used anywhere in the app must come from `core:ui`'s
-`Color.kt` palette (black/white/gray only -- no hues, no Material You
-dynamic color, no gradients or shadows). If a screen needs something that
-isn't expressible with what's already in `core:ui`, that's a sign the
-design system needs a new shared piece, not a one-off in a feature module.
+`Color.kt` palette (black/white/gray only -- no other hues, no Material You
+dynamic color, no gradients or shadows), with one exception: `ColorScheme.tertiary`/`onTertiary`,
+used for active/selected state (the selected bottom-nav pill, the top bar's
+voice-search button, the Search screen's accents). `ResonaNavGraph` overrides
+those two roles once, at the top of the app, with whatever's playing's
+album-art color (falling back to plain white/black when nothing is) -- see
+`AlbumArtPalette.kt` in `:feature:player`. Don't hardcode a color for that
+role anywhere else; read `MaterialTheme.colorScheme.tertiary` and it comes
+along for free. If a screen needs something that isn't expressible with what's already in
+`core:ui`, that's a sign the design system needs a new shared piece, not a
+one-off in a feature module.
 
 ## Building and testing
 

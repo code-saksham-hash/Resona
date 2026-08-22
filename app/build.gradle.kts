@@ -37,8 +37,8 @@ android {
         applicationId = "com.resona.music"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.3.1"
+        versionCode = 6
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -84,6 +84,7 @@ dependencies {
     implementation(project(":feature:search"))
     implementation(project(":feature:player"))
     implementation(project(":feature:library"))
+    implementation(project(":feature:settings"))
 
     // Core / lifecycle
     implementation(libs.androidx.core.ktx)

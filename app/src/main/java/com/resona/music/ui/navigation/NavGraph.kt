@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
@@ -29,13 +30,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,8 +74,9 @@ import com.resona.music.ui.library.PlaylistDetailScreen
 import com.resona.music.ui.library.PlaylistDetailViewModel
 import com.resona.music.ui.nowplaying.NowPlayingScreen
 import com.resona.music.ui.player.MiniPlayerBar
+import com.resona.music.ui.player.rememberAlbumArtPalette
 import com.resona.music.ui.search.SearchPage
-import com.resona.music.ui.search.SearchScreen
+import com.resona.music.ui.settings.SettingsScreen
 
 private val navAnimSpec = tween<Float>(450)
 
@@ -109,57 +112,53 @@ fun ResonaNavGraph() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    Scaffold(
-        bottomBar = {
-            // Without this, the bar stays pinned to the physical bottom of
-            // the screen while the soft keyboard draws on top of it -- the
-            // mini-player and its play/pause button end up fully covered
-            // (and untappable) any time the keyboard is open, e.g. right
-            // after tapping a search result without dismissing it first.
-            Column(modifier = Modifier.imePadding()) {
-                // Redundant next to the full player, so it's hidden on that
-                // screen specifically rather than gated on currentTrack alone.
-                AnimatedVisibility(
-                    visible = currentRoute != ResonaDestination.NowPlaying.route,
-                    enter = chromeEnter,
-                    exit = chromeExit
-                ) {
-                    Column {
-                        // Read through lastTrack, not currentTrack directly, so
-                        // the exit animation below has a track to render while
-                        // it slides away instead of the content vanishing out
-                        // from under it the instant currentTrack goes null.
-                        var lastTrack by remember { mutableStateOf<Song?>(null) }
-                        playerUiState.currentTrack?.let { lastTrack = it }
+    // The app's one departure from strict monochrome: ColorScheme.tertiary/
+    // onTertiary (the selected bottom-nav pill, the top bar's voice-search
+    // button, the Search screen's accents) is overridden here, once, with
+    // whatever's currently playing's album-art color -- the same extraction
+    // the mini-player/Now Playing screens already use (see AlbumArtPalette.kt
+    // in :feature:player). Only while isAdaptive is true, though (a real
+    // color was actually extracted) -- its own neutral() fallback pairs
+    // white with onSurface/surfaceContainer (a near-black Gray900, not true
+    // black), which read as low-contrast/washed-out for the pill's bold
+    // label text. Skipping the override entirely when nothing's playing (or
+    // extraction hasn't finished yet) instead falls through to tertiary/
+    // onTertiary's own Color.kt values, which are exactly primary/onPrimary
+    // -- true black-on-white, guaranteed legible. Every plain
+    // `MaterialTheme.colorScheme.tertiary` read below this point -- in this
+    // file, in :core:ui, in the Search screen -- picks either up automatically.
+    val nowPlayingPalette = rememberAlbumArtPalette(playerUiState.currentTrack?.highResThumbnailUrl)
+    val dynamicColorScheme = if (nowPlayingPalette.isAdaptive) {
+        MaterialTheme.colorScheme.copy(
+            tertiary = nowPlayingPalette.accent,
+            onTertiary = nowPlayingPalette.onAccent,
+        )
+    } else {
+        MaterialTheme.colorScheme
+    }
 
-                        AnimatedVisibility(
-                            visible = playerUiState.currentTrack != null,
-                            enter = chromeEnter,
-                            exit = chromeExit
-                        ) {
-                            lastTrack?.let { track ->
-                                MiniPlayerBar(
-                                    track = track,
-                                    isPlaying = playerUiState.isPlaying,
-                                    modifier = Modifier.offset(y = (-20).dp),
-                                    onTogglePlayPause = playerViewModel::togglePlayPause,
-                                    onSkipToPrevious = playerViewModel::skipToPrevious,
-                                    onSkipToNext = playerViewModel::skipToNext,
-                                    onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) }
-                                )
-                            }
-                        }
-                        ResonaBottomBar(navController, currentRoute)
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = ResonaDestination.Home.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
+    MaterialTheme(
+        colorScheme = dynamicColorScheme,
+        typography = MaterialTheme.typography,
+        shapes = MaterialTheme.shapes,
+    ) {
+        // A plain Box, not Scaffold -- the bottom chrome (mini-player + pill
+        // nav) is meant to float over the feed, not reserve fixed space for
+        // itself that every screen's content has to stop short of. Each
+        // screen scrolls full-bleed underneath it and pads its own last item
+        // clear of it instead.
+        Box(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = ResonaDestination.Home.route,
+                // Top only -- Scaffold used to reserve this via innerPadding
+                // (every screen's content implicitly assumed it), but the
+                // bottom is deliberately left unpadded here so content can
+                // scroll full-bleed under the floating chrome below.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+            ) {
             composable(
                 ResonaDestination.Home.route,
                 enterTransition = { bottomNavEnter },
@@ -200,14 +199,20 @@ fun ResonaNavGraph() {
                     onSearchQuery = { query ->
                         navController.navigate(searchRoute(query))
                     },
+                    onSettingsClick = {
+                        navController.navigate(ResonaDestination.Settings.route)
+                    },
+                    onDownloadsClick = {
+                        navController.navigateToTopLevel(ResonaDestination.Library.route)
+                    },
                 )
             }
             composable(
                 ResonaDestination.Stats.route,
-                enterTransition = { bottomNavEnter },
-                exitTransition = { bottomNavExit },
-                popEnterTransition = { bottomNavEnter },
-                popExitTransition = { bottomNavExit },
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
             ) {
                 StatsScreen(
                     onArtistClick = { artist ->
@@ -218,14 +223,13 @@ fun ResonaNavGraph() {
             composable(
                 route = "${ResonaDestination.Search.route}?query={query}",
                 arguments = listOf(navArgument("query") { type = NavType.StringType; defaultValue = "" }),
-                enterTransition = { slideEnter },
-                exitTransition = { slideExit },
-                popEnterTransition = { slidePopEnter },
-                popExitTransition = { slidePopExit },
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
             ) { backStackEntry ->
                 SearchPage(
                     initialQuery = backStackEntry.arguments?.getString("query").orEmpty(),
-                    onBack = { navController.popBackStack() },
                     onSongClick = playerViewModel::play,
                 )
             }
@@ -258,10 +262,10 @@ fun ResonaNavGraph() {
             }
             composable(
                 ResonaDestination.History.route,
-                enterTransition = { bottomNavEnter },
-                exitTransition = { bottomNavExit },
-                popEnterTransition = { bottomNavEnter },
-                popExitTransition = { bottomNavExit },
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
             ) {
                 HistoryScreen(onSongClick = playerViewModel::play)
             }
@@ -278,10 +282,28 @@ fun ResonaNavGraph() {
                     onUserPlaylistClick = { playlist ->
                         navController.navigate(playlistDetailRoute(playlist.id, playlist.name))
                     },
-                    onSearchClick = {
-                        navController.navigate(ResonaDestination.Search.route)
+                    onSearchQuery = { query ->
+                        navController.navigate(searchRoute(query))
+                    },
+                    onSettingsClick = {
+                        navController.navigate(ResonaDestination.Settings.route)
+                    },
+                    onStatsClick = {
+                        navController.navigate(ResonaDestination.Stats.route)
+                    },
+                    onHistoryClick = {
+                        navController.navigate(ResonaDestination.History.route)
                     },
                 )
+            }
+            composable(
+                ResonaDestination.Settings.route,
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
+            ) {
+                SettingsScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = "${ResonaDestination.PlaylistDetail.route}/{${PlaylistDetailViewModel.ARG_BROWSE_ID}}" +
@@ -312,6 +334,56 @@ fun ResonaNavGraph() {
                     onBack = { navController.popBackStack() },
                     onSongClick = { song, songs -> playerViewModel.play(song, songs) },
                 )
+            }
+            }
+
+            // The floating bottom chrome: mini-player above the pill nav,
+            // both bottom-aligned over the NavHost content rather than
+            // pushing it up. imePadding() here (not on the Box above) keeps
+            // just this chrome clear of the soft keyboard -- the mini-player
+            // and its play/pause button would otherwise end up fully covered
+            // (and untappable) any time the keyboard is open, e.g. right
+            // after tapping a search result without dismissing it first.
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .imePadding()
+            ) {
+                // Redundant next to the full player, so it's hidden on that
+                // screen specifically rather than gated on currentTrack alone.
+                AnimatedVisibility(
+                    visible = currentRoute != ResonaDestination.NowPlaying.route,
+                    enter = chromeEnter,
+                    exit = chromeExit
+                ) {
+                    Column {
+                        // Read through lastTrack, not currentTrack directly, so
+                        // the exit animation below has a track to render while
+                        // it slides away instead of the content vanishing out
+                        // from under it the instant currentTrack goes null.
+                        var lastTrack by remember { mutableStateOf<Song?>(null) }
+                        playerUiState.currentTrack?.let { lastTrack = it }
+
+                        AnimatedVisibility(
+                            visible = playerUiState.currentTrack != null,
+                            enter = chromeEnter,
+                            exit = chromeExit
+                        ) {
+                            lastTrack?.let { track ->
+                                MiniPlayerBar(
+                                    track = track,
+                                    isPlaying = playerUiState.isPlaying,
+                                    modifier = Modifier.offset(y = (-20).dp),
+                                    onTogglePlayPause = playerViewModel::togglePlayPause,
+                                    onSkipToPrevious = playerViewModel::skipToPrevious,
+                                    onSkipToNext = playerViewModel::skipToNext,
+                                    onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) }
+                                )
+                            }
+                        }
+                        ResonaBottomBar(navController, currentRoute)
+                    }
+                }
             }
         }
     }
@@ -344,8 +416,14 @@ private fun ResonaBottomBar(navController: NavHostController, currentRoute: Stri
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Search's registered route carries an optional "?query=..."
+                // suffix (see the Search composable() below) -- currentRoute
+                // reflects that full pattern while on the screen, so a bare
+                // equality check against destination.route would never match
+                // and the pill would never show selected.
+                val currentBaseRoute = currentRoute?.substringBefore("?")
                 bottomNavDestinations.forEach { destination ->
-                    val selected = currentRoute == destination.route
+                    val selected = currentBaseRoute == destination.route
                     NavPillItem(
                         label = destination.label,
                         icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
@@ -378,12 +456,22 @@ private fun NavPillItem(
         label = "navPillPadding"
     )
     val containerColor by animateColorAsState(
-        targetValue = if (selected) Color.White.copy(alpha = 0.14f) else Color.Transparent,
+        targetValue = if (selected) MaterialTheme.colorScheme.tertiary else Color.Transparent,
         animationSpec = navColorSpec,
         label = "navPillContainer"
     )
+    // Computed locally rather than trusting onTertiary -- that's tuned for
+    // AlbumArtPalette's broader use (mini-player backdrops, seek bars) with
+    // a middling luminance cutoff for choosing black vs. white text. This
+    // pill is small, bold, and meant to be read at a glance, so it leans
+    // harder toward black -- only a genuinely dark extracted fill falls
+    // back to white -- rather than splitting evenly.
     val contentColor by animateColorAsState(
-        targetValue = if (selected) Color.White else Color.White.copy(alpha = 0.4f),
+        targetValue = when {
+            !selected -> Color.White.copy(alpha = 0.4f)
+            MaterialTheme.colorScheme.tertiary.luminance() > 0.3f -> Color.Black
+            else -> Color.White
+        },
         animationSpec = navColorSpec,
         label = "navPillContent"
     )

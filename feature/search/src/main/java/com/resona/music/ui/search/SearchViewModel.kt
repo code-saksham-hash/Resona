@@ -4,6 +4,7 @@ package com.resona.music.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,6 +34,24 @@ sealed interface SearchUiState {
     data class Error(val message: String) : SearchUiState
 }
 
+/** One real, fetched shelf of songs on the blank-query Browse landing (see
+ *  [BrowseUiState]) -- e.g. "Trending Now" or "Suggested For You". */
+data class BrowseSection(val title: String, val songs: List<Song>)
+
+/** Browse-landing state -- shown in place of search history/results while
+ *  [SearchViewModel.query] is blank. Pulled from [MusicRepository.getHomeFeed],
+ *  the same real, InnerTube-backed source Home's own Trending/Recommended
+ *  sections use, never static/mock data. */
+sealed interface BrowseUiState {
+    data object Loading : BrowseUiState
+    data class Success(val sections: List<BrowseSection>) : BrowseUiState
+    /** The feed loaded but had nothing playable, or the load itself failed
+     *  -- collapsed into one case since the landing screen reacts to both
+     *  the same way (just don't show a Browse section; search history, if
+     *  any, still renders above it). */
+    data object Unavailable : BrowseUiState
+}
+
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val musicRepository: MusicRepository
@@ -49,6 +68,9 @@ class SearchViewModel @Inject constructor(
     val searchHistory: StateFlow<List<String>> = musicRepository.observeSearchHistory()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val _browseState = MutableStateFlow<BrowseUiState>(BrowseUiState.Loading)
+    val browseState: StateFlow<BrowseUiState> = _browseState.asStateFlow()
+
     init {
         viewModelScope.launch {
             _query
@@ -56,7 +78,39 @@ class SearchViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .collectLatest { query -> performSearch(query) }
         }
+        loadBrowse()
     }
+
+    /** Runs once per ViewModel lifetime (this screen survives tab switches
+     *  via the bottom nav's saved-state, so this isn't re-fetched on every
+     *  visit) -- pull-to-refresh isn't wired here the way Home's is, since
+     *  this landing is secondary to the search field itself. [retryBrowse]
+     *  covers the one case that needs a manual re-trigger: the initial
+     *  fetch failing outright. */
+    private fun loadBrowse() {
+        viewModelScope.launch {
+            _browseState.value = try {
+                val feed = musicRepository.getHomeFeed()
+                val sections = listOfNotNull(
+                    feed.sectionToBrowse("trending", "Trending Now"),
+                    feed.sectionToBrowse("recommended", "Suggested For You"),
+                )
+                if (sections.isEmpty()) BrowseUiState.Unavailable else BrowseUiState.Success(sections)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                BrowseUiState.Unavailable
+            }
+        }
+    }
+
+    fun retryBrowse() {
+        _browseState.value = BrowseUiState.Loading
+        loadBrowse()
+    }
+
+    private fun HomeFeed.sectionToBrowse(id: String, title: String): BrowseSection? =
+        sections.find { it.id == id }?.songs?.takeIf { it.isNotEmpty() }?.let { BrowseSection(title, it) }
 
     fun onQueryChange(newQuery: String) {
         _query.value = newQuery

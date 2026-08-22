@@ -89,7 +89,7 @@ interface MusicRepository {
     suspend fun getSyncedLyrics(title: String, artist: String): List<LyricsLine>?
 
     /**
-     * Up to 5 songs by [artistName]. There's no logged-in session (see
+     * Up to 20 songs by [artistName]. There's no logged-in session (see
      * getHomeFeed's kdoc) so this can't be a real per-listener "most played"
      * ranking -- it's [artistName] run back through the same search already
      * used everywhere else, which surfaces YouTube Music's own relevance

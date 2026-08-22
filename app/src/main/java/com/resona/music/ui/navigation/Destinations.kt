@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -39,6 +41,9 @@ sealed class ResonaDestination(
     data object History : ResonaDestination("history", "History", Icons.Filled.History, Icons.Outlined.History)
     data object Library : ResonaDestination("library", "Library", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic)
 
+    /** Reached from the top bar's gear icon, not the bottom bar -- its icon is unused. */
+    data object Settings : ResonaDestination("settings", "Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
+
     /** Reached from a Library playlist card, not the bottom bar -- its icon is unused. */
     data object PlaylistDetail : ResonaDestination(
         "playlist", "Playlist", Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic
@@ -48,9 +53,11 @@ sealed class ResonaDestination(
     data object ArtistDetail : ResonaDestination("artist", "Artist", Icons.Filled.Explore, Icons.Outlined.Explore)
 }
 
+/** The 3 tabs on the floating pill nav -- Stats and History are still real
+ *  routes (reached from Library's quick links instead) now that the bar
+ *  itself only carries Home/Search/Library. */
 val bottomNavDestinations = listOf(
     ResonaDestination.Home,
-    ResonaDestination.Stats,
-    ResonaDestination.History,
+    ResonaDestination.Search,
     ResonaDestination.Library
 )

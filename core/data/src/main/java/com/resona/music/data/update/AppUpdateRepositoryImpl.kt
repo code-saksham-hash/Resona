@@ -22,7 +22,14 @@ private data class GitHubRelease(
     @SerialName("html_url") val htmlUrl: String,
     val body: String? = null,
     val draft: Boolean = false,
-    val prerelease: Boolean = false
+    val prerelease: Boolean = false,
+    val assets: List<GitHubReleaseAsset> = emptyList()
+)
+
+@Serializable
+private data class GitHubReleaseAsset(
+    val name: String,
+    @SerialName("browser_download_url") val downloadUrl: String
 )
 
 /** Resona's own repo, checked through GitHub's public releases API -- no
@@ -69,6 +76,7 @@ class GitHubAppUpdateRepository @Inject internal constructor(
             .putString(KEY_LATEST_VERSION, fetched.versionName)
             .putString(KEY_LATEST_URL, fetched.releaseUrl)
             .putString(KEY_LATEST_NOTES, fetched.releaseNotes)
+            .putString(KEY_LATEST_APK_URL, fetched.apkDownloadUrl)
             .apply()
         return fetched
     }
@@ -79,6 +87,7 @@ class GitHubAppUpdateRepository @Inject internal constructor(
                 versionName = it,
                 releaseUrl = prefs.getString(KEY_LATEST_URL, "").orEmpty(),
                 releaseNotes = prefs.getString(KEY_LATEST_NOTES, null),
+                apkDownloadUrl = prefs.getString(KEY_LATEST_APK_URL, null),
             )
         }
 
@@ -93,6 +102,7 @@ class GitHubAppUpdateRepository @Inject internal constructor(
             versionName = release.tagName.removePrefix("v"),
             releaseUrl = release.htmlUrl,
             releaseNotes = release.body,
+            apkDownloadUrl = release.assets.find { it.name.endsWith(".apk", ignoreCase = true) }?.downloadUrl,
         )
     }.getOrElse { e ->
         Log.w(TAG, "fetchLatestRelease: couldn't reach GitHub", e)
@@ -126,6 +136,7 @@ class GitHubAppUpdateRepository @Inject internal constructor(
         const val KEY_LATEST_VERSION = "latest_version"
         const val KEY_LATEST_URL = "latest_url"
         const val KEY_LATEST_NOTES = "latest_notes"
+        const val KEY_LATEST_APK_URL = "latest_apk_url"
         const val KEY_DISMISSED_VERSION = "dismissed_version"
 
         const val CHECK_INTERVAL_MILLIS = 24 * 60 * 60 * 1000L
