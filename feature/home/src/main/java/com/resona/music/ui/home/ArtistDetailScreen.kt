@@ -109,6 +109,9 @@ private fun ArtistDetailScreenContent(
                     items(uiState.songs, key = { it.videoId }) { song ->
                         ArtistTopSongRow(song = song, onClick = { onSongClick(song, uiState.songs) })
                     }
+                    // Clears the floating bottom chrome (pill nav, plus the
+                    // mini-player when a track is playing).
+                    item { Spacer(modifier = Modifier.height(160.dp)) }
                 }
                 ArtistDetailUiState.Empty -> Text(
                     text = "No songs found for $artistName",

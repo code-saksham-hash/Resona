@@ -101,6 +101,9 @@ private fun PlaylistDetailScreenContent(
                     items(uiState.songs, key = { it.videoId }) { song ->
                         PlaylistSongRow(song = song, onClick = { onSongClick(song, uiState.songs) })
                     }
+                    // Clears the floating bottom chrome (pill nav, plus the
+                    // mini-player when a track is playing).
+                    item { Spacer(modifier = Modifier.height(160.dp)) }
                 }
                 PlaylistDetailUiState.Empty -> Text(
                     text = "This playlist has no tracks",

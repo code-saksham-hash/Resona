@@ -4,7 +4,11 @@ package com.resona.music.domain.repository
 data class AppUpdateInfo(
     val versionName: String,
     val releaseUrl: String,
-    val releaseNotes: String?
+    val releaseNotes: String?,
+    /** Direct download URL for the release's .apk asset, or null if that
+     *  release has none attached -- lets the update banner download it
+     *  straight away instead of only linking out to the release page. */
+    val apkDownloadUrl: String? = null
 )
 
 /** Checks whether a newer Resona release exists than the one currently

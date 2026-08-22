@@ -20,9 +20,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DownloadDone
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material3.AlertDialog
@@ -63,9 +64,9 @@ import kotlinx.coroutines.launch
 import com.resona.music.domain.model.DownloadedSong
 import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
-import com.resona.music.ui.theme.ResonaLogoIcon
-import com.resona.music.ui.theme.ResonaSearchEntryBar
 import com.resona.music.ui.theme.ResonaTheme
+import com.resona.music.ui.theme.ResonaTopBar
+import com.resona.music.ui.theme.rememberVoiceSearchLauncher
 
 data class QuickLink(
     val id: String,
@@ -81,8 +82,10 @@ fun LibraryScreen(
     onDownloadedSongClick: (Song) -> Unit = {},
     onLikedSongClick: (Song) -> Unit = {},
     onUserPlaylistClick: (Playlist) -> Unit = {},
-    onSearchClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
+    onSearchQuery: (String) -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
+    onHistoryClick: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val downloadedSongs by viewModel.downloadedSongs.collectAsStateWithLifecycle()
@@ -103,8 +106,10 @@ fun LibraryScreen(
         onImportPlaylist = viewModel::importPlaylist,
         onAcknowledgeImportResult = viewModel::acknowledgeImportResult,
         onUserPlaylistClick = onUserPlaylistClick,
-        onSearchClick = onSearchClick,
-        onProfileClick = onProfileClick,
+        onSearchQuery = onSearchQuery,
+        onSettingsClick = onSettingsClick,
+        onStatsClick = onStatsClick,
+        onHistoryClick = onHistoryClick,
         modifier = modifier
     )
 }
@@ -124,8 +129,10 @@ private fun LibraryScreenContent(
     onImportPlaylist: (String) -> Unit = {},
     onAcknowledgeImportResult: () -> Unit = {},
     onUserPlaylistClick: (Playlist) -> Unit = {},
-    onSearchClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
+    onSearchQuery: (String) -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
+    onHistoryClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isRefreshing by remember { mutableStateOf(false) }
@@ -328,11 +335,20 @@ private fun LibraryScreenContent(
         modifier = modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            LibraryTopBar(onSearchClick = onSearchClick, onProfileClick = onProfileClick)
-
             val listState = rememberLazyListState()
             val downloadedSectionIndex = if (playlists.isNotEmpty()) 6 else 4
             val sortedPlaylists = playlists.sortedBy { it.createdAtMillis }
+
+            val launchVoiceSearch = rememberVoiceSearchLauncher(onResult = onSearchQuery)
+            ResonaTopBar(
+                onDownloadsClick = {
+                    if (downloadedSongs.isNotEmpty()) {
+                        scope.launch { listState.animateScrollToItem(downloadedSectionIndex) }
+                    }
+                },
+                onSettingsClick = onSettingsClick,
+                onVoiceSearchClick = launchVoiceSearch
+            )
 
             LazyColumn(
                 state = listState,
@@ -356,7 +372,9 @@ private fun LibraryScreenContent(
                             if (downloadedSongs.isNotEmpty()) {
                                 scope.launch { listState.animateScrollToItem(downloadedSectionIndex) }
                             }
-                        }
+                        },
+                        onStatsClick = onStatsClick,
+                        onHistoryClick = onHistoryClick
                     )
                 }
                 item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -379,46 +397,11 @@ private fun LibraryScreenContent(
                     }
                     item { Spacer(modifier = Modifier.height(32.dp)) }
                 }
-                item { Spacer(modifier = Modifier.height(68.dp)) }
+                // Clears the floating bottom chrome (pill nav, plus the
+                // mini-player when a track is playing) -- see HomeScreen's
+                // matching spacer for why this needs to be this generous now.
+                item { Spacer(modifier = Modifier.height(160.dp)) }
             }
-        }
-    }
-}
-
-@Composable
-private fun LibraryTopBar(
-    onSearchClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 17.dp)
-            .height(61.dp)
-            .padding(bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = ResonaLogoIcon(),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(52.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        ResonaSearchEntryBar(
-            onClick = onSearchClick,
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        IconButton(onClick = onProfileClick) {
-            Icon(
-                imageVector = Icons.Outlined.AccountCircle,
-                contentDescription = "Profile",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
         }
     }
 }
@@ -467,24 +450,29 @@ private fun QuickLinksSection(
     downloadedCount: Int,
     onLikedClick: () -> Unit = {},
     onDownloadsClick: () -> Unit = {},
+    onStatsClick: () -> Unit = {},
+    onHistoryClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val likedSubtitle = "$likedCount tracks"
-    val downloadsSubtitle = "$downloadedCount tracks"
     val quickLinks = listOf(
-        QuickLink("liked", "Liked", likedSubtitle, Icons.Filled.Favorite, tint = Color.White),
-        QuickLink("downloads", "Downloads", downloadsSubtitle, Icons.Outlined.DownloadDone),
+        QuickLink("liked", "Liked", "$likedCount tracks", Icons.Filled.Favorite, tint = Color.White) to onLikedClick,
+        QuickLink("downloads", "Downloads", "$downloadedCount tracks", Icons.Outlined.DownloadDone) to onDownloadsClick,
+        QuickLink("stats", "Stats", "Your listening", Icons.Outlined.Leaderboard) to onStatsClick,
+        QuickLink("history", "History", "Recently played", Icons.Outlined.History) to onHistoryClick,
     )
-    val onClicks = mapOf("liked" to onLikedClick, "downloads" to onDownloadsClick)
 
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 17.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        quickLinks.forEach { link ->
-            QuickLinkCard(link = link, onClick = onClicks[link.id] ?: {}, modifier = Modifier.weight(1f))
+        quickLinks.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                row.forEach { (link, onClick) ->
+                    QuickLinkCard(link = link, onClick = onClick, modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }

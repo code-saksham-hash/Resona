@@ -9,57 +9,37 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -73,89 +53,98 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.NocturneOutlinedButton
-import com.resona.music.ui.theme.ResonaLogoIcon
-import com.resona.music.ui.theme.ResonaSearchEntryBar
 import com.resona.music.ui.theme.ResonaTheme
-
-data class Genre(
-    val name: String,
-    val imageUrl: String,
-    val isFeatured: Boolean = false
-)
-
-data class TrendingAlbum(
-    val id: String,
-    val title: String,
-    val artist: String,
-    val imageUrl: String
-)
-
-data class Creator(
-    val id: String,
-    val name: String,
-    val imageUrl: String
-)
-
-private val mockGenres = listOf(
-    Genre("Experimental", "https://picsum.photos/seed/genre1/400/400", isFeatured = true),
-    Genre("Jazz", "https://picsum.photos/seed/genre2/400/400"),
-    Genre("Techno", "https://picsum.photos/seed/genre3/400/400"),
-    Genre("Piano", "https://picsum.photos/seed/genre4/400/400"),
-    Genre("Glitch", "https://picsum.photos/seed/genre5/400/400"),
-)
+import com.resona.music.ui.theme.SectionHeaderTextStyle
 
 @Composable
-fun SearchScreen(
-    modifier: Modifier = Modifier,
+fun SearchPage(
+    initialQuery: String = "",
     onSongClick: (Song) -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
+    val browseState by viewModel.browseState.collectAsStateWithLifecycle()
 
-    SearchScreenContent(
+    LaunchedEffect(Unit) {
+        if (initialQuery.isNotBlank()) viewModel.onQueryChange(initialQuery)
+    }
+
+    SearchPageContent(
         query = query,
         uiState = uiState,
+        searchHistory = searchHistory,
+        browseState = browseState,
         onQueryChange = viewModel::onQueryChange,
+        onSubmitSearch = viewModel::submitSearch,
+        onRemoveHistory = viewModel::removeHistoryEntry,
+        onClearHistory = viewModel::clearHistory,
         onRetry = viewModel::retry,
-        onSongClick = onSongClick,
-        modifier = modifier
+        onRetryBrowse = viewModel::retryBrowse,
+        onSongClick = onSongClick
     )
 }
 
+/**
+ * Stateless so it's directly previewable (see the `@Preview`s below) without
+ * standing up Hilt -- [SearchPage] above owns the [SearchViewModel] and
+ * threads its state through.
+ */
 @Composable
-private fun SearchScreenContent(
+private fun SearchPageContent(
     query: String,
     uiState: SearchUiState,
+    searchHistory: List<String>,
+    browseState: BrowseUiState,
     onQueryChange: (String) -> Unit,
+    onSubmitSearch: (String) -> Unit,
+    onRemoveHistory: (String) -> Unit,
+    onClearHistory: () -> Unit,
     onRetry: () -> Unit,
+    onRetryBrowse: () -> Unit,
     onSongClick: (Song) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        SearchBarSection(query = query, onQueryChange = onQueryChange)
+    val keyboardController = LocalSoftwareKeyboardController.current
 
-        Box(
+    Column(modifier = modifier.fillMaxSize()) {
+        Spacer(modifier = Modifier.height(20.dp))
+        RoundedSearchField(
+            query = query,
+            onQueryChange = onQueryChange,
+            onSearch = {
+                // Search already runs on a debounce as the user types; this
+                // submits it as an explicit search instead (jumps the queue,
+                // saves it to history) and dismisses the keyboard.
+                onSubmitSearch(query)
+                keyboardController?.hide()
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-        ) {
+                .padding(horizontal = 17.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             if (query.isBlank()) {
-                ExploreLanding()
+                SearchLanding(
+                    history = searchHistory,
+                    browseState = browseState,
+                    onQueryClick = onSubmitSearch,
+                    onRemoveHistory = onRemoveHistory,
+                    onClearHistory = onClearHistory,
+                    onRetryBrowse = onRetryBrowse,
+                    onSongClick = onSongClick
+                )
             } else {
                 when (uiState) {
-                    SearchUiState.Loading -> CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    SearchUiState.Loading -> SearchSkeletonList()
                     is SearchUiState.Success -> SearchResultsList(
                         results = uiState.results,
                         onSongClick = onSongClick
@@ -191,411 +180,224 @@ private fun SearchScreenContent(
     }
 }
 
+/**
+ * A search field built on [BasicTextField] rather than Material3's [TextField]
+ * -- the stock component's internal padding assumes its ~56dp default height,
+ * so constraining it down to a compact pill with `heightIn(max = ...)` left it
+ * looking cramped/off-center instead of actually shrinking. Owning the box,
+ * padding, and icon layout directly gives a clean, fully-rounded pill at
+ * exactly the size this screen wants.
+ */
 @Composable
-private fun SearchBarSection(
+private fun RoundedSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    Row(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(start = 11.dp, end = 17.dp, top = 7.dp, bottom = 7.dp)
+            .height(52.dp)
             .clip(RoundedCornerShape(50))
-            .background(Color(0xFF000000))
-            .height(38.dp)
-            .padding(horizontal = 8.dp, vertical = 0.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            TextField(
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Box(modifier = Modifier.weight(1f)) {
+            if (query.isEmpty()) {
+                Text(
+                    text = "Search songs, artists, albums...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                )
+            }
+            BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
-                modifier = Modifier.weight(1f),
-                placeholder = {
-                    Text(
-                        "Search...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                        modifier = Modifier.offset(y = (-1).dp)
-                    )
-                },
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onSurface
                 ),
                 singleLine = true,
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.tertiary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {}),
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    cursorColor = MaterialTheme.colorScheme.onSurface,
-                )
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        if (query.isNotEmpty()) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "Clear search",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .size(18.dp)
+                    .clickable { onQueryChange("") }
             )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The blank-query landing: recent searches (if any) above real, fetched
+ * Trending/Suggested shelves (see [BrowseUiState]) -- one scroll, not
+ * history and Browse each owning their own nested list.
+ */
 @Composable
-private fun ExploreLanding(modifier: Modifier = Modifier) {
-    var isRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            scope.launch {
-                isRefreshing = true
-                delay(1500)
-                isRefreshing = false
+private fun SearchLanding(
+    history: List<String>,
+    browseState: BrowseUiState,
+    onQueryClick: (String) -> Unit,
+    onRemoveHistory: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    onRetryBrowse: () -> Unit,
+    onSongClick: (Song) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(modifier = modifier.fillMaxSize()) {
+        if (history.isNotEmpty()) {
+            item(key = "history_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 17.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Recent Searches",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Text(
+                        text = "Clear all",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.clickable(onClick = onClearHistory)
+                    )
+                }
             }
-        },
-        modifier = modifier.fillMaxSize()
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            item { Spacer(modifier = Modifier.height(10.dp)) }
-            item { RecentTags() }
-            item { Spacer(modifier = Modifier.height(27.dp)) }
-            item { GenreGrid() }
-            item { Spacer(modifier = Modifier.height(27.dp)) }
-            item { TrendingNowSection() }
-            item { Spacer(modifier = Modifier.height(41.dp)) }
-            item { FeaturedCreatorsSection() }
-            item { Spacer(modifier = Modifier.height(68.dp)) }
+            items(history, key = { "history_$it" }) { pastQuery ->
+                SearchHistoryRow(
+                    query = pastQuery,
+                    onClick = { onQueryClick(pastQuery) },
+                    onRemove = { onRemoveHistory(pastQuery) }
+                )
+            }
+            item(key = "history_spacer") { Spacer(modifier = Modifier.height(20.dp)) }
         }
+
+        when (browseState) {
+            BrowseUiState.Loading -> item(key = "browse_loading") {
+                Column(modifier = Modifier.padding(top = 4.dp)) {
+                    repeat(4) { SearchResultSkeleton() }
+                }
+            }
+            is BrowseUiState.Success -> browseState.sections.forEach { section ->
+                item(key = "browse_header_${section.title}") {
+                    Text(
+                        text = section.title,
+                        style = SectionHeaderTextStyle,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 17.dp, vertical = 12.dp)
+                    )
+                }
+                items(section.songs, key = { "browse_${section.title}_${it.videoId}" }) { song ->
+                    BrowseSongRow(song = song, onClick = { onSongClick(song) })
+                }
+                item(key = "browse_spacer_${section.title}") { Spacer(modifier = Modifier.height(12.dp)) }
+            }
+            BrowseUiState.Unavailable -> if (history.isEmpty()) {
+                item(key = "browse_unavailable") {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp, vertical = 48.dp)
+                    ) {
+                        Text(
+                            text = "Search for a song, artist, or album to get started",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        NocturneOutlinedButton(
+                            text = "Retry",
+                            onClick = onRetryBrowse,
+                            borderColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+        // Clears the floating bottom chrome (pill nav, plus the mini-player
+        // when a track is playing).
+        item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(160.dp)) }
     }
 }
 
+/** One row of a real Trending/Suggested shelf -- thumbnail, title, artist,
+ *  and a play affordance, styled like [SearchResultRow] but with the
+ *  trailing play icon the Browse reference design calls for. */
 @Composable
-private fun RecentTags(modifier: Modifier = Modifier) {
-    val tags = listOf("Deep Ambient", "Glitch Jazz", "Post-Piano")
-    val scrollState = rememberScrollState()
-
+private fun BrowseSongRow(song: Song, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .horizontalScroll(scrollState)
-            .padding(horizontal = 17.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        tags.forEachIndexed { index, tag ->
-            SuggestionChip(
-                onClick = { },
-                label = {
-                    Text(
-                        text = if (index == 0) "Recent: $tag" else tag,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                },
-                colors = SuggestionChipDefaults.suggestionChipColors(
-                    containerColor = if (index == 0)
-                        MaterialTheme.colorScheme.surfaceContainer
-                    else
-                        Color.Transparent,
-                    labelColor = MaterialTheme.colorScheme.onSurface
-                ),
-                border = SuggestionChipDefaults.suggestionChipBorder(
-                    borderColor = MaterialTheme.colorScheme.outlineVariant,
-                    enabled = true
-                ),
-                shape = MaterialTheme.shapes.extraLarge
-            )
-        }
-    }
-}
-
-@Composable
-private fun GenreGrid(
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier.padding(horizontal = 17.dp)) {
-        Text(
-            text = "Sonic Landscapes",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                GenreCard(
-                    name = mockGenres[0].name,
-                    imageUrl = mockGenres[0].imageUrl,
-                    isFeatured = true,
-                    modifier = Modifier.weight(2f)
-                )
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    GenreCard(name = mockGenres[1].name, imageUrl = mockGenres[1].imageUrl)
-                    GenreCard(name = mockGenres[2].name, imageUrl = mockGenres[2].imageUrl)
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                GenreCard(name = mockGenres[3].name, imageUrl = mockGenres[3].imageUrl, modifier = Modifier.weight(1f))
-                GenreCard(name = mockGenres[4].name, imageUrl = mockGenres[4].imageUrl, modifier = Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun GenreCard(
-    name: String,
-    imageUrl: String,
-    isFeatured: Boolean = false,
-    onClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onClick)
-    ) {
-        AsyncImage(
-            model = imageUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            modifier = Modifier.fillMaxSize()
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))
-        )
-        Box(
-            modifier = modifier
-                .align(if (isFeatured) Alignment.BottomStart else Alignment.Center)
-                .padding(if (isFeatured) 20.dp else 0.dp)
-        ) {
-            if (isFeatured) {
-                Column {
-                    Text(
-                        text = "GENRE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
-                    Text(
-                        text = name,
-                        style = MaterialTheme.typography.displayMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            } else {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrendingNowSection(modifier: Modifier = Modifier) {
-    val scrollState = rememberScrollState()
-
-    Column(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 17.dp)
-        ) {
-            Column {
-                Text(
-                    text = "Trending Now",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-                Text(
-                    text = "High Fidelity Signals",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(scrollState)
-                .padding(horizontal = 17.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            TrendingCard(
-                title = "Ether Drift",
-                artist = "Vanish In Dust",
-                imageUrl = "https://picsum.photos/seed/trending1/400/300"
-            )
-            TrendingCard(
-                title = "Monolith IV",
-                artist = "Structural Integrity",
-                imageUrl = "https://picsum.photos/seed/trending2/400/300"
-            )
-            TrendingCard(
-                title = "Surface Tension",
-                artist = "Kinesis",
-                imageUrl = "https://picsum.photos/seed/trending3/400/300"
-            )
-        }
-    }
-}
-
-@Composable
-private fun TrendingCard(
-    title: String,
-    artist: String,
-    imageUrl: String,
-    onClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .width(204.dp)
-            .clickable(onClick = onClick)
+            .padding(horizontal = 17.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(4f / 3f)
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .size(48.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             AsyncImage(
-                model = imageUrl,
+                model = song.thumbnailUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxSize()
             )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(10.dp)
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.8f))
-                    .clickable { },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.PlayArrow,
-                    contentDescription = "Play",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         }
-        Spacer(modifier = Modifier.height(10.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(
-                imageVector = Icons.Outlined.MoreVert,
-                contentDescription = "More",
-                tint = MaterialTheme.colorScheme.outline
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = song.displayArtist,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-    }
-}
 
-@Composable
-private fun FeaturedCreatorsSection(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 17.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Featured CREATORS",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            CreatorAvatar(name = "AELOS", imageUrl = "https://picsum.photos/seed/creator1/200/200")
-            CreatorAvatar(name = "K\u00d8HL", imageUrl = "https://picsum.photos/seed/creator2/200/200")
-            CreatorAvatar(name = "OBSCURA", imageUrl = "https://picsum.photos/seed/creator3/200/200")
-        }
-    }
-}
+        Spacer(modifier = Modifier.width(12.dp))
 
-@Composable
-private fun CreatorAvatar(
-    name: String,
-    imageUrl: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        AsyncImage(
-            model = imageUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-            modifier = Modifier
-                .size(85.dp)
-                .clip(CircleShape)
-        )
-        Spacer(modifier = Modifier.height(7.dp))
-        Text(
-            text = name,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
+        Icon(
+            imageVector = Icons.Outlined.PlayArrow,
+            contentDescription = "Play",
+            tint = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.size(22.dp)
         )
     }
 }
@@ -675,6 +477,8 @@ private fun SearchResultsList(
         items(results, key = { it.videoId }) { song ->
             SearchResultRow(song = song, onClick = { onSongClick(song) })
         }
+        // Clears the floating bottom chrome -- see SearchLanding's matching spacer.
+        item(key = "results_bottom_spacer") { Spacer(modifier = Modifier.height(160.dp)) }
     }
 }
 
@@ -725,352 +529,6 @@ private fun SearchResultRow(song: Song, onClick: () -> Unit, modifier: Modifier 
     }
 }
 
-private val previewSongs = listOf(
-    Song(videoId = "1", title = "Midnight City", artist = "M83", thumbnailUrl = ""),
-    Song(videoId = "2", title = "Nightcall", artist = "Kavinsky", thumbnailUrl = ""),
-    Song(
-        videoId = "3",
-        title = "Instant Crush",
-        artist = "Daft Punk ft. Julian Casablancas",
-        thumbnailUrl = ""
-    )
-)
-
-@Preview(showBackground = true, name = "Explore")
-@Composable
-private fun SearchScreenPreview() {
-    ResonaTheme {
-        SearchScreenContent(
-            query = "",
-            uiState = SearchUiState.Empty,
-            onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES, name = "Explore Dark")
-@Composable
-private fun SearchScreenDarkPreview() {
-    ResonaTheme(darkTheme = true) {
-        SearchScreenContent(
-            query = "",
-            uiState = SearchUiState.Empty,
-            onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Results")
-@Composable
-private fun SearchScreenResultsPreview() {
-    ResonaTheme {
-        SearchScreenContent(
-            query = "daft punk",
-            uiState = SearchUiState.Success(previewSongs),
-            onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Loading")
-@Composable
-private fun SearchScreenLoadingPreview() {
-    ResonaTheme {
-        SearchScreenContent(
-            query = "daft punk",
-            uiState = SearchUiState.Loading,
-            onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Error")
-@Composable
-private fun SearchScreenErrorPreview() {
-    ResonaTheme {
-        SearchScreenContent(
-            query = "daft punk",
-            uiState = SearchUiState.Error("Unable to resolve host \"music.youtube.com\""),
-            onQueryChange = {},
-            onRetry = {},
-            onSongClick = {}
-        )
-    }
-}
-
-@Composable
-fun ExploreScreen(
-    onSearchClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(start = 17.dp, end = 17.dp)
-                .height(61.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                painter = ResonaLogoIcon(),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(52.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            ResonaSearchEntryBar(
-                onClick = onSearchClick,
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(onClick = onProfileClick) {
-                Icon(
-                    imageVector = Icons.Outlined.AccountCircle,
-                    contentDescription = "Profile",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-        ExploreLanding()
-    }
-}
-
-/**
- * A search field built on [BasicTextField] rather than Material3's [TextField]
- * -- the stock component's internal padding assumes its ~56dp default height,
- * so constraining it down to a compact pill with `heightIn(max = ...)` left it
- * looking cramped/off-center instead of actually shrinking. Owning the box,
- * padding, and icon layout directly gives a clean, fully-rounded pill at
- * exactly the size this screen wants.
- */
-@Composable
-private fun RoundedSearchField(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(50))
-            .background(Color(0xFF000000))
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Search,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Box(modifier = Modifier.weight(1f)) {
-            if (query.isEmpty()) {
-                Text(
-                    text = "Search...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                )
-            }
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                ),
-                singleLine = true,
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        if (query.isNotEmpty()) {
-            Icon(
-                imageVector = Icons.Outlined.Close,
-                contentDescription = "Clear search",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier
-                    .size(18.dp)
-                    .clickable { onQueryChange("") }
-            )
-        }
-    }
-}
-
-@Composable
-fun SearchPage(
-    initialQuery: String = "",
-    onBack: () -> Unit = {},
-    onSongClick: (Song) -> Unit = {},
-    viewModel: SearchViewModel = hiltViewModel()
-) {
-    val query by viewModel.query.collectAsStateWithLifecycle()
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
-    val focusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    LaunchedEffect(Unit) {
-        if (initialQuery.isNotBlank()) viewModel.onQueryChange(initialQuery)
-        // The field may not be attached to the composition/layout tree yet
-        // on the very first frame after navigating here (e.g. mid-transition),
-        // in which case Compose throws IllegalStateException("FocusRequester
-        // is not initialized") -- losing autofocus is a fair trade for never
-        // crashing the screen over it.
-        runCatching { focusRequester.requestFocus() }
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(end = 17.dp)
-                .height(61.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            RoundedSearchField(
-                query = query,
-                onQueryChange = viewModel::onQueryChange,
-                onSearch = {
-                    // Search already runs on a debounce as the user types;
-                    // this submits it as an explicit search instead (jumps
-                    // the queue, saves it to history) and dismisses the
-                    // keyboard.
-                    viewModel.submitSearch()
-                    keyboardController?.hide()
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
-            if (query.isBlank()) {
-                SearchHistorySection(
-                    history = searchHistory,
-                    onQueryClick = viewModel::submitSearch,
-                    onRemove = viewModel::removeHistoryEntry,
-                    onClearAll = viewModel::clearHistory
-                )
-            } else {
-                val state = uiState
-                when (state) {
-                    SearchUiState.Loading -> SearchSkeletonList()
-                    is SearchUiState.Success -> SearchResultsList(
-                        results = state.results,
-                        onSongClick = onSongClick
-                    )
-                    SearchUiState.Empty -> Text(
-                        text = "No results found",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                    is SearchUiState.Error -> Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = 32.dp)
-                    ) {
-                        Text(
-                            text = state.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        NocturneOutlinedButton(
-                            text = "Retry",
-                            onClick = viewModel::retry,
-                            borderColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchHistorySection(
-    history: List<String>,
-    onQueryClick: (String) -> Unit,
-    onRemove: (String) -> Unit,
-    onClearAll: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(modifier = modifier.fillMaxSize()) {
-        if (history.isEmpty()) {
-            Text(
-                text = "Your recent searches will show up here",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 32.dp)
-            )
-        } else {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 17.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Recent Searches",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    Text(
-                        text = "Clear all",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.clickable(onClick = onClearAll)
-                    )
-                }
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(history, key = { it }) { pastQuery ->
-                        SearchHistoryRow(
-                            query = pastQuery,
-                            onClick = { onQueryClick(pastQuery) },
-                            onRemove = { onRemove(pastQuery) }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun SearchHistoryRow(
     query: String,
@@ -1108,5 +566,121 @@ private fun SearchHistoryRow(
                 modifier = Modifier.size(16.dp)
             )
         }
+    }
+}
+
+private val previewSongs = listOf(
+    Song(videoId = "1", title = "Midnight City", artist = "M83", thumbnailUrl = ""),
+    Song(videoId = "2", title = "Nightcall", artist = "Kavinsky", thumbnailUrl = ""),
+    Song(
+        videoId = "3",
+        title = "Instant Crush",
+        artist = "Daft Punk ft. Julian Casablancas",
+        thumbnailUrl = ""
+    )
+)
+
+@Preview(showBackground = true, name = "Browse")
+@Composable
+private fun SearchPageBrowsePreview() {
+    ResonaTheme(darkTheme = true) {
+        SearchPageContent(
+            query = "",
+            uiState = SearchUiState.Empty,
+            searchHistory = listOf("daft punk", "lofi beats"),
+            browseState = BrowseUiState.Success(
+                listOf(
+                    BrowseSection("Trending Now", previewSongs),
+                    BrowseSection("Suggested For You", previewSongs.take(2)),
+                )
+            ),
+            onQueryChange = {},
+            onSubmitSearch = {},
+            onRemoveHistory = {},
+            onClearHistory = {},
+            onRetry = {},
+            onRetryBrowse = {},
+            onSongClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO, name = "Browse Light")
+@Composable
+private fun SearchPageBrowseLightPreview() {
+    ResonaTheme(darkTheme = false) {
+        SearchPageContent(
+            query = "",
+            uiState = SearchUiState.Empty,
+            searchHistory = emptyList(),
+            browseState = BrowseUiState.Success(listOf(BrowseSection("Trending Now", previewSongs))),
+            onQueryChange = {},
+            onSubmitSearch = {},
+            onRemoveHistory = {},
+            onClearHistory = {},
+            onRetry = {},
+            onRetryBrowse = {},
+            onSongClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Results")
+@Composable
+private fun SearchPageResultsPreview() {
+    ResonaTheme(darkTheme = true) {
+        SearchPageContent(
+            query = "daft punk",
+            uiState = SearchUiState.Success(previewSongs),
+            searchHistory = emptyList(),
+            browseState = BrowseUiState.Loading,
+            onQueryChange = {},
+            onSubmitSearch = {},
+            onRemoveHistory = {},
+            onClearHistory = {},
+            onRetry = {},
+            onRetryBrowse = {},
+            onSongClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Loading")
+@Composable
+private fun SearchPageLoadingPreview() {
+    ResonaTheme(darkTheme = true) {
+        SearchPageContent(
+            query = "daft punk",
+            uiState = SearchUiState.Loading,
+            searchHistory = emptyList(),
+            browseState = BrowseUiState.Loading,
+            onQueryChange = {},
+            onSubmitSearch = {},
+            onRemoveHistory = {},
+            onClearHistory = {},
+            onRetry = {},
+            onRetryBrowse = {},
+            onSongClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Error")
+@Composable
+private fun SearchPageErrorPreview() {
+    ResonaTheme(darkTheme = true) {
+        SearchPageContent(
+            query = "daft punk",
+            uiState = SearchUiState.Error("Unable to resolve host \"music.youtube.com\""),
+            searchHistory = emptyList(),
+            browseState = BrowseUiState.Unavailable,
+            onQueryChange = {},
+            onSubmitSearch = {},
+            onRemoveHistory = {},
+            onClearHistory = {},
+            onRetry = {},
+            onRetryBrowse = {},
+            onSongClick = {}
+        )
     }
 }

@@ -1,2 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- For SpeechRecognizer (VoiceSearch.kt): recognition runs in-process
+         against this permission rather than handing off to a system voice
+         search UI, which is what lets the top bar's voice-search button show
+         Resona's own listening animation instead of a generic system popup. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+</manifest>

@@ -1,8 +1,11 @@
 package com.resona.music.ui.home
 
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Environment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -24,7 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Search
@@ -61,10 +63,10 @@ import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.AppUpdateInfo
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.NocturneSurface
-import com.resona.music.ui.theme.ResonaLogoIcon
-import com.resona.music.ui.theme.ResonaSearchEntryBar
 import com.resona.music.ui.theme.ResonaTheme
+import com.resona.music.ui.theme.ResonaTopBar
 import com.resona.music.ui.theme.SectionHeaderTextStyle
+import com.resona.music.ui.theme.rememberVoiceSearchLauncher
 
 data class HomeAlbum(
     val id: String,
@@ -97,7 +99,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onSearchQuery: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onDownloadsClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
     onTrackClick: (HomeTrack) -> Unit = {},
@@ -111,7 +114,8 @@ fun HomeScreen(
         onDismissUpdate = viewModel::dismissUpdate,
         onSearchQuery = onSearchQuery,
         onSearchClick = onSearchClick,
-        onProfileClick = onProfileClick,
+        onSettingsClick = onSettingsClick,
+        onDownloadsClick = onDownloadsClick,
         onAlbumClick = onAlbumClick,
         onArtistClick = onArtistClick,
         onTrackClick = onTrackClick,
@@ -127,7 +131,8 @@ private fun HomeScreenContent(
     onDismissUpdate: () -> Unit = {},
     onSearchQuery: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onDownloadsClick: () -> Unit = {},
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
     onTrackClick: (HomeTrack) -> Unit = {},
@@ -139,7 +144,12 @@ private fun HomeScreenContent(
         modifier = modifier.fillMaxSize()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            HomeTopBar(onSearchQuery = onSearchQuery, onProfileClick = onProfileClick)
+            val launchVoiceSearch = rememberVoiceSearchLauncher(onResult = onSearchQuery)
+            ResonaTopBar(
+                onDownloadsClick = onDownloadsClick,
+                onSettingsClick = onSettingsClick,
+                onVoiceSearchClick = launchVoiceSearch
+            )
 
             uiState.updateInfo?.let { info ->
                 UpdateAvailableBanner(
@@ -199,14 +209,24 @@ private fun UpdateAvailableBanner(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
-            NocturneOutlinedButton(
-                text = "View release",
-                onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl))
-                    context.startActivity(intent)
-                },
-                borderColor = MaterialTheme.colorScheme.onSurface
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NocturneOutlinedButton(
+                    text = "View release",
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl))
+                        context.startActivity(intent)
+                    },
+                    borderColor = MaterialTheme.colorScheme.onSurface
+                )
+                val apkDownloadUrl = info.apkDownloadUrl
+                if (apkDownloadUrl != null) {
+                    NocturneOutlinedButton(
+                        text = "Download",
+                        onClick = { downloadApk(context, apkDownloadUrl, info.versionName) },
+                        borderColor = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
         IconButton(onClick = onDismiss) {
             Icon(
@@ -216,6 +236,22 @@ private fun UpdateAvailableBanner(
             )
         }
     }
+}
+
+/** Downloads the release APK straight to this app's own external files dir
+ *  via [DownloadManager] -- no storage permission needed on any API level
+ *  (app-specific external storage is always writable without one), and the
+ *  system's own download notification shows progress and, once finished,
+ *  opens the installer when tapped. */
+private fun downloadApk(context: Context, apkUrl: String, versionName: String) {
+    val request = DownloadManager.Request(Uri.parse(apkUrl))
+        .setTitle("Resona $versionName")
+        .setDescription("Downloading update…")
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "Resona-v$versionName.apk")
+        .setMimeType("application/vnd.android.package-archive")
+    val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    downloadManager.enqueue(request)
 }
 
 @Composable
@@ -349,7 +385,11 @@ private fun HomeFeedList(
                 }
             }
         }
-        item { Spacer(modifier = Modifier.height(27.dp)) }
+        // Clears the floating bottom chrome (pill nav, plus the mini-player
+        // when a track is playing) -- NavHost content now runs full-bleed
+        // behind that chrome rather than Scaffold reserving space for it, so
+        // the last real item needs its own generous bottom padding instead.
+        item { Spacer(modifier = Modifier.height(160.dp)) }
     }
 }
 
@@ -381,43 +421,6 @@ private fun ArtistSpotlight.toHomeArtist(index: Int) = HomeArtist(
     name = name,
     imageUrl = thumbnailUrl
 )
-
-@Composable
-private fun HomeTopBar(
-    onSearchQuery: (String) -> Unit = {},
-    onProfileClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(start = 17.dp, end = 17.dp)
-            .height(61.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = ResonaLogoIcon(),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(52.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        ResonaSearchEntryBar(
-            onClick = { onSearchQuery("") },
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        IconButton(onClick = onProfileClick) {
-            Icon(
-                imageVector = Icons.Outlined.AccountCircle,
-                contentDescription = "Profile",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-    }
-}
 
 @Composable
 private fun QuickPicksRow(onGenreClick: (String) -> Unit = {}, modifier: Modifier = Modifier) {

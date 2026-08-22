@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.resona.music.feature.player.R
 import com.resona.music.domain.model.Song
-import com.resona.music.ui.theme.JosefinSansFontFamily
 import com.resona.music.ui.theme.ResonaTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -103,7 +102,6 @@ fun MiniPlayerBar(
 
         val textMeasurer = rememberTextMeasurer()
         val titleStyle = MaterialTheme.typography.titleSmall.copy(
-            fontFamily = JosefinSansFontFamily,
             fontWeight = FontWeight.Bold
         )
         val marqueeAnim = remember { Animatable(0f) }

@@ -370,7 +370,7 @@ class MusicRepositoryImpl @Inject internal constructor(
     private companion object {
         const val TAG = "MusicRepositoryImpl"
         const val MAX_POPULAR_ARTISTS = 8
-        const val MAX_ARTIST_TOP_SONGS = 5
+        const val MAX_ARTIST_TOP_SONGS = 20
         const val MAX_RECOMMENDED_ARTIST_CANDIDATES = 3
         const val FEATURED_PLAYLISTS_BROWSE_ID = "FEmusic_home"
         const val ARTIST_RADIO_SUFFIX = " radio"
