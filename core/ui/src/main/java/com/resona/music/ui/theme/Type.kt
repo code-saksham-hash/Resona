@@ -16,9 +16,8 @@ import androidx.compose.ui.unit.sp
 
 // Montserrat: Google's variable font (OFL-licensed, github.com/google/fonts;
 // same file the Google Fonts CDN itself serves), backs the display voice
-// below -- same typeface Koda's own displayLarge uses (Koda pulls it through
-// Google's Font Provider at runtime; bundled locally here instead, so no new
-// Play-Services dependency).
+// below. Bundled locally here rather than pulled through Google's Font
+// Provider at runtime, so this doesn't add a new Play-Services dependency.
 //
 // Built the same way robotoFlex() below is, through an explicit
 // FontVariation.Settings weight rather than registering one FontFamily with
@@ -35,17 +34,16 @@ private fun montserrat(weight: Int) = FontFamily(
     )
 )
 
-// Koda's own displayLarge weight, deliberately not the heavier 700 used
-// elsewhere in this file -- Bold at this size, stretched 50% wider
-// (textGeometricTransform below) and tracked this tight, turns visibly
-// chunky/distorted; SemiBold is what actually holds together at the stretch.
+// SemiBold, deliberately not the heavier 700 used elsewhere in this file.
+// Bold at this size, stretched 50% wider (textGeometricTransform below) and
+// tracked this tight, turns visibly chunky/distorted; SemiBold is what
+// actually holds together at the stretch.
 private val MontserratDisplay = montserrat(weight = 600)
 
 // Roboto Flex: Google's variable font (OFL-licensed, github.com/google/fonts),
-// bundled locally the same way Koda itself bundles it -- backs every tier
+// bundled locally for the same reason Montserrat is above. Backs every tier
 // below the display voice, FontVariation.width()/weight() driving each
-// style's exact look off that one file, same technique Koda uses for its
-// headlineSmall/bodyLarge/labelMedium.
+// style's exact look off that one file.
 private fun robotoFlex(width: Float, weight: Int) = FontFamily(
     Font(
         resId = com.resona.music.core.ui.R.font.roboto_flex,
@@ -66,18 +64,16 @@ private val RobotoFlexTitleWide = robotoFlex(width = 110f, weight = 700)
 private val RobotoFlexBold = robotoFlex(width = 100f, weight = 800)
 
 /**
- * Matches Koda's (github.com/Ivorisnoob/Koda) Material 3 Expressive type
- * system: Montserrat for the big, wide, tightly-tracked display voice; Roboto
- * Flex for everything else, its width/weight axes driving each tier's exact
- * look off one file -- the same two typefaces Koda itself uses, just bundled
+ * A Material 3 Expressive type system: Montserrat for the big, wide,
+ * tightly-tracked display voice; Roboto Flex for everything else, its
+ * width/weight axes driving each tier's exact look off one file, bundled
  * locally rather than through Google's Font Provider (a Play-Services
  * runtime dependency this app deliberately has nowhere else). Every tier
- * pushed bolder than Koda's own numbers call for: thin type at these sizes
+ * pushed bolder than the usual Material defaults: thin type at these sizes
  * reads as unfinished, not clean.
  *
  * [SectionHeaderTextStyle] used to be a separate Inter-based style; it's
- * just [Typography.headlineSmall] now, at the same 24sp/32sp Koda itself
- * uses for that role.
+ * just [Typography.headlineSmall] now, at 24sp/32sp.
  */
 private fun displayVoice(fontSize: TextUnit) = TextStyle(
     fontFamily = MontserratDisplay,
