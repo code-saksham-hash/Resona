@@ -4,12 +4,15 @@ import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,6 +25,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -72,6 +76,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,11 +104,14 @@ import com.resona.music.feature.player.R
 import com.resona.music.playback.DownloadState
 import com.resona.music.playback.LyricsState
 import com.resona.music.playback.PlayerUiState
+import com.resona.music.playback.SleepTimerState
+import com.resona.music.playback.RepeatMode as PlaybackRepeatMode
 import com.resona.music.ui.player.AlbumArtBackdrop
 import com.resona.music.ui.player.AlbumArtPalette
 import com.resona.music.ui.player.MiniPlayerBar
 import com.resona.music.ui.player.rememberAlbumArtPalette
 import com.resona.music.ui.theme.ResonaTheme
+import kotlinx.coroutines.launch
 
 private enum class BottomTab { Queue, Lyrics }
 
@@ -122,9 +130,16 @@ fun NowPlayingScreen(
     onDownloadClick: () -> Unit = {},
     onToggleLike: () -> Unit = {},
     onLoadLyrics: () -> Unit = {},
+    onToggleShuffle: () -> Unit = {},
+    onCycleRepeat: () -> Unit = {},
     playlists: List<Playlist> = emptyList(),
     onAddToPlaylist: (playlistId: String) -> Unit = {},
+    sleepTimerState: SleepTimerState = SleepTimerState.Off,
+    onStartSleepTimer: (durationMillis: Long) -> Unit = {},
+    onStartSleepTimerEndOfTrack: () -> Unit = {},
+    onCancelSleepTimer: () -> Unit = {},
     onBack: () -> Unit,
+    onStop: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var activeTab by remember { mutableStateOf<BottomTab?>(null) }
@@ -164,6 +179,10 @@ fun NowPlayingScreen(
                 onDownloadClick = onDownloadClick,
                 playlists = playlists,
                 onAddToPlaylist = onAddToPlaylist,
+                sleepTimerState = sleepTimerState,
+                onStartSleepTimer = onStartSleepTimer,
+                onStartSleepTimerEndOfTrack = onStartSleepTimerEndOfTrack,
+                onCancelSleepTimer = onCancelSleepTimer,
                 onShareClick = {
                     if (track != null) {
                         val sendIntent = Intent(Intent.ACTION_SEND).apply {
@@ -191,6 +210,7 @@ fun NowPlayingScreen(
                         onSkipPrevious = onSkipPrevious,
                         onSkipNext = onSkipNext,
                         onMiniPlayerClick = { activeTab = null },
+                        onDismissMiniPlayer = onStop,
                     )
                     NowPlayingPane.Lyrics -> LyricsContent(
                         lyricsState = uiState.lyricsState,
@@ -215,13 +235,18 @@ fun NowPlayingScreen(
                             isBuffering = uiState.isBuffering,
                             downloadState = uiState.downloadState,
                             error = uiState.error,
+                            isShuffled = uiState.isShuffled,
+                            repeatMode = uiState.repeatMode,
                             palette = palette,
                             onSeek = onSeek,
                             onTogglePlayPause = onTogglePlayPause,
                             onSkipNext = onSkipNext,
                             onSkipPrevious = onSkipPrevious,
                             onToggleLike = onToggleLike,
-                            onDownloadClick = onDownloadClick
+                            onDownloadClick = onDownloadClick,
+                            onToggleShuffle = onToggleShuffle,
+                            onCycleRepeat = onCycleRepeat,
+                            onSwipeDismiss = onBack
                         )
                     }
                 }
@@ -254,6 +279,8 @@ private fun PlayerContent(
     isBuffering: Boolean,
     downloadState: DownloadState,
     error: String?,
+    isShuffled: Boolean,
+    repeatMode: PlaybackRepeatMode,
     palette: AlbumArtPalette,
     onSeek: (Long) -> Unit,
     onTogglePlayPause: () -> Unit,
@@ -261,10 +288,62 @@ private fun PlayerContent(
     onSkipPrevious: () -> Unit,
     onToggleLike: () -> Unit,
     onDownloadClick: () -> Unit,
+    onToggleShuffle: () -> Unit,
+    onCycleRepeat: () -> Unit,
+    onSwipeDismiss: () -> Unit = {},
 ) {
+    // One-handed dismiss: dragging this pane down collapses back to the
+    // mini-player (same as tapping the back arrow), matching the reference
+    // apps' now-playing sheet. Scoped to this non-scrolling pane only --
+    // Queue/Lyrics keep vertical drag as plain list scrolling instead (see
+    // NowPlayingScreen's `pane` dispatch, which only reaches PlayerContent
+    // for NowPlayingPane.Player).
+    val scope = rememberCoroutineScope()
+    val offsetY = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    val dismissThresholdPx = with(density) { 120.dp.toPx() }
+    var paneHeightPx by remember { mutableStateOf(0f) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .onSizeChanged { paneHeightPx = it.height.toFloat() }
+            .graphicsLayer {
+                translationY = offsetY.value
+                val fadeRange = paneHeightPx.coerceAtLeast(1f) * 0.6f
+                alpha = 1f - (offsetY.value / fadeRange).coerceIn(0f, 0.5f)
+            }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        val shouldDismiss = offsetY.value > dismissThresholdPx
+                        scope.launch {
+                            if (shouldDismiss) {
+                                onSwipeDismiss()
+                            } else {
+                                offsetY.animateTo(
+                                    0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    )
+                                )
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch { offsetY.animateTo(0f) }
+                    }
+                ) { change, dragAmount ->
+                    // Only claims downward drags -- an upward one (e.g. the
+                    // start of a scroll-like gesture) is left alone rather
+                    // than fighting the seek bar/buttons below for it.
+                    if (offsetY.value > 0f || dragAmount > 0f) {
+                        change.consume()
+                        scope.launch { offsetY.snapTo((offsetY.value + dragAmount).coerceAtLeast(0f)) }
+                    }
+                }
+            }
             .padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -328,7 +407,17 @@ private fun PlayerContent(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(4.dp))
+
+        ShuffleRepeatRow(
+            isShuffled = isShuffled,
+            repeatMode = repeatMode,
+            palette = palette,
+            onToggleShuffle = onToggleShuffle,
+            onCycleRepeat = onCycleRepeat
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         PlaybackControls(
             isPlaying = isPlaying,
@@ -354,6 +443,50 @@ private fun PlayerContent(
     }
 }
 
+/** Slim shuffle/repeat row above the main transport controls -- kept
+ *  separate from [PlaybackControls] (Like/Prev/Play-Pause/Next/Download,
+ *  already five icons wide) rather than folded into it, matching the scale
+ *  [BottomActionRow] already uses for secondary controls on this screen. */
+@Composable
+private fun ShuffleRepeatRow(
+    isShuffled: Boolean,
+    repeatMode: PlaybackRepeatMode,
+    palette: AlbumArtPalette,
+    onToggleShuffle: () -> Unit,
+    onCycleRepeat: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onToggleShuffle, modifier = Modifier.size(36.dp)) {
+            Icon(
+                painter = painterResource(R.drawable.ic_shuffle),
+                contentDescription = if (isShuffled) "Shuffle on" else "Shuffle off",
+                tint = if (isShuffled) palette.accent else palette.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(32.dp))
+
+        IconButton(onClick = onCycleRepeat, modifier = Modifier.size(36.dp)) {
+            Icon(
+                painter = painterResource(if (repeatMode == PlaybackRepeatMode.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat),
+                contentDescription = when (repeatMode) {
+                    PlaybackRepeatMode.OFF -> "Repeat off"
+                    PlaybackRepeatMode.ALL -> "Repeat all"
+                    PlaybackRepeatMode.ONE -> "Repeat one"
+                },
+                tint = if (repeatMode == PlaybackRepeatMode.OFF) palette.onBackground.copy(alpha = 0.6f) else palette.accent,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
 @Composable
 private fun QueueContent(
     queue: List<Song>,
@@ -366,6 +499,7 @@ private fun QueueContent(
     onSkipPrevious: () -> Unit,
     onSkipNext: () -> Unit,
     onMiniPlayerClick: () -> Unit,
+    onDismissMiniPlayer: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         var miniPlayerHeightPx by remember { mutableStateOf(0) }
@@ -488,6 +622,7 @@ private fun QueueContent(
                 onSkipToPrevious = onSkipPrevious,
                 onSkipToNext = onSkipNext,
                 onClick = onMiniPlayerClick,
+                onDismiss = onDismissMiniPlayer,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .onSizeChanged { miniPlayerHeightPx = it.height }
@@ -740,10 +875,15 @@ private fun NowPlayingTopBar(
     playlists: List<Playlist> = emptyList(),
     onAddToPlaylist: (playlistId: String) -> Unit = {},
     onShareClick: () -> Unit = {},
+    sleepTimerState: SleepTimerState = SleepTimerState.Off,
+    onStartSleepTimer: (durationMillis: Long) -> Unit = {},
+    onStartSleepTimerEndOfTrack: () -> Unit = {},
+    onCancelSleepTimer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var overflowExpanded by remember { mutableStateOf(false) }
     var showPlaylistPicker by remember { mutableStateOf(false) }
+    var showSleepTimerPicker by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -821,6 +961,13 @@ private fun NowPlayingTopBar(
                         onShareClick()
                     }
                 )
+                DropdownMenuItem(
+                    text = { Text("Sleep timer" + sleepTimerState.menuSuffix()) },
+                    onClick = {
+                        overflowExpanded = false
+                        showSleepTimerPicker = true
+                    }
+                )
             }
         }
     }
@@ -835,6 +982,116 @@ private fun NowPlayingTopBar(
             onDismiss = { showPlaylistPicker = false }
         )
     }
+
+    if (showSleepTimerPicker) {
+        SleepTimerDialog(
+            sleepTimerState = sleepTimerState,
+            onSelectDuration = {
+                onStartSleepTimer(it)
+                showSleepTimerPicker = false
+            },
+            onSelectEndOfTrack = {
+                onStartSleepTimerEndOfTrack()
+                showSleepTimerPicker = false
+            },
+            onCancelTimer = {
+                onCancelSleepTimer()
+                showSleepTimerPicker = false
+            },
+            onDismiss = { showSleepTimerPicker = false }
+        )
+    }
+}
+
+/** "" when off, else a short " · 12:34"/" · end of track" suffix for the
+ *  overflow menu's "Sleep timer" row, so an active timer is visible without
+ *  opening the picker. */
+private fun SleepTimerState.menuSuffix(): String = when (this) {
+    SleepTimerState.Off -> ""
+    is SleepTimerState.Counting -> " · " + formatDuration(remainingMillis)
+    SleepTimerState.EndOfTrack -> " · end of track"
+}
+
+/** Duration presets + "end of track", matching the reference apps' sleep
+ *  timer picker. Reuses [AddToPlaylistDialog]'s AlertDialog styling. */
+@Composable
+private fun SleepTimerDialog(
+    sleepTimerState: SleepTimerState,
+    onSelectDuration: (durationMillis: Long) -> Unit,
+    onSelectEndOfTrack: () -> Unit,
+    onCancelTimer: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val isActive = sleepTimerState != SleepTimerState.Off
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_sleep_timer),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        title = { Text("Sleep timer") },
+        text = {
+            Column {
+                if (isActive) {
+                    Text(
+                        text = when (sleepTimerState) {
+                            is SleepTimerState.Counting -> "Pausing in ${formatDuration(sleepTimerState.remainingMillis)}"
+                            SleepTimerState.EndOfTrack -> "Pausing at the end of this track"
+                            SleepTimerState.Off -> ""
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                SLEEP_TIMER_MINUTE_PRESETS.forEach { minutes ->
+                    SleepTimerOptionRow(
+                        label = "$minutes minutes",
+                        onClick = { onSelectDuration(minutes * 60_000L) }
+                    )
+                }
+                SleepTimerOptionRow(label = "End of track", onClick = onSelectEndOfTrack)
+            }
+        },
+        confirmButton = {
+            if (isActive) {
+                TextButton(onClick = onCancelTimer) { Text("Turn off") }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Close") }
+            }
+        },
+        dismissButton = if (isActive) {
+            { TextButton(onClick = onDismiss) { Text("Close") } }
+        } else null
+    )
+}
+
+private val SLEEP_TIMER_MINUTE_PRESETS = listOf(5, 10, 15, 30, 45, 60)
+
+@Composable
+private fun SleepTimerOptionRow(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp)
+    )
 }
 
 /** Matches the AlertDialog styling LibraryScreen's playlist dialogs already

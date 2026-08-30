@@ -65,6 +65,8 @@ import com.resona.music.ui.home.HomeScreen
 import com.resona.music.ui.home.HomeTrack
 import com.resona.music.ui.home.HomeAlbum
 import com.resona.music.ui.home.HomeArtist
+import com.resona.music.ui.home.AlbumDetailScreen
+import com.resona.music.ui.home.AlbumDetailViewModel
 import com.resona.music.ui.home.ArtistDetailScreen
 import com.resona.music.ui.home.ArtistDetailViewModel
 import com.resona.music.ui.home.HistoryScreen
@@ -128,13 +130,31 @@ fun ResonaNavGraph() {
     // `MaterialTheme.colorScheme.tertiary` read below this point -- in this
     // file, in :core:ui, in the Search screen -- picks either up automatically.
     val nowPlayingPalette = rememberAlbumArtPalette(playerUiState.currentTrack?.highResThumbnailUrl)
-    val dynamicColorScheme = if (nowPlayingPalette.isAdaptive) {
-        MaterialTheme.colorScheme.copy(
-            tertiary = nowPlayingPalette.accent,
-            onTertiary = nowPlayingPalette.onAccent,
-        )
-    } else {
-        MaterialTheme.colorScheme
+    // remember, keyed on the actual colors -- not just a plain if/else --
+    // is load-bearing, not style. ColorScheme.copy() returns a new object
+    // identity every call, even when the fields are the same, and that
+    // identity is what MaterialTheme below hands to every screen in the app
+    // via CompositionLocalProvider: a *new* identity invalidates every
+    // composable anywhere that reads a theme color, app-wide, regardless of
+    // whether anything actually looks different. Recomputing this plainly
+    // on every recomposition of this composable -- which happens every
+    // ~500ms purely from the position-polling in PlayerViewModel.uiState,
+    // completely unrelated to color -- was doing exactly that continuously,
+    // for as long as anything was playing: found by tracing a reported
+    // "laggy all over the app, no specific screen" down to its cause.
+    // remember here means a new ColorScheme is only ever built when the
+    // extracted color genuinely changes (a track change settling on a new
+    // palette), which is what should have been invalidating it all along.
+    val baseColorScheme = MaterialTheme.colorScheme
+    val dynamicColorScheme = remember(baseColorScheme, nowPlayingPalette.isAdaptive, nowPlayingPalette.accent, nowPlayingPalette.onAccent) {
+        if (nowPlayingPalette.isAdaptive) {
+            baseColorScheme.copy(
+                tertiary = nowPlayingPalette.accent,
+                onTertiary = nowPlayingPalette.onAccent,
+            )
+        } else {
+            baseColorScheme
+        }
     }
 
     MaterialTheme(
@@ -231,6 +251,9 @@ fun ResonaNavGraph() {
                 SearchPage(
                     initialQuery = backStackEntry.arguments?.getString("query").orEmpty(),
                     onSongClick = playerViewModel::play,
+                    onArtistClick = { artist ->
+                        navController.navigate(artistDetailRoute(artist.name, artist.browseId))
+                    },
                 )
             }
             composable(
@@ -255,9 +278,16 @@ fun ResonaNavGraph() {
                     onDownloadClick = playerViewModel::download,
                     onToggleLike = playerViewModel::toggleLike,
                     onLoadLyrics = playerViewModel::loadLyrics,
+                    onToggleShuffle = { playerViewModel.setShuffleEnabled(!playerUiState.isShuffled) },
+                    onCycleRepeat = playerViewModel::cycleRepeatMode,
                     playlists = playerViewModel.playlists.collectAsStateWithLifecycle().value,
                     onAddToPlaylist = playerViewModel::addCurrentTrackToPlaylist,
-                    onBack = { navController.popBackStack() }
+                    sleepTimerState = playerViewModel.sleepTimerState.collectAsStateWithLifecycle().value,
+                    onStartSleepTimer = playerViewModel::startSleepTimer,
+                    onStartSleepTimerEndOfTrack = playerViewModel::startSleepTimerAtEndOfTrack,
+                    onCancelSleepTimer = playerViewModel::cancelSleepTimer,
+                    onBack = { navController.popBackStack() },
+                    onStop = playerViewModel::stop
                 )
             }
             composable(
@@ -323,8 +353,12 @@ fun ResonaNavGraph() {
                 )
             }
             composable(
-                route = "${ResonaDestination.ArtistDetail.route}/{${ArtistDetailViewModel.ARG_NAME}}",
-                arguments = listOf(navArgument(ArtistDetailViewModel.ARG_NAME) { type = NavType.StringType }),
+                route = "${ResonaDestination.ArtistDetail.route}/{${ArtistDetailViewModel.ARG_NAME}}" +
+                    "?${ArtistDetailViewModel.ARG_BROWSE_ID}={${ArtistDetailViewModel.ARG_BROWSE_ID}}",
+                arguments = listOf(
+                    navArgument(ArtistDetailViewModel.ARG_NAME) { type = NavType.StringType },
+                    navArgument(ArtistDetailViewModel.ARG_BROWSE_ID) { type = NavType.StringType; defaultValue = "" }
+                ),
                 enterTransition = { slideEnter },
                 exitTransition = { slideExit },
                 popEnterTransition = { slidePopEnter },
@@ -333,6 +367,27 @@ fun ResonaNavGraph() {
                 ArtistDetailScreen(
                     onBack = { navController.popBackStack() },
                     onSongClick = { song, songs -> playerViewModel.play(song, songs) },
+                    onShufflePlay = { songs ->
+                        if (songs.isNotEmpty()) {
+                            playerViewModel.play(songs.random(), songs)
+                            playerViewModel.setShuffleEnabled(true)
+                        }
+                    },
+                    onAlbumClick = { album -> navController.navigate(albumDetailRoute(album.browseId)) },
+                )
+            }
+            composable(
+                route = "${ResonaDestination.AlbumDetail.route}/{${AlbumDetailViewModel.ARG_BROWSE_ID}}",
+                arguments = listOf(navArgument(AlbumDetailViewModel.ARG_BROWSE_ID) { type = NavType.StringType }),
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
+            ) {
+                AlbumDetailScreen(
+                    onBack = { navController.popBackStack() },
+                    onSongClick = { song, songs -> playerViewModel.play(song, songs) },
+                    onArtistClick = { name, browseId -> navController.navigate(artistDetailRoute(name, browseId)) },
                 )
             }
             }
@@ -377,7 +432,8 @@ fun ResonaNavGraph() {
                                     onTogglePlayPause = playerViewModel::togglePlayPause,
                                     onSkipToPrevious = playerViewModel::skipToPrevious,
                                     onSkipToNext = playerViewModel::skipToNext,
-                                    onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) }
+                                    onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) },
+                                    onDismiss = playerViewModel::stop
                                 )
                             }
                         }
@@ -534,6 +590,16 @@ private fun searchRoute(query: String): String =
 private fun playlistDetailRoute(browseId: String, title: String): String =
     "${ResonaDestination.PlaylistDetail.route}/${Uri.encode(browseId)}?title=${Uri.encode(title)}"
 
-/** [ResonaDestination.ArtistDetail]'s route for one specific artist. */
-private fun artistDetailRoute(name: String): String =
-    "${ResonaDestination.ArtistDetail.route}/${Uri.encode(name)}"
+/** [ResonaDestination.ArtistDetail]'s route for one specific artist.
+ *  [browseId] is only ever known upfront for a Search result (see
+ *  SearchModels.extractArtists()) -- every other caller (Home, Stats,
+ *  History) only has [name], and ArtistDetailViewModel resolves a browseId
+ *  for those itself. */
+private fun artistDetailRoute(name: String, browseId: String? = null): String {
+    val base = "${ResonaDestination.ArtistDetail.route}/${Uri.encode(name)}"
+    return if (browseId.isNullOrBlank()) base else "$base?${ArtistDetailViewModel.ARG_BROWSE_ID}=${Uri.encode(browseId)}"
+}
+
+/** [ResonaDestination.AlbumDetail]'s route for one specific album. */
+private fun albumDetailRoute(browseId: String): String =
+    "${ResonaDestination.AlbumDetail.route}/${Uri.encode(browseId)}"

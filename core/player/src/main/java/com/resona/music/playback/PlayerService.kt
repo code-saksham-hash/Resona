@@ -18,15 +18,18 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * Hosts the single [ExoPlayer]/[MediaSession] pair for the whole app. Holds
- * no dependency on [com.resona.music.domain.repository.MusicRepository] --
- * [PlayerViewModel] resolves each stream URL before handing this service a
- * ready-to-play [androidx.media3.common.MediaItem], so this class only ever
- * deals with playback mechanics (player, session, notification, foreground
- * lifecycle), never networking. One exception: [httpDataSourceFactory]'s
- * User-Agent has to match whatever InnerTube client resolved the current
- * track (see [PlaybackDataSourceModule]) -- [PlayerViewModel] updates it,
- * this service just wires it into ExoPlayer.
+ * Hosts the single [ExoPlayer]/[MediaSession] pair for the whole app. This
+ * class itself only deals with playback mechanics (player, session,
+ * notification, foreground lifecycle) -- resolving a [Song][com.resona.music.domain.model.Song]
+ * into a playable stream, and everything queue/skip/autoplay-related, lives
+ * in [PlaybackQueueManager], which this service [PlaybackQueueManager.attach]es
+ * to the player right after building it. That split (rather than doing it
+ * inline here) is what lets [PlayerViewModel] share the exact same queue
+ * logic instead of duplicating it -- see [PlaybackQueueManager]'s kdoc.
+ * [httpDataSourceFactory]'s User-Agent has to match whatever InnerTube client
+ * resolved the current track (see [PlaybackDataSourceModule]) --
+ * [PlaybackQueueManager] updates it, this service just wires it into
+ * ExoPlayer.
  *
  * [httpDataSourceFactory] is wrapped in [RangedHttpDataSource.Factory] first
  * (see its kdoc for why every request needs an explicit byte range), then in
@@ -45,6 +48,15 @@ import javax.inject.Inject
 class PlayerService : MediaSessionService() {
 
     @Inject lateinit var httpDataSourceFactory: DefaultHttpDataSource.Factory
+
+    // Shared with PlayerViewModel (see its kdoc for why) -- attached to the
+    // player built below so its queue/skip/autoplay logic keeps working
+    // regardless of whether any Activity/ViewModel is currently around.
+    @Inject lateinit var queueManager: PlaybackQueueManager
+
+    // Same sharing/attach reasoning as queueManager -- a sleep timer that
+    // stops working once the screen turns off would be pointless.
+    @Inject lateinit var sleepTimerController: SleepTimerController
 
     private var mediaSession: MediaSession? = null
 
@@ -80,6 +92,9 @@ class PlayerService : MediaSessionService() {
             )
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+
+        queueManager.attach(player)
+        sleepTimerController.attach(player)
 
         mediaSession = MediaSession.Builder(this, player).build()
 

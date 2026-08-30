@@ -1,16 +1,47 @@
 package com.resona.music.domain.repository
 
+import com.resona.music.domain.model.Album
+import com.resona.music.domain.model.Artist
 import com.resona.music.domain.model.DownloadedSong
 import com.resona.music.domain.model.FeaturedPlaylist
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.PlayHistoryEntry
 import com.resona.music.domain.model.Playlist
+import com.resona.music.domain.model.ArtistSummary
+import com.resona.music.domain.model.SongSearchPage
 import com.resona.music.domain.model.Song
 import kotlinx.coroutines.flow.Flow
 
 interface MusicRepository {
     suspend fun search(query: String): List<Song>
+
+    /**
+     * First page of a Songs-*category* search for [query] -- a long, purely-song
+     * result list with real pagination, unlike [search] (mixed categories, capped
+     * at whatever InnerTube's default overview happens to include -- often under
+     * 10, with no way to ask for more). What the Search screen's results list and
+     * "Load more" are built on.
+     */
+    suspend fun searchSongsPage(query: String): SongSearchPage
+
+    /** The next page for a [SongSearchPage.continuationToken] earlier returned by
+     *  [searchSongsPage] (or this same method, for the page after that). */
+    suspend fun loadMoreSongResults(continuationToken: String): SongSearchPage
+
+    /** Real artist matches for [query] -- also used by ArtistDetailViewModel
+     *  to resolve a plain artist-name reference (Home/Stats/History, which
+     *  never carry a real InnerTube identity) into a browseId it can hand
+     *  to [getArtist]. */
+    suspend fun searchArtists(query: String): List<ArtistSummary>
+
+    /** A real artist channel profile: bio, hero image, listener count, and
+     *  real discography (albums/singles), not the [getTopSongsForArtist]
+     *  text-search approximation. */
+    suspend fun getArtist(browseId: String): Artist
+
+    /** A real album: cover, year, and full tracklist. */
+    suspend fun getAlbum(browseId: String): Album
     /** [excludedClients] (InnerTube client names, e.g. "ANDROID_VR") are skipped in the
      *  fallback chain -- for a retry after the CDN itself rejected a previous resolution's
      *  url, not a resolve-time failure (see [StreamSource.clientName]). */
@@ -40,7 +71,9 @@ interface MusicRepository {
 
     /** Downloads [song]'s audio for offline playback. A no-op if it's already
      *  downloaded. [onProgress] receives the download fraction (0f..1f); it's
-     *  never called when the server omits a Content-Length. */
+     *  never called when the server omits a Content-Length. Also best-effort
+     *  fetches and caches lyrics for offline use (see [getLyrics]) -- a
+     *  failure there never fails the download itself. */
     suspend fun downloadSong(song: Song, onProgress: (Float) -> Unit = {}): DownloadedSong
 
     /** All currently-downloaded songs, most-recently-downloaded first. */
@@ -82,18 +115,22 @@ interface MusicRepository {
      */
     suspend fun importPlaylistFromUrl(url: String): Playlist
 
-    /** [videoId]'s lyrics, or null if InnerTube doesn't have/expose any for it. */
+    /** [videoId]'s lyrics, or null if InnerTube doesn't have/expose any for it.
+     *  For a downloaded [videoId], returns a cached value fetched at download
+     *  time instead of hitting the network -- see [downloadSong]. */
     suspend fun getLyrics(videoId: String): String?
 
-    /** Timed/synced lyrics for [title] by [artist] via LRCLIB, or null if unavailable. */
-    suspend fun getSyncedLyrics(title: String, artist: String): List<LyricsLine>?
+    /** Timed/synced lyrics for [title] by [artist] via LRCLIB, or null if
+     *  unavailable. [videoId] is only used to check a downloaded track's
+     *  offline lyrics cache first -- see [getLyrics]. */
+    suspend fun getSyncedLyrics(videoId: String, title: String, artist: String): List<LyricsLine>?
 
     /**
-     * Up to 20 songs by [artistName]. There's no logged-in session (see
-     * getHomeFeed's kdoc) so this can't be a real per-listener "most played"
-     * ranking -- it's [artistName] run back through the same search already
-     * used everywhere else, which surfaces YouTube Music's own relevance
-     * ranking for that artist instead.
+     * Up to 20 songs by [artistName], via plain text search. ArtistDetailViewModel's
+     * last-resort fallback when [artistName] can't be resolved to a real
+     * [getArtist] browseId at all (searchArtists() found no match) -- prefer
+     * [getArtist] everywhere a browseId is available, which has real top
+     * songs from the artist's own channel instead of a search approximation.
      */
     suspend fun getTopSongsForArtist(artistName: String): List<Song>
 

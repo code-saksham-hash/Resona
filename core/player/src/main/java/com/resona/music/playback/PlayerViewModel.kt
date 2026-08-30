@@ -2,20 +2,11 @@ package com.resona.music.playback
 
 import android.content.ComponentName
 import android.content.Context
-import android.net.Uri
-import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
-import androidx.annotation.OptIn
-import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
@@ -25,10 +16,9 @@ import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,7 +28,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.io.File
 import javax.inject.Inject
 
 /**
@@ -58,7 +47,8 @@ data class PlayerUiState(
     val isLiked: Boolean = false,
     val lyricsState: LyricsState = LyricsState.NotLoaded,
     val syncedLyrics: List<LyricsLine> = emptyList(),
-    val isLooping: Boolean = false,
+    val isShuffled: Boolean = false,
+    val repeatMode: RepeatMode = RepeatMode.OFF,
     val queue: List<Song> = emptyList()
 )
 
@@ -90,73 +80,37 @@ sealed interface LyricsState {
  * touches an [androidx.media3.exoplayer.ExoPlayer] directly, so playback
  * keeps running in the service regardless of this ViewModel's lifecycle.
  *
- * @OptIn below is for [DefaultHttpDataSource.Factory.setUserAgent], which
- * Media3 marks `@UnstableApi` (see [PlayerService]'s kdoc for the same deal).
+ * Queue/skip/autoplay mechanics live in [PlaybackQueueManager], not here --
+ * see its kdoc for why (short version: it has to keep working with no
+ * Activity/ViewModel around at all, which this class fundamentally can't).
+ * This class delegates to it and mirrors its [PlaybackQueueManager.state]
+ * into [PlayerUiState], and otherwise only handles things that genuinely
+ * need an open screen to make sense (download, like, lyrics, playlists) plus
+ * the purely mechanical transport state ([PlayerUiState.isPlaying]/
+ * [PlayerUiState.isBuffering]/position/duration) read straight off the
+ * controller.
  */
-@OptIn(markerClass = [UnstableApi::class])
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val musicRepository: MusicRepository,
-    private val httpDataSourceFactory: DefaultHttpDataSource.Factory,
+    private val queueManager: PlaybackQueueManager,
+    private val sleepTimerController: SleepTimerController,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
-    /** Songs queued for sequential playback. Empty while a single tapped
-     *  track is playing *and* its similar-songs radio queue hasn't finished
-     *  loading yet (see [attachRadioQueue]). */
-    private var queue: List<Song> = emptyList()
+    /** For Now Playing's sleep timer entry -- see [SleepTimerController], which
+     *  this only forwards to/from (it's a singleton attached straight to the
+     *  service's player so it keeps counting down with no screen open). */
+    val sleepTimerState: StateFlow<SleepTimerState> = sleepTimerController.state
 
-    /** Index into [queue] for the currently playing song. */
-    private var currentQueueIndex: Int = 0
-
-    /** Bumped on every play() so the radio background fetch can tell whether
-     *  it's still the active one -- a stale mix must never attach to a
-     *  different track that superseded it while it was loading. */
-    private var radioGeneration = 0
-
-    /** In-flight background radio fetch for a single-song tap (see
-     *  [attachRadioQueue]) -- cancelled whenever a new play() supersedes it
-     *  so a stale mix can never attach to a different track. */
-    private var radioQueueJob: Job? = null
-
-    /** The scheduled retry from a source error (either [Player.Listener.onPlayerError]
-     *  or [play]'s own resolve-failure catch), if one is currently pending. Found live:
-     *  tapping skip/previous (or any other new play()) while this was still waiting out
-     *  its retry delay didn't stop it, since it wasn't tracked anywhere. It would still
-     *  fire afterward and call play() on the track the user had already left, silently
-     *  undoing the skip a moment later. Cancelled whenever a new play() supersedes it,
-     *  the same reason [radioQueueJob] is. */
-    private var retryJob: Job? = null
-
-    @Volatile
-    private var isTransitioning: Boolean = false
-
-    /** How many times the current track has been auto-retried after a
-     *  retryable playback error (see [Player.Listener.onPlayerError] below).
-     *  Reset whenever [play] starts a genuinely different track. */
-    private var streamRetryCount = 0
-
-    /** InnerTube client names (see [StreamSource.clientName]) that already
-     *  produced a url the CDN rejected *under the current visitor identity*.
-     *  A client self-reporting a format as resolvable doesn't mean the CDN
-     *  will actually serve it, and re-resolving with the same client and the
-     *  same identity just reproduces the same doomed url -- so within one
-     *  identity, skipping a client that already failed is the only way a
-     *  retry actually tries something different.
-     *
-     *  Cleared every time the identity itself gets reminted (see the retry
-     *  sites below), though: a logcat trace of a real failure end to end
-     *  showed the CDN's verdict tracks the visitor identity, not the client,
-     *  so a client excluded under a now-discarded identity is worth trying
-     *  again under the new one. Without this reset, two unlucky identities
-     *  in a row permanently locked a track out of the only clients that ever
-     *  return a directly playable url, and every retry after that was spent
-     *  on clients that were never going to work anonymously either -- the
-     *  track just never played. Reset alongside [streamRetryCount]. */
-    private val excludedClients = mutableSetOf<String>()
+    /** videoId [uiState] was last updated for, so the [queueManager] state
+     *  collector below can tell a genuine track change (which resets
+     *  per-track UI fields like [PlayerUiState.lyricsState]) apart from e.g.
+     *  just the queue/shuffle/repeat fields changing underneath the same song. */
+    private var lastObservedSongId: String? = null
 
     private val controllerFuture = MediaController.Builder(
         context,
@@ -184,92 +138,7 @@ class PlayerViewModel @Inject constructor(
                             )
                         }
                     }
-
-                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                        val id = mediaItem?.mediaId ?: return
-                        when {
-                            id.startsWith(DUMMY_NEXT) -> skipToNext()
-                            id.startsWith(DUMMY_PREV) -> skipToPrevious()
-                        }
-                    }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        Log.d(
-                            TAG,
-                            "onPlayerError: errorCode=${error.errorCodeName}, message=${error.message}",
-                            error.cause
-                        )
-                        val track = _uiState.value.currentTrack
-                        val isCurrentTrackStream = track != null &&
-                            controller.currentMediaItem?.mediaId == track.videoId
-                        // A format url InnerTube marked resolvable can still get
-                        // flatly rejected by the CDN (403, "source error") once the
-                        // player actually opens it -- only observable here, so this
-                        // is the one place it can be caught. Capped, and scoped to
-                        // IO errors only, so a genuinely broken/unplayable video
-                        // still surfaces an error instead of retrying forever.
-                        //
-                        // Tracing one of these failures through logcat end to end
-                        // showed the rejection isn't really about the client at
-                        // all: the CDN's verdict is keyed on the anonymous visitor
-                        // identity that resolved the url, and it can go either way
-                        // per identity no matter which client asked.
-                        // refreshStreamIdentity() mints a replacement before the
-                        // retry re-resolves -- and the exclusion list is wiped
-                        // right here too, because an exclusion recorded against
-                        // the identity we're about to throw away doesn't mean
-                        // anything once it's gone. Leaving it in place was the
-                        // actual bug: once
-                        // the two clients that ever hand back a directly playable
-                        // url had each failed once, they stayed excluded for the
-                        // rest of the track's retry budget even after a brand new
-                        // identity made them worth trying again, so every retry
-                        // after that was burned on clients that don't work
-                        // anonymously at all and the track just sat there.
-                        if (track != null && isCurrentTrackStream &&
-                            error.errorCode in RETRYABLE_ERROR_CODES &&
-                            streamRetryCount < MAX_STREAM_RETRIES
-                        ) {
-                            streamRetryCount++
-                            excludedClients.clear()
-                            Log.d(
-                                TAG,
-                                "onPlayerError: retrying ${track.videoId} " +
-                                    "(attempt $streamRetryCount/$MAX_STREAM_RETRIES)"
-                            )
-                            retryJob = viewModelScope.launch {
-                                musicRepository.refreshStreamIdentity()
-                                delay(STREAM_RETRY_DELAY_MILLIS)
-                                play(track, queue)
-                            }
-                            return
-                        }
-                        _uiState.update {
-                            it.copy(isBuffering = false, error = error.message ?: "Playback error")
-                        }
-                    }
-
-                    override fun onRepeatModeChanged(repeatMode: Int) {
-                        _uiState.update { it.copy(isLooping = repeatMode == Player.REPEAT_MODE_ONE) }
-                    }
                 })
-
-                // Resync with playback already under way -- the foreground
-                // service can outlive this ViewModel (screen rotation,
-                // process restart, returning from the background), so on a
-                // fresh connection it may already have an active track.
-                if (controller.currentMediaItem != null) {
-                    _uiState.update {
-                        it.copy(
-                            currentTrack = controller.currentMediaItem?.toSong(),
-                            isPlaying = controller.isPlaying,
-                            isBuffering = controller.playbackState == Player.STATE_BUFFERING,
-                            position = controller.currentPosition.coerceAtLeast(0L),
-                            duration = controller.duration.coerceAtLeast(0L),
-                            isLooping = controller.repeatMode == Player.REPEAT_MODE_ONE
-                        )
-                    }
-                }
 
                 controllerReady.complete(controller)
             },
@@ -281,228 +150,60 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             val controller = controllerReady.await()
             while (isActive) {
-                if (!isTransitioning && controller.isPlaying) {
+                if (!queueManager.state.value.isResolving && controller.isPlaying) {
                     _uiState.update { it.copy(position = controller.currentPosition.coerceAtLeast(0L)) }
                 }
                 delay(POSITION_UPDATE_MILLIS)
             }
         }
-    }
 
-    fun play(song: Song, queue: List<Song> = emptyList()) {
-        if (song.videoId != _uiState.value.currentTrack?.videoId) {
-            streamRetryCount = 0
-            excludedClients.clear()
-        }
-        // A source-error retry schedules itself a beat in the future (see
-        // retryJob's kdoc). If the user skips or taps another track before
-        // that beat is up, this stops it from firing afterward and quietly
-        // undoing the skip by calling play() on the track they just left.
-        retryJob?.cancel()
-        this.queue = queue
-        currentQueueIndex = if (queue.isNotEmpty()) {
-            queue.indexOfFirst { it.videoId == song.videoId }.coerceAtLeast(0)
-        } else 0
-
-        // A single-track tap (artist/playlist screens always pass their full
-        // song list as `queue`) has no queue at all -- the stream should
-        // start playing immediately, not wait on a network fetch. So the
-        // similar-songs radio is fetched in the background and attached as
-        // this track's queue once it lands (see attachRadioQueue). Bump the
-        // generation and cancel any in-flight fetch so a superseding tap
-        // (or the same track tapped twice) can't attach a stale mix.
-        radioGeneration++
-        radioQueueJob?.cancel()
-        radioQueueJob = if (queue.isEmpty()) {
-            viewModelScope.launch { attachRadioQueue(song, radioGeneration) }
-        } else {
-            null
-        }
-
+        // The single source of truth for which track is current, the queue,
+        // and shuffle/repeat. queueManager is a singleton shared with
+        // PlayerService (see its kdoc), so it already reflects whatever's
+        // playing -- even something started or skipped entirely from the
+        // notification while this ViewModel didn't exist yet -- from the
+        // very first emission below, no separate reconnect-resync needed.
         viewModelScope.launch {
-            val controller = controllerReady.await()
-
-            isTransitioning = true
-
-            val downloadedFilePath = musicRepository.localFileForSong(song.videoId)
-            _uiState.update {
-                it.copy(
-                    currentTrack = song,
-                    isPlaying = false,
-                    isBuffering = true,
-                    position = 0L,
-                    duration = 0L,
-                    error = null,
-                    downloadState = if (downloadedFilePath != null) DownloadState.Downloaded else DownloadState.Idle,
-                    isLiked = musicRepository.isLiked(song.videoId),
-                    lyricsState = LyricsState.NotLoaded,
-                    syncedLyrics = emptyList(),
-                    queue = queue
-                )
-            }
-            try {
-                val mediaUri = if (downloadedFilePath != null) {
-                    Uri.fromFile(File(downloadedFilePath))
-                } else {
-                    val streamSource = musicRepository.getStreamSource(song.videoId, excludedClients)
-                    // Recorded regardless of what happens next: if this client's url
-                    // does get rejected (onPlayerError below, or a caller further up
-                    // retrying after this whole play() throws), a retry must not land
-                    // on it again -- see excludedClients' kdoc.
-                    excludedClients += streamSource.clientName
-                    // has to happen before prepare()/play() or ExoPlayer opens
-                    // the connection with the wrong user agent and gets rejected
-                    httpDataSourceFactory.setUserAgent(streamSource.userAgent)
-                    streamSource.url.toUri()
-                }
-                val mediaItem = MediaItem.Builder()
-                    .setMediaId(song.videoId)
-                    .setUri(mediaUri)
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(song.title)
-                            .setArtist(song.artist)
-                            .setArtworkUri(song.highResThumbnailUrl.toUri())
-                            .build()
-                    )
-                    .build()
-                controller.setMediaItem(mediaItem)
-                controller.prepare()
-                controller.play()
-                isTransitioning = false
-                musicRepository.recordPlay(song)
-
-                if (currentQueueIndex > 0) {
-                    val prevSong = queue[currentQueueIndex - 1]
-                    val prevDummy = MediaItem.Builder()
-                        .setMediaId("${DUMMY_PREV}${prevSong.videoId}")
-                        .setUri(mediaUri)
-                        .setMediaMetadata(
-                            MediaMetadata.Builder()
-                                .setTitle(prevSong.title)
-                                .setArtist(prevSong.artist)
-                                .setArtworkUri(prevSong.highResThumbnailUrl.toUri())
-                                .build()
+            queueManager.state.collect { qs ->
+                val songChanged = qs.currentSong?.videoId != lastObservedSongId
+                lastObservedSongId = qs.currentSong?.videoId
+                _uiState.update { current ->
+                    if (songChanged) {
+                        current.copy(
+                            currentTrack = qs.currentSong,
+                            queue = qs.queue,
+                            isShuffled = qs.isShuffled,
+                            repeatMode = qs.repeatMode,
+                            error = qs.error,
+                            isPlaying = false,
+                            isBuffering = qs.currentSong != null,
+                            position = 0L,
+                            duration = 0L,
+                            downloadState = qs.currentSong?.let { song ->
+                                if (musicRepository.localFileForSong(song.videoId) != null) {
+                                    DownloadState.Downloaded
+                                } else {
+                                    DownloadState.Idle
+                                }
+                            } ?: DownloadState.Idle,
+                            isLiked = qs.currentSong?.let { musicRepository.isLiked(it.videoId) } ?: false,
+                            lyricsState = LyricsState.NotLoaded,
+                            syncedLyrics = emptyList(),
                         )
-                        .build()
-                    controller.addMediaItem(0, prevDummy)
-                }
-                if (queue.isNotEmpty() && currentQueueIndex < queue.size - 1) {
-                    val nextSong = queue[currentQueueIndex + 1]
-                    val nextDummy = MediaItem.Builder()
-                        .setMediaId("${DUMMY_NEXT}${nextSong.videoId}")
-                        .setUri(mediaUri)
-                        .setMediaMetadata(
-                            MediaMetadata.Builder()
-                                .setTitle(nextSong.title)
-                                .setArtist(nextSong.artist)
-                                .setArtworkUri(nextSong.highResThumbnailUrl.toUri())
-                                .build()
+                    } else {
+                        current.copy(
+                            queue = qs.queue,
+                            isShuffled = qs.isShuffled,
+                            repeatMode = qs.repeatMode,
+                            error = qs.error,
                         )
-                        .build()
-                    val nextPos = if (currentQueueIndex > 0) 2 else 1
-                    controller.addMediaItem(nextPos, nextDummy)
-                }
-            } catch (e: CancellationException) {
-                isTransitioning = false
-                throw e
-            } catch (e: Exception) {
-                isTransitioning = false
-                Log.d(TAG, "play: failed to resolve/prepare stream", e)
-                // getStreamSource() can fail outright -- every client in the
-                // fallback chain gated, or every format's signature failed to
-                // decipher -- before ExoPlayer ever gets a MediaItem to try,
-                // so onPlayerError's retry never gets a chance to run. Same
-                // retry budget as onPlayerError (shared streamRetryCount):
-                // this is the exact "no stream at all" counterpart to that
-                // one's "stream url the CDN then rejected" -- and the same
-                // root cause too, just caught one step earlier. Every client
-                // in the chain coming back with no playable audio is what a
-                // bad visitor identity looks like at resolve time, so this
-                // reminds one and clears the exclusion list before retrying,
-                // for the same reason onPlayerError does (see its comment).
-                if (streamRetryCount < MAX_STREAM_RETRIES) {
-                    streamRetryCount++
-                    excludedClients.clear()
-                    Log.d(
-                        TAG,
-                        "play: retrying ${song.videoId} (attempt $streamRetryCount/$MAX_STREAM_RETRIES) " +
-                            "after resolve failure: ${e.message}"
-                    )
-                    retryJob = viewModelScope.launch {
-                        musicRepository.refreshStreamIdentity()
-                        delay(STREAM_RETRY_DELAY_MILLIS)
-                        play(song, queue)
                     }
-                    return@launch
-                }
-                _uiState.update {
-                    it.copy(isBuffering = false, error = e.message ?: "Unable to play this track")
                 }
             }
         }
     }
 
-    /**
-     * Background half of a single-track tap (see [play]): resolves the
-     * similar-songs radio for [song] and attaches it as this track's queue
-     * once it arrives -- the tapped song itself already got [play]'s full
-     * immediate path (setMediaItem/prepare/play), so nothing here holds up
-     * first-audio. Running as its own coroutine, it only mutates queue state
-     * while it still matches the generation captured at launch; anything
-     * stale (user tapped another track meanwhile) just returns.
-     */
-    private suspend fun attachRadioQueue(song: Song, generation: Int) {
-        val radio = try {
-            musicRepository.getSongRadio(song.videoId)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.d(TAG, "attachRadioQueue: no radio for ${song.videoId}: ${e.message}")
-            emptyList()
-        }
-        if (radio.isEmpty() || generation != radioGeneration) return
-
-        val controller = controllerReady.await()
-
-        // The tapped song may be still preparing (play()'s coroutine resolves
-        // the stream concurrently) -- wait briefly for it to be the current
-        // item so the next-dummy is inserted right after it.
-        val radioTimeoutMillis = SystemClock.elapsedRealtime() + RADIO_ATTACH_TIMEOUT_MILLIS
-        while (controller.currentMediaItem?.mediaId != song.videoId &&
-            SystemClock.elapsedRealtime() < radioTimeoutMillis
-        ) {
-            delay(50L)
-            if (generation != radioGeneration) return
-        }
-        if (controller.currentMediaItem?.mediaId != song.videoId) return
-
-        // Radio mix normally leads with the tapped track itself, which
-        // matches the currently-playing media item (index 0) exactly -- but
-        // pin it explicitly and dedupe so index 0 is *always* the tapped
-        // song regardless of how the panel was shaped.
-        this.queue = (listOf(song) + radio).distinctBy { it.videoId }
-        currentQueueIndex = 0
-        _uiState.update { it.copy(queue = this.queue) }
-        Log.d(TAG, "attachRadioQueue: attached ${this.queue.size} songs as queue for ${song.videoId}")
-
-        if (this.queue.size > 1) {
-            val nextSong = this.queue[1]
-            val mediaUri = controller.currentMediaItem?.localConfiguration?.uri ?: return
-            val nextDummy = MediaItem.Builder()
-                .setMediaId("${DUMMY_NEXT}${nextSong.videoId}")
-                .setUri(mediaUri)
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(nextSong.title)
-                        .setArtist(nextSong.artist)
-                        .setArtworkUri(nextSong.highResThumbnailUrl.toUri())
-                        .build()
-                )
-                .build()
-            controller.addMediaItem(1, nextDummy)
-        }
-    }
+    fun play(song: Song, queue: List<Song> = emptyList()) = queueManager.playSong(song, queue)
 
     /**
      * Downloads [PlayerUiState.currentTrack] for offline playback. Result is
@@ -593,7 +294,7 @@ class PlayerViewModel @Inject constructor(
 
             val (plainText, synced) = try {
                 val plainDeferred = viewModelScope.async { musicRepository.getLyrics(track.videoId) }
-                val syncedDeferred = viewModelScope.async { musicRepository.getSyncedLyrics(track.title, track.artist) }
+                val syncedDeferred = viewModelScope.async { musicRepository.getSyncedLyrics(track.videoId, track.title, track.artist) }
                 plainDeferred.await() to syncedDeferred.await()
             } catch (e: CancellationException) {
                 throw e
@@ -676,98 +377,42 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun skipToNext() {
-        if (queue.isEmpty()) return
-        val nextIndex = currentQueueIndex + 1
-        if (nextIndex >= queue.size) return
-        currentQueueIndex = nextIndex
-        play(queue[nextIndex], queue)
-    }
+    fun skipToNext() = queueManager.skipToNext()
 
-    fun skipToPrevious() {
-        if (queue.isEmpty()) {
-            seekTo(0)
-            return
-        }
-        val prevIndex = currentQueueIndex - 1
-        if (prevIndex < 0) {
-            seekTo(0)
-            return
-        }
-        currentQueueIndex = prevIndex
-        play(queue[prevIndex], queue)
-    }
+    fun skipToPrevious() = queueManager.skipToPrevious()
 
-    /** Toggles repeating the current track (there's no queue yet -- see
-     *  skipToNext/Previous -- so "loop" only ever means repeat-one). */
-    fun toggleRepeat() {
-        viewModelScope.launch {
-            val controller = controllerReady.await()
-            controller.repeatMode = if (controller.repeatMode == Player.REPEAT_MODE_ONE) {
-                Player.REPEAT_MODE_OFF
-            } else {
-                Player.REPEAT_MODE_ONE
-            }
-        }
-    }
+    fun setShuffleEnabled(enabled: Boolean) = queueManager.setShuffleEnabled(enabled)
+
+    /** Cycles repeat off -> all -> one -> off (matches YouTube Music). "All"
+     *  loops the queue itself (see [PlaybackQueueManager.skipToNext]); "one"
+     *  repeats just the current track. */
+    fun cycleRepeatMode() = queueManager.cycleRepeatMode()
 
     /** Stops playback and clears the current track entirely -- what the
      *  mini-player's close button dismisses itself with (its visibility is
      *  driven by currentTrack being non-null). */
     fun stop() {
-        // A superseding stop() must not have a stale radio queue, or a
-        // pending source-error retry, land after it.
-        radioGeneration++
-        radioQueueJob?.cancel()
-        radioQueueJob = null
-        retryJob?.cancel()
-        retryJob = null
+        queueManager.reset()
         viewModelScope.launch {
             val controller = controllerReady.await()
             controller.stop()
             controller.clearMediaItems()
-            _uiState.value = PlayerUiState()
         }
     }
+
+    fun startSleepTimer(durationMillis: Long) = sleepTimerController.startCountdown(durationMillis)
+
+    fun startSleepTimerAtEndOfTrack() = sleepTimerController.startAtEndOfTrack()
+
+    fun cancelSleepTimer() = sleepTimerController.cancel()
 
     override fun onCleared() {
         MediaController.releaseFuture(controllerFuture)
         super.onCleared()
     }
 
-    private fun MediaItem.toSong(): Song = Song(
-        videoId = mediaId,
-        title = mediaMetadata.title?.toString() ?: "",
-        artist = mediaMetadata.artist?.toString() ?: "",
-        thumbnailUrl = mediaMetadata.artworkUri?.toString() ?: ""
-    )
-
     private companion object {
         const val TAG = "PlayerViewModel"
         const val POSITION_UPDATE_MILLIS = 500L
-        // Upper bound on how long a background radio fetch waits for the
-        // tapped song to become the current media item before giving up.
-        const val RADIO_ATTACH_TIMEOUT_MILLIS = 5_000L
-        const val DUMMY_NEXT = "__queue_next__"
-        const val DUMMY_PREV = "__queue_prev__"
-
-        // See onPlayerError/excludedClients: each retry mints a fresh visitor
-        // identity and gets a clean shot at the whole client chain again, so
-        // this is really "how many different identities are worth trying"
-        // rather than a client count. STREAM_RETRY_DELAY_MILLIS is just
-        // pacing between attempts, not load-bearing for correctness.
-        const val MAX_STREAM_RETRIES = 4
-        const val STREAM_RETRY_DELAY_MILLIS = 600L
-        // The whole ERROR_CODE_IO_* family (2000-2008) -- a gated/rejected
-        // request doesn't always fail as a clean "403 status" IOException.
-        // Media3 only assigns BAD_HTTP_STATUS when the failure is a
-        // HttpDataSource.InvalidResponseCodeException specifically; a
-        // connection the CDN drops or resets mid-read (which is exactly how
-        // some anti-abuse rejections behave) surfaces as the generic
-        // ERROR_CODE_IO_UNSPECIFIED instead, which a narrower code-by-code
-        // set would silently let through unretried.
-        val RETRYABLE_ERROR_CODES =
-            (PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
-                .toSet()
     }
 }

@@ -51,6 +51,9 @@ sealed class ResonaDestination(
 
     /** Reached from a Home artist card, not the bottom bar -- its icon is unused. */
     data object ArtistDetail : ResonaDestination("artist", "Artist", Icons.Filled.Explore, Icons.Outlined.Explore)
+
+    /** Reached from an artist's Albums/Singles shelf, not the bottom bar -- its icon is unused. */
+    data object AlbumDetail : ResonaDestination("album", "Album", Icons.Filled.Explore, Icons.Outlined.Explore)
 }
 
 /** The 3 tabs on the floating pill nav -- Stats and History are still real

@@ -541,13 +541,8 @@ private fun UserPlaylistsSection(
             if (row.size == 2) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     row.forEach { playlist ->
-                        QuickLinkCard(
-                            link = QuickLink(
-                                id = playlist.id,
-                                title = playlist.name,
-                                subtitle = if (playlist.songs.isNotEmpty()) "${playlist.songs.size} tracks" else "Empty",
-                                icon = Icons.Outlined.LibraryMusic
-                            ),
+                        PlaylistCard(
+                            playlist = playlist,
                             onClick = { onPlaylistClick(playlist) },
                             modifier = Modifier.weight(1f)
                         )
@@ -556,19 +551,76 @@ private fun UserPlaylistsSection(
             } else {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Spacer(modifier = Modifier.weight(1f))
-                    QuickLinkCard(
-                        link = QuickLink(
-                            id = row.single().id,
-                            title = row.single().name,
-                            subtitle = if (row.single().songs.isNotEmpty()) "${row.single().songs.size} tracks" else "Empty",
-                            icon = Icons.Outlined.LibraryMusic
-                        ),
+                    PlaylistCard(
+                        playlist = row.single(),
                         onClick = { onPlaylistClick(row.single()) },
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
+        }
+    }
+}
+
+/** Like [QuickLinkCard], but for a user playlist: shows its own cover art
+ *  (the first song's thumbnail) in the icon-badge slot instead of a generic
+ *  glyph repeated identically for every playlist, falling back to that same
+ *  generic look only when the playlist is empty. */
+@Composable
+private fun PlaylistCard(
+    playlist: Playlist,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.large)
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.1f), MaterialTheme.shapes.large)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val coverUrl = playlist.songs.firstOrNull()?.thumbnailUrl
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.1f))
+                .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (coverUrl != null) {
+                AsyncImage(
+                    model = coverUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.LibraryMusic,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = playlist.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = if (playlist.songs.isNotEmpty()) "${playlist.songs.size} tracks" else "Empty",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.resona.music.data.repository
 
 import android.util.Log
+import com.resona.music.data.download.CachedLyrics
 import com.resona.music.data.download.DownloadedSongsStore
 import com.resona.music.data.download.SongDownloader
 import com.resona.music.data.extractor.YouTubeStreamExtractor
@@ -9,14 +10,28 @@ import com.resona.music.data.history.SearchHistoryStore
 import com.resona.music.data.likes.LikedSongsStore
 import com.resona.music.data.playlists.UserPlaylistsStore
 import com.resona.music.data.remote.innertube.InnerTubeApi
+import com.resona.music.data.remote.innertube.models.InnerTubeAlbumSummary
+import com.resona.music.data.remote.innertube.models.InnerTubeArtist
+import com.resona.music.data.remote.innertube.models.InnerTubeSong
+import com.resona.music.data.remote.innertube.models.extractAlbumHeader
+import com.resona.music.data.remote.innertube.models.extractAlbumTracks
+import com.resona.music.data.remote.innertube.models.extractArtistDiscographyShelf
+import com.resona.music.data.remote.innertube.models.extractArtistHeader
+import com.resona.music.data.remote.innertube.models.extractArtists
 import com.resona.music.data.remote.innertube.models.extractFeaturedPlaylists
+import com.resona.music.data.remote.innertube.models.extractFilteredSongs
 import com.resona.music.data.remote.innertube.models.extractLyricsBrowseId
 import com.resona.music.data.remote.innertube.models.extractLyricsText
 import com.resona.music.data.remote.innertube.models.extractPlaylistSongs
 import com.resona.music.data.remote.innertube.models.extractPlaylistTitle
 import com.resona.music.data.remote.innertube.models.extractRadioSongs
+import com.resona.music.data.remote.innertube.models.extractSearchContinuation
 import com.resona.music.data.remote.innertube.models.extractSongs
+import com.resona.music.domain.model.Album
+import com.resona.music.domain.model.AlbumSummary
+import com.resona.music.domain.model.Artist
 import com.resona.music.domain.model.ArtistSpotlight
+import com.resona.music.domain.model.ArtistSummary
 import com.resona.music.domain.model.DownloadedSong
 import com.resona.music.domain.model.FeaturedPlaylist
 import com.resona.music.domain.model.HomeFeed
@@ -24,6 +39,7 @@ import com.resona.music.domain.model.HomeFeedSection
 import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.PlayHistoryEntry
 import com.resona.music.domain.model.Playlist
+import com.resona.music.domain.model.SongSearchPage
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import com.resona.music.domain.repository.StreamSource
@@ -49,15 +65,83 @@ class MusicRepositoryImpl @Inject internal constructor(
 ) : MusicRepository {
 
     override suspend fun search(query: String): List<Song> =
-        api.search(query).extractSongs().map { song ->
-            Song(
-                videoId = song.videoId,
-                title = song.title,
-                artist = song.artist,
-                thumbnailUrl = song.thumbnailUrl,
-                duration = song.duration
-            )
-        }
+        api.search(query).extractSongs().map { it.toSong() }
+
+    override suspend fun searchSongsPage(query: String): SongSearchPage {
+        val response = api.searchSongs(query)
+        return SongSearchPage(
+            // distinctBy is defense-in-depth against a single page ever
+            // repeating a videoId internally -- not observed live, but the
+            // Search screen keys its list by videoId (see SearchResultsList),
+            // and a duplicate key there is a hard Compose crash, not just a
+            // cosmetic repeat -- worth guarding cheaply regardless.
+            songs = response.extractFilteredSongs().map { it.toSong() }.distinctBy { it.videoId },
+            continuationToken = response.extractSearchContinuation(),
+        )
+    }
+
+    override suspend fun loadMoreSongResults(continuationToken: String): SongSearchPage {
+        val response = api.searchSongsContinuation(continuationToken)
+        return SongSearchPage(
+            songs = response.extractFilteredSongs().map { it.toSong() }.distinctBy { it.videoId },
+            continuationToken = response.extractSearchContinuation(),
+        )
+    }
+
+    override suspend fun searchArtists(query: String): List<ArtistSummary> =
+        api.search(query).extractArtists().map { it.toArtistSummary() }
+
+    override suspend fun getArtist(browseId: String): Artist {
+        val response = api.browse(browseId)
+        val header = response.extractArtistHeader()
+        return Artist(
+            browseId = browseId,
+            name = header?.name ?: "",
+            thumbnailUrl = header?.thumbnailUrl ?: "",
+            description = header?.description ?: "",
+            listenerCountText = header?.listenerCountText ?: "",
+            // "Top songs" is shaped exactly like a playlist track row (no
+            // "Song" type label, since every row here is already known to be
+            // one) -- see extractPlaylistSongs()'s own kdoc.
+            topSongs = response.extractPlaylistSongs().map { it.toSong() },
+            albums = response.extractArtistDiscographyShelf("Albums").map { it.toAlbumSummary() },
+            singles = response.extractArtistDiscographyShelf("Singles & EPs").map { it.toAlbumSummary() },
+        )
+    }
+
+    override suspend fun getAlbum(browseId: String): Album {
+        val response = api.browse(browseId)
+        val header = response.extractAlbumHeader()
+        val coverUrl = header?.thumbnailUrl ?: ""
+        return Album(
+            browseId = browseId,
+            title = header?.title ?: "",
+            artistName = header?.artistName ?: "",
+            artistBrowseId = header?.artistBrowseId,
+            thumbnailUrl = coverUrl,
+            year = header?.year ?: "",
+            // An album track row has no thumbnail of its own (every track
+            // shares the album cover) -- see extractAlbumTracks()'s kdoc.
+            songs = response.extractAlbumTracks().map { it.toSong().withFallbackThumbnail(coverUrl) },
+        )
+    }
+
+    private fun InnerTubeSong.toSong() = Song(
+        videoId = videoId,
+        title = title,
+        artist = artist,
+        thumbnailUrl = thumbnailUrl,
+        duration = duration
+    )
+
+    private fun Song.withFallbackThumbnail(url: String): Song =
+        if (thumbnailUrl.isBlank()) copy(thumbnailUrl = url) else this
+
+    private fun InnerTubeArtist.toArtistSummary() =
+        ArtistSummary(browseId = browseId, name = name, thumbnailUrl = thumbnailUrl)
+
+    private fun InnerTubeAlbumSummary.toAlbumSummary() =
+        AlbumSummary(browseId = browseId, title = title, thumbnailUrl = thumbnailUrl, year = year)
 
     // Same as search(), but for callers that already know every result
     // "should" be by a single named artist (right now, just getHomeFeed's
@@ -205,6 +289,19 @@ class MusicRepositoryImpl @Inject internal constructor(
         val file = songDownloader.download(song, streamSource, onProgress)
         Log.d(TAG, "downloadSong: wrote ${file.absolutePath} (${file.length()} bytes), persisting index")
         downloadedSongsStore.markDownloaded(song, file.absolutePath)
+
+        // Best-effort: lyrics are what make offline playback of a downloaded
+        // song fall short otherwise (both getLyrics/getSyncedLyrics are
+        // network-only), so fetch and cache them now while a connection is
+        // presumably available -- but never let a lyrics failure undo an
+        // otherwise-successful download.
+        runCatching {
+            val plain = runCatching { fetchLyrics(song.videoId) }.getOrNull()
+            val synced = runCatching { fetchSyncedLyrics(song.title, song.artist) }.getOrNull()
+            downloadedSongsStore.cacheLyrics(song.videoId, plain, synced)
+            Log.d(TAG, "downloadSong: cached lyrics for ${song.videoId} (plain=${plain != null}, synced=${synced?.size ?: 0} lines)")
+        }.onFailure { e -> Log.w(TAG, "downloadSong: lyrics caching failed for ${song.videoId}", e) }
+
         return DownloadedSong(song, file.absolutePath)
     }
 
@@ -268,32 +365,72 @@ class MusicRepositoryImpl @Inject internal constructor(
     }
 
     override suspend fun getLyrics(videoId: String): String? {
+        downloadedSongsStore.cachedLyrics(videoId)?.let { cached ->
+            Log.d(TAG, "getLyrics: using cached copy for $videoId")
+            return cached.plain
+        }
+        val downloaded = downloadedSongsStore.downloads.value.find { it.song.videoId == videoId }
+        if (downloaded != null) return backfillLyricsCache(downloaded.song).plain
+        return fetchLyrics(videoId)
+    }
+
+    override suspend fun getSyncedLyrics(videoId: String, title: String, artist: String): List<LyricsLine>? {
+        downloadedSongsStore.cachedLyrics(videoId)?.let { cached ->
+            Log.d(TAG, "getSyncedLyrics: using cached copy for $videoId")
+            return cached.synced
+        }
+        val downloaded = downloadedSongsStore.downloads.value.find { it.song.videoId == videoId }
+        if (downloaded != null) return backfillLyricsCache(downloaded.song).synced
+        return fetchSyncedLyrics(title, artist)
+    }
+
+    /**
+     * A song downloaded before lyrics-caching existed (see [downloadSong])
+     * has no [DownloadedSongsStore.cachedLyrics] entry at all yet -- this
+     * fetches both plain and synced lyrics for it live, the same as
+     * [downloadSong] does at download time, and persists them so the song
+     * self-heals into having an offline copy the next time it's viewed
+     * (still requires a connection *this* one time). Shared by
+     * [getLyrics]/[getSyncedLyrics] rather than caching a lone field from
+     * either individually -- [DownloadedSongsStore.cacheLyrics] replaces
+     * both fields at once, so caching from only one side would clobber
+     * whatever the other side had already found.
+     */
+    private suspend fun backfillLyricsCache(song: Song): CachedLyrics {
+        val plain = runCatching { fetchLyrics(song.videoId) }.getOrNull()
+        val synced = runCatching { fetchSyncedLyrics(song.title, song.artist) }.getOrNull()
+        runCatching { downloadedSongsStore.cacheLyrics(song.videoId, plain, synced) }
+            .onFailure { e -> Log.w(TAG, "backfillLyricsCache: failed to persist for ${song.videoId}", e) }
+        return CachedLyrics(plain, synced)
+    }
+
+    private suspend fun fetchLyrics(videoId: String): String? {
         val lyricsBrowseId = runCatching { api.next(videoId).extractLyricsBrowseId() }.getOrNull()
         if (lyricsBrowseId == null) {
-            Log.d(TAG, "getLyrics: no Lyrics tab for $videoId")
+            Log.d(TAG, "fetchLyrics: no Lyrics tab for $videoId")
             return null
         }
         val lyrics = runCatching { api.browse(lyricsBrowseId).extractLyricsText() }.getOrNull()
-        Log.d(TAG, "getLyrics: $videoId -> ${if (lyrics != null) "${lyrics.length} chars" else "unavailable"}")
+        Log.d(TAG, "fetchLyrics: $videoId -> ${if (lyrics != null) "${lyrics.length} chars" else "unavailable"}")
         return lyrics
     }
 
-    override suspend fun getSyncedLyrics(title: String, artist: String): List<LyricsLine>? {
+    private suspend fun fetchSyncedLyrics(title: String, artist: String): List<LyricsLine>? {
         return runCatching {
             val url = "https://lrclib.net/api/get?artist_name=${artist.take(100)}&track_name=${title.take(100)}"
-            Log.d(TAG, "getSyncedLyrics: fetching from LRCLIB for title=$title artist=$artist")
+            Log.d(TAG, "fetchSyncedLyrics: fetching from LRCLIB for title=$title artist=$artist")
             val response = httpClient.get(url)
             val body = response.bodyAsText()
             val syncedKey = "\"syncedLyrics\":\""
             val start = body.indexOf(syncedKey)
             if (start == -1) {
-                Log.d(TAG, "getSyncedLyrics: no syncedLyrics field in response")
+                Log.d(TAG, "fetchSyncedLyrics: no syncedLyrics field in response")
                 return@runCatching null
             }
             val lrcStart = start + syncedKey.length
             val lrcEnd = body.indexOf("\"", lrcStart)
             if (lrcEnd == -1) {
-                Log.d(TAG, "getSyncedLyrics: malformed JSON")
+                Log.d(TAG, "fetchSyncedLyrics: malformed JSON")
                 return@runCatching null
             }
             val lrcText = body.substring(lrcStart, lrcEnd)
@@ -301,10 +438,10 @@ class MusicRepositoryImpl @Inject internal constructor(
                 .replace("\\\"", "\"")
                 .replace("\\\\", "\\")
             val lines = parseLrc(lrcText)
-            Log.d(TAG, "getSyncedLyrics: parsed ${lines.size} lines")
+            Log.d(TAG, "fetchSyncedLyrics: parsed ${lines.size} lines")
             lines
         }.onFailure { e ->
-            Log.w(TAG, "getSyncedLyrics: failed", e)
+            Log.w(TAG, "fetchSyncedLyrics: failed", e)
         }.getOrNull()
     }
 
@@ -382,29 +519,57 @@ class MusicRepositoryImpl @Inject internal constructor(
         // Fallback for a bare id pasted with no url around it at all.
         val BARE_PLAYLIST_ID_REGEX = Regex("""^[\w-]{10,}$""")
 
-        // One of these is picked at random per section per getHomeFeed()
-        // call (see pickQuery) -- plain synonyms/rephrasings of the same
-        // idea, not different concepts, so every pick is still a reasonable
-        // answer to "what's trending" / "what's new" / "what do I like".
+        // One of these is picked at random per section per getHomeFeed() call
+        // (see pickQuery). Deliberately spread across genres/moods rather
+        // than just synonyms of "popular right now" -- a handful of
+        // near-synonymous phrasings (the old pool: "trending music", "viral
+        // hits", "chart toppers"...) all rank against essentially the same
+        // handful of globally-dominant hits on YouTube's side, so rotating
+        // between them barely changed what showed up and the feed read as
+        // static. Genre/mood variety is what actually makes two consecutive
+        // picks surface different songs.
         val TRENDING_QUERIES = listOf(
             "trending music",
             "trending songs right now",
             "viral hits",
-            "what's trending",
             "chart toppers",
+            "trending pop",
+            "trending hip hop",
+            "trending r&b",
+            "trending electronic dance music",
+            "trending rock",
+            "trending indie",
+            "trending k-pop",
+            "trending afrobeats",
+            "trending latin music",
+            "trending country",
         )
         val NEW_QUERIES = listOf(
             "new music releases",
             "new songs this week",
             "latest releases",
             "fresh new tracks",
-            "new singles",
+            "new pop releases",
+            "new hip hop releases",
+            "new rock releases",
+            "new indie releases",
+            "new electronic music",
+            "new r&b releases",
+            "new k-pop releases",
+            "new singles this week",
         )
         val RECOMMENDED_FALLBACK_QUERIES = listOf(
             "today's top hits",
             "popular hits right now",
             "feel good hits",
             "chart hits",
+            "pop hits",
+            "hip hop hits",
+            "rock classics",
+            "chill indie hits",
+            "r&b hits",
+            "dance hits",
+            "throwback hits",
         )
     }
 }

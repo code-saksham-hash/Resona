@@ -1,5 +1,6 @@
 package com.resona.music.data.repository
 
+import com.resona.music.data.download.CachedLyrics
 import com.resona.music.data.download.DownloadedSongsStore
 import com.resona.music.data.download.SongDownloader
 import com.resona.music.data.extractor.InnerTubeExtractionClient
@@ -15,6 +16,7 @@ import com.resona.music.data.extractor.decipher.PlayerJsRepository
 import com.resona.music.data.extractor.decipher.SignatureDecipherer
 import com.resona.music.data.remote.innertube.InnerTubeApi
 import com.resona.music.domain.model.DownloadedSong
+import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.PlayHistoryEntry
 import com.resona.music.domain.model.Playlist
 import com.resona.music.domain.model.Song
@@ -220,6 +222,8 @@ class MusicRepositoryImplTest {
             override fun filePathFor(videoId: String): String? = null
             override suspend fun markDownloaded(song: Song, filePath: String) = Unit
             override suspend fun remove(videoId: String) = Unit
+            override fun cachedLyrics(videoId: String): CachedLyrics? = null
+            override suspend fun cacheLyrics(videoId: String, plain: String?, synced: List<LyricsLine>?) = Unit
         }
         val likedSongsStore = object : LikedSongsStore {
             override val likedSongs = MutableStateFlow(emptyList<Song>())

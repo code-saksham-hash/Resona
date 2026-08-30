@@ -4,12 +4,15 @@ package com.resona.music.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.resona.music.domain.model.ArtistSummary
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +32,23 @@ import javax.inject.Inject
  */
 sealed interface SearchUiState {
     data object Loading : SearchUiState
-    data class Success(val results: List<Song>) : SearchUiState
+    /**
+     * [songs] comes from a Songs-*category* search (see
+     * [MusicRepository.searchSongsPage]), which returns a real ~20-per-page
+     * shelf with genuine pagination -- not the old mixed-category overview,
+     * which could top out under 10 with nothing more to fetch. [continuationToken]
+     * is the next page's token, null once there's nothing left to load; [isLoadingMore]
+     * covers just that in-flight "Load more" tap so the rest of the list stays put.
+     * [artists] is separate -- a handful of circular-avatar candidates at most,
+     * from the *unfiltered* search (see [MusicRepository.searchArtists]), never
+     * paginated.
+     */
+    data class Success(
+        val songs: List<Song>,
+        val artists: List<ArtistSummary>,
+        val continuationToken: String?,
+        val isLoadingMore: Boolean = false,
+    ) : SearchUiState
     data object Empty : SearchUiState
     data class Error(val message: String) : SearchUiState
 }
@@ -157,8 +176,24 @@ class SearchViewModel @Inject constructor(
         }
         _uiState.value = SearchUiState.Loading
         _uiState.value = try {
-            val results = musicRepository.search(query)
-            if (results.isEmpty()) SearchUiState.Empty else SearchUiState.Success(results)
+            coroutineScope {
+                // Two genuinely different InnerTube requests (a Songs-category
+                // filter vs. the default mixed one -- see searchSongsPage()'s
+                // kdoc), fired concurrently rather than one after the other.
+                // Artist lookup failing shouldn't fail the whole search --
+                // songs are the primary content here, the avatar row is a bonus.
+                val songsDeferred = async { musicRepository.searchSongsPage(query) }
+                val artistsDeferred = async {
+                    runCatching { musicRepository.searchArtists(query) }.getOrDefault(emptyList())
+                }
+                val songsPage = songsDeferred.await()
+                val artists = artistsDeferred.await()
+                if (songsPage.songs.isEmpty() && artists.isEmpty()) {
+                    SearchUiState.Empty
+                } else {
+                    SearchUiState.Success(songsPage.songs, artists, songsPage.continuationToken)
+                }
+            }
         } catch (e: CancellationException) {
             // collectLatest cancels the in-flight search as soon as a newer
             // query arrives -- that cancellation must propagate rather than
@@ -166,6 +201,55 @@ class SearchViewModel @Inject constructor(
             throw e
         } catch (e: Exception) {
             SearchUiState.Error(e.message ?: "Unknown error")
+        }
+    }
+
+    /**
+     * Appends the next page of song results using [SearchUiState.Success.continuationToken].
+     * A no-op if there's nothing more, or a load is already in flight. Re-reads
+     * [_uiState] after the network call (rather than trusting the [SearchUiState.Success]
+     * captured at the start) and bails if [query] changed underneath it, so a slow
+     * "load more" can't stomp on results from a newer search that superseded it.
+     *
+     * Deduped by videoId against what's already on screen: verified live that
+     * consecutive pages of the same continuation chain aren't guaranteed
+     * disjoint (InnerTube's own ranking drifted enough between two real
+     * requests to repeat several songs across a page boundary) -- without
+     * this, "Load more" could visibly repeat a row.
+     */
+    fun loadMoreResults() {
+        val current = _uiState.value
+        if (current !is SearchUiState.Success) return
+        val token = current.continuationToken ?: return
+        if (current.isLoadingMore) return
+        val forQuery = _query.value
+
+        viewModelScope.launch {
+            _uiState.value = current.copy(isLoadingMore = true)
+            val page = try {
+                musicRepository.loadMoreSongResults(token)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+
+            if (_query.value != forQuery) return@launch
+            val latest = _uiState.value
+            if (latest !is SearchUiState.Success) return@launch
+            _uiState.value = if (page != null) {
+                val existingIds = latest.songs.mapTo(mutableSetOf()) { it.videoId }
+                latest.copy(
+                    songs = latest.songs + page.songs.filterNot { it.videoId in existingIds },
+                    continuationToken = page.continuationToken,
+                    isLoadingMore = false,
+                )
+            } else {
+                // Best-effort -- a failed "load more" shouldn't blow away the
+                // results already on screen, just stop offering more for now
+                // (the user can tap it again).
+                latest.copy(isLoadingMore = false)
+            }
         }
     }
 

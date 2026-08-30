@@ -3,10 +3,13 @@ package com.resona.music.ui.player
 import android.content.res.Configuration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +41,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -55,6 +60,7 @@ import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.ResonaTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
@@ -65,6 +71,7 @@ fun MiniPlayerBar(
     onSkipToPrevious: () -> Unit,
     onSkipToNext: () -> Unit,
     onClick: () -> Unit,
+    onDismiss: () -> Unit = {},
     error: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -76,10 +83,58 @@ fun MiniPlayerBar(
     val palette = rememberAlbumArtPalette(track.highResThumbnailUrl)
     val pillShape = RoundedCornerShape(50.dp)
 
+    // One-handed dismiss: drag the whole bar down: past dismissThresholdPx
+    // (or the bar clears its own height, whichever is closer) calls
+    // onDismiss (wired to PlayerViewModel.stop()); short of that, it springs
+    // back to 0. Lives on this outer Column -- a sibling to, not wrapping,
+    // the tap-to-open Row and transport IconButtons below, so a plain tap
+    // (no meaningful vertical movement) still reaches them untouched.
+    val scope = rememberCoroutineScope()
+    val offsetY = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    val dismissThresholdPx = with(density) { 48.dp.toPx() }
+    val barHeightPx = remember { mutableStateOf(0f) }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
+            .onSizeChanged { barHeightPx.value = it.height.toFloat() }
+            .graphicsLayer {
+                translationY = offsetY.value
+                alpha = 1f - (offsetY.value / (barHeightPx.value.coerceAtLeast(1f))).coerceIn(0f, 0.85f)
+            }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        val shouldDismiss = offsetY.value > dismissThresholdPx
+                        scope.launch {
+                            if (shouldDismiss) {
+                                offsetY.animateTo(
+                                    barHeightPx.value.coerceAtLeast(dismissThresholdPx * 2f),
+                                    animationSpec = tween(180, easing = LinearEasing)
+                                )
+                                onDismiss()
+                                offsetY.snapTo(0f)
+                            } else {
+                                offsetY.animateTo(
+                                    0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    )
+                                )
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch { offsetY.animateTo(0f) }
+                    }
+                ) { change, dragAmount ->
+                    change.consume()
+                    scope.launch { offsetY.snapTo((offsetY.value + dragAmount).coerceAtLeast(0f)) }
+                }
+            }
             .shadow(elevation = 8.dp, shape = pillShape)
             .background(
                 Brush.linearGradient(colors = listOf(palette.background, palette.accent)),

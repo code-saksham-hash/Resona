@@ -8,6 +8,7 @@ import com.resona.music.data.remote.innertube.models.NextRequest
 import com.resona.music.data.remote.innertube.models.NextResponse
 import com.resona.music.data.remote.innertube.models.PlayerRequest
 import com.resona.music.data.remote.innertube.models.PlayerResponse
+import com.resona.music.data.remote.innertube.models.SearchContinuationRequest
 import com.resona.music.data.remote.innertube.models.SearchRequest
 import com.resona.music.data.remote.innertube.models.SearchResponse
 import com.resona.music.data.extractor.decipher.PlayerJsRepository
@@ -78,6 +79,43 @@ class InnerTubeApi @Inject constructor(
         return body.also { learnVisitor(it.responseContext?.visitorData) }
     }
 
+    /**
+     * A Songs-*category* search for [query] -- unlike [search] (which mixes
+     * every category into one short overview, capped by whatever InnerTube
+     * feels like including that's often well under 10 songs, with no way to
+     * ask for more), this scopes to just Songs via [SEARCH_SONGS_PARAMS] --
+     * the same request tapping that filter chip in the real app makes -- and
+     * gets back a long shelf (~20 rows) plus a real continuation token (see
+     * [searchSongsContinuation]). Verified live: params value, row shape,
+     * and the continuation chain all confirmed against real responses.
+     */
+    suspend fun searchSongs(query: String): SearchResponse {
+        val response = httpClient.post("$BASE_URL/search") {
+            applyInnerTubeDefaults()
+            setBody(SearchRequest(context = webRemixContext(), query = query, params = SEARCH_SONGS_PARAMS))
+        }
+        if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
+        val body: SearchResponse = response.body()
+        return body.also { learnVisitor(it.responseContext?.visitorData) }
+    }
+
+    /** The next page of a [searchSongs] shelf, given the continuation token
+     *  from its (or an earlier continuation's) result. */
+    suspend fun searchSongsContinuation(continuation: String): SearchResponse {
+        val response = httpClient.post("$BASE_URL/search") {
+            applyInnerTubeDefaults()
+            url {
+                parameters.append("ctoken", continuation)
+                parameters.append("continuation", continuation)
+                parameters.append("type", "next")
+            }
+            setBody(SearchContinuationRequest(context = webRemixContext()))
+        }
+        if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
+        val body: SearchResponse = response.body()
+        return body.also { learnVisitor(it.responseContext?.visitorData) }
+    }
+
     suspend fun getPlayerResponse(videoId: String): PlayerResponse =
         httpClient.post("$BASE_URL/player") {
             applyInnerTubeDefaults()
@@ -141,6 +179,11 @@ class InnerTubeApi @Inject constructor(
         // unofficial client that talks to it.
         const val API_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
         const val CLIENT_VERSION = "1.20240101.01.00"
+
+        // Scopes a search to the "Songs" category -- same value the real
+        // web client sends when you tap that filter chip. Opaque/compiled,
+        // not meant to be human-readable; verified live rather than assumed.
+        const val SEARCH_SONGS_PARAMS = "EgWKAQIIAWoKEAoQAxAEEAkQBQ%3D%3D"
         const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

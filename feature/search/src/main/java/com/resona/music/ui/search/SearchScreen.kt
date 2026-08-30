@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.resona.music.domain.model.ArtistSummary
 import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.NocturneOutlinedButton
 import com.resona.music.ui.theme.ResonaTheme
@@ -65,6 +69,7 @@ import com.resona.music.ui.theme.SectionHeaderTextStyle
 fun SearchPage(
     initialQuery: String = "",
     onSongClick: (Song) -> Unit = {},
+    onArtistClick: (ArtistSummary) -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -87,7 +92,9 @@ fun SearchPage(
         onClearHistory = viewModel::clearHistory,
         onRetry = viewModel::retry,
         onRetryBrowse = viewModel::retryBrowse,
-        onSongClick = onSongClick
+        onSongClick = onSongClick,
+        onArtistClick = onArtistClick,
+        onLoadMore = viewModel::loadMoreResults
     )
 }
 
@@ -109,6 +116,8 @@ private fun SearchPageContent(
     onRetry: () -> Unit,
     onRetryBrowse: () -> Unit,
     onSongClick: (Song) -> Unit,
+    onArtistClick: (ArtistSummary) -> Unit = {},
+    onLoadMore: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -146,8 +155,13 @@ private fun SearchPageContent(
                 when (uiState) {
                     SearchUiState.Loading -> SearchSkeletonList()
                     is SearchUiState.Success -> SearchResultsList(
-                        results = uiState.results,
-                        onSongClick = onSongClick
+                        songs = uiState.songs,
+                        artists = uiState.artists,
+                        continuationToken = uiState.continuationToken,
+                        isLoadingMore = uiState.isLoadingMore,
+                        onSongClick = onSongClick,
+                        onArtistClick = onArtistClick,
+                        onLoadMore = onLoadMore
                     )
                     SearchUiState.Empty -> Text(
                         text = "No results found",
@@ -469,16 +483,113 @@ private fun SearchResultSkeleton(modifier: Modifier = Modifier) {
 
 @Composable
 private fun SearchResultsList(
-    results: List<Song>,
+    songs: List<Song>,
+    artists: List<ArtistSummary>,
+    continuationToken: String?,
+    isLoadingMore: Boolean,
     onSongClick: (Song) -> Unit,
+    onArtistClick: (ArtistSummary) -> Unit,
+    onLoadMore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier = modifier.fillMaxSize()) {
-        items(results, key = { it.videoId }) { song ->
+        if (artists.isNotEmpty()) {
+            item(key = "artist_row") {
+                ArtistAvatarRow(artists = artists, onArtistClick = onArtistClick)
+            }
+        }
+        items(songs, key = { it.videoId }) { song ->
             SearchResultRow(song = song, onClick = { onSongClick(song) })
+        }
+        // continuationToken is only ever non-null when there's a real next
+        // page (see SearchViewModel.performSearch/loadMoreResults) -- so
+        // its mere presence is what shows this row at all.
+        if (continuationToken != null) {
+            item(key = "load_more") {
+                LoadMoreRow(isLoading = isLoadingMore, onClick = onLoadMore)
+            }
         }
         // Clears the floating bottom chrome -- see SearchLanding's matching spacer.
         item(key = "results_bottom_spacer") { Spacer(modifier = Modifier.height(160.dp)) }
+    }
+}
+
+@Composable
+private fun LoadMoreRow(isLoading: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(28.dp),
+                strokeWidth = 2.5.dp,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        } else {
+            NocturneOutlinedButton(
+                text = "Load more",
+                onClick = onClick,
+                borderColor = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+/** Circular artist avatars above the song results -- tapping one opens their
+ *  real profile (see ArtistDetailScreen), using the browseId this row
+ *  already carries straight off the search response instead of the
+ *  name-only resolve every other artist entry point needs. */
+@Composable
+private fun ArtistAvatarRow(
+    artists: List<ArtistSummary>,
+    onArtistClick: (ArtistSummary) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 17.dp),
+    ) {
+        artists.forEachIndexed { index, artist ->
+            ArtistAvatarChip(artist = artist, onClick = { onArtistClick(artist) })
+            if (index != artists.lastIndex) Spacer(modifier = Modifier.width(16.dp))
+        }
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+}
+
+@Composable
+private fun ArtistAvatarChip(artist: ArtistSummary, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .width(76.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AsyncImage(
+            model = artist.thumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier
+                .size(76.dp)
+                .clip(CircleShape)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = artist.name,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -631,7 +742,7 @@ private fun SearchPageResultsPreview() {
     ResonaTheme(darkTheme = true) {
         SearchPageContent(
             query = "daft punk",
-            uiState = SearchUiState.Success(previewSongs),
+            uiState = SearchUiState.Success(previewSongs, emptyList(), continuationToken = "fake_token"),
             searchHistory = emptyList(),
             browseState = BrowseUiState.Loading,
             onQueryChange = {},
