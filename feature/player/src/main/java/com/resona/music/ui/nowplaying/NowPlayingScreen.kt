@@ -96,6 +96,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.resona.music.domain.model.LyricsLine
 import com.resona.music.domain.model.Playlist
@@ -104,12 +105,13 @@ import com.resona.music.feature.player.R
 import com.resona.music.playback.DownloadState
 import com.resona.music.playback.LyricsState
 import com.resona.music.playback.PlayerUiState
+import com.resona.music.playback.PlayerViewModel
 import com.resona.music.playback.SleepTimerState
 import com.resona.music.playback.RepeatMode as PlaybackRepeatMode
 import com.resona.music.ui.player.AlbumArtBackdrop
 import com.resona.music.ui.player.AlbumArtPalette
 import com.resona.music.ui.player.MiniPlayerBar
-import com.resona.music.ui.player.rememberAlbumArtPalette
+import com.resona.music.ui.player.rememberAnimatedAlbumArtPalette
 import com.resona.music.ui.theme.ResonaTheme
 import kotlinx.coroutines.launch
 
@@ -118,8 +120,46 @@ private enum class BottomTab { Queue, Lyrics }
 /** Which pane [NowPlayingScreen] is currently showing below the top bar. */
 private enum class NowPlayingPane { Player, Queue, Lyrics, Empty }
 
+/** Stateful entry used by the nav graph: collects playback state and binds
+ *  callbacks to [PlayerViewModel], keeping the graph off uiState (which
+ *  re-emits every ~second while playing). */
 @Composable
 fun NowPlayingScreen(
+    playerViewModel: PlayerViewModel,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val uiState by playerViewModel.uiState.collectAsStateWithLifecycle()
+    val playlists by playerViewModel.playlists.collectAsStateWithLifecycle()
+    val sleepTimerState by playerViewModel.sleepTimerState.collectAsStateWithLifecycle()
+
+    NowPlayingContent(
+        uiState = uiState,
+        onTogglePlayPause = playerViewModel::togglePlayPause,
+        onSeek = playerViewModel::seekTo,
+        onSkipNext = playerViewModel::skipToNext,
+        onSkipPrevious = playerViewModel::skipToPrevious,
+        onQueueClick = {},
+        onSongClick = { song -> playerViewModel.play(song, uiState.queue) },
+        onDownloadClick = playerViewModel::download,
+        onToggleLike = playerViewModel::toggleLike,
+        onLoadLyrics = playerViewModel::loadLyrics,
+        onToggleShuffle = { playerViewModel.setShuffleEnabled(!uiState.isShuffled) },
+        onCycleRepeat = playerViewModel::cycleRepeatMode,
+        playlists = playlists,
+        onAddToPlaylist = playerViewModel::addCurrentTrackToPlaylist,
+        sleepTimerState = sleepTimerState,
+        onStartSleepTimer = playerViewModel::startSleepTimer,
+        onStartSleepTimerEndOfTrack = playerViewModel::startSleepTimerAtEndOfTrack,
+        onCancelSleepTimer = playerViewModel::cancelSleepTimer,
+        onBack = onBack,
+        onStop = playerViewModel::stop,
+        modifier = modifier,
+    )
+}
+
+@Composable
+fun NowPlayingContent(
     uiState: PlayerUiState,
     onTogglePlayPause: () -> Unit,
     onSeek: (positionMs: Long) -> Unit,
@@ -146,8 +186,8 @@ fun NowPlayingScreen(
     val context = LocalContext.current
 
     val track = uiState.currentTrack
-    // Shared by every pane below; see AlbumArtPalette.kt.
-    val palette = rememberAlbumArtPalette(track?.highResThumbnailUrl)
+    // Animated (see AlbumArtPalette.kt): track colors fade in here.
+    val palette = rememberAnimatedAlbumArtPalette(track?.highResThumbnailUrl)
     val pane = when {
         activeTab == BottomTab.Queue -> NowPlayingPane.Queue
         activeTab == BottomTab.Lyrics -> NowPlayingPane.Lyrics
@@ -1477,7 +1517,7 @@ private val previewTrack = Song(
 @Composable
 private fun NowPlayingScreenPlayingPreview() {
     ResonaTheme {
-        NowPlayingScreen(
+        NowPlayingContent(
             uiState = PlayerUiState(
                 currentTrack = previewTrack,
                 isPlaying = true,
@@ -1499,7 +1539,7 @@ private fun NowPlayingScreenPlayingPreview() {
 @Composable
 private fun NowPlayingScreenPlayingDarkPreview() {
     ResonaTheme(darkTheme = true) {
-        NowPlayingScreen(
+        NowPlayingContent(
             uiState = PlayerUiState(
                 currentTrack = previewTrack,
                 isPlaying = true,
@@ -1521,7 +1561,7 @@ private fun NowPlayingScreenPlayingDarkPreview() {
 @Composable
 private fun NowPlayingScreenEmptyPreview() {
     ResonaTheme {
-        NowPlayingScreen(
+        NowPlayingContent(
             uiState = PlayerUiState(),
             onTogglePlayPause = {},
             onSeek = {},

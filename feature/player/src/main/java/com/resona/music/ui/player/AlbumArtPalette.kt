@@ -53,13 +53,32 @@ private const val PALETTE_SAMPLE_PX = 112
 /** How long a track's colors take to fade into place, both on first load and when skipping tracks. */
 private val paletteAnimationSpec = tween<Color>(durationMillis = 600)
 
-/**
- * Resolves to [AlbumArtPalette.neutral] immediately, then eases into the
- * artwork's extracted colors once [Palette] finishes running on a
- * background thread. Two calls with the same [artworkUrl] converge on the
- * same result -- Coil's memory cache guarantees the mini-player and Now
- * Playing screen never disagree about what a track's colors are.
- */
+/** Shared extraction cache: the nav root, mini-player, and Now Playing all
+ *  extract the same track's colors at once, so without this the artwork is
+ *  re-decoded and [Palette.generate] re-run up to three times per track.
+ *  Access-ordered and bounded, so recent tracks stay warm. */
+private object AlbumArtPaletteCache {
+    private const val MAX_ENTRIES = 8
+
+    private val cache = object : LinkedHashMap<String, AlbumArtPalette>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AlbumArtPalette>): Boolean =
+            size > MAX_ENTRIES
+    }
+
+    @Synchronized
+    fun get(artworkUrl: String): AlbumArtPalette? = cache[artworkUrl]
+
+    @Synchronized
+    fun put(artworkUrl: String, palette: AlbumArtPalette) {
+        cache[artworkUrl] = palette
+    }
+}
+
+/** Returns [AlbumArtPalette.neutral] immediately, then the extracted colors
+ *  once [Palette] finishes on a background thread. Not animated: the nav
+ *  root derives the app-wide theme override from this, and animating would
+ *  rebuild the MaterialTheme color scheme every frame. Extraction is shared
+ *  via [AlbumArtPaletteCache]. */
 @Composable
 fun rememberAlbumArtPalette(artworkUrl: String?): AlbumArtPalette {
     val context = LocalContext.current
@@ -71,9 +90,22 @@ fun rememberAlbumArtPalette(artworkUrl: String?): AlbumArtPalette {
     val extracted by produceState(initialValue = neutral, artworkUrl, neutral) {
         value = artworkUrl
             ?.takeIf { it.isNotBlank() }
-            ?.let { extractAlbumArtPalette(context, it) }
+            ?.let { url ->
+                AlbumArtPaletteCache.get(url)
+                    ?: extractAlbumArtPalette(context, url)?.also { AlbumArtPaletteCache.put(url, it) }
+            }
             ?: neutral
     }
+
+    return extracted
+}
+
+/** [rememberAlbumArtPalette], with colors eased in over 600ms -- what the
+ *  mini-player and Now Playing surface want. The animation is scoped to the
+ *  call site, so the fade never recomposes the whole app. */
+@Composable
+fun rememberAnimatedAlbumArtPalette(artworkUrl: String?): AlbumArtPalette {
+    val extracted = rememberAlbumArtPalette(artworkUrl)
 
     return AlbumArtPalette(
         background = animateColorAsState(extracted.background, paletteAnimationSpec, "albumPaletteBackground").value,
