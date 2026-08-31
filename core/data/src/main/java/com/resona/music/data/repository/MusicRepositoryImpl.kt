@@ -324,6 +324,12 @@ class MusicRepositoryImpl @Inject internal constructor(
     override suspend fun addSongToPlaylist(playlistId: String, song: Song) =
         userPlaylistsStore.addSongToPlaylist(playlistId, song)
 
+    override suspend fun removeSongFromPlaylist(playlistId: String, videoId: String) =
+        userPlaylistsStore.removeSongFromPlaylist(playlistId, videoId)
+
+    override suspend fun deletePlaylist(playlistId: String) =
+        userPlaylistsStore.deletePlaylist(playlistId)
+
     override suspend fun importPlaylistFromUrl(url: String): Playlist {
         val playlistId = extractPlaylistId(url)
             ?: throw IllegalArgumentException("That doesn't look like a YouTube playlist link.")

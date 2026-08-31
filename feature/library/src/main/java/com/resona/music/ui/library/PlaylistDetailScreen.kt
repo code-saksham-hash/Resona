@@ -15,20 +15,33 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -47,13 +60,20 @@ fun PlaylistDetailScreen(
     viewModel: PlaylistDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isLocalPlaylist by viewModel.isLocalPlaylist.collectAsStateWithLifecycle()
 
     PlaylistDetailScreenContent(
         title = viewModel.title,
         uiState = uiState,
+        isLocalPlaylist = isLocalPlaylist,
         onBack = onBack,
         onSongClick = onSongClick,
-        onRetry = viewModel::retry
+        onRetry = viewModel::retry,
+        onRemoveSong = { song -> viewModel.removeSong(song.videoId) },
+        onDeletePlaylist = {
+            viewModel.deletePlaylist()
+            onBack()
+        }
     )
 }
 
@@ -61,11 +81,72 @@ fun PlaylistDetailScreen(
 private fun PlaylistDetailScreenContent(
     title: String,
     uiState: PlaylistDetailUiState,
+    isLocalPlaylist: Boolean = false,
     onBack: () -> Unit = {},
     onSongClick: (song: Song, songs: List<Song>) -> Unit = { _, _ -> },
     onRetry: () -> Unit = {},
+    onRemoveSong: (Song) -> Unit = {},
+    onDeletePlaylist: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var overflowExpanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            icon = {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            },
+            title = {
+                Text(
+                    text = "Delete playlist?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Text(
+                    text = "\"${title.ifBlank { "This playlist" }}\" will be deleted. This can't be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDeletePlaylist()
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        )
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -87,8 +168,32 @@ private fun PlaylistDetailScreenContent(
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
+            if (isLocalPlaylist) {
+                Box {
+                    IconButton(onClick = { overflowExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Outlined.MoreVert,
+                            contentDescription = "More options",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = overflowExpanded,
+                        onDismissRequest = { overflowExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Delete playlist") },
+                            onClick = {
+                                overflowExpanded = false
+                                showDeleteConfirm = true
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -99,7 +204,11 @@ private fun PlaylistDetailScreenContent(
                 )
                 is PlaylistDetailUiState.Success -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(uiState.songs, key = { it.videoId }) { song ->
-                        PlaylistSongRow(song = song, onClick = { onSongClick(song, uiState.songs) })
+                        PlaylistSongRow(
+                            song = song,
+                            onClick = { onSongClick(song, uiState.songs) },
+                            onRemove = if (isLocalPlaylist) ({ onRemoveSong(song) }) else null
+                        )
                     }
                     // Clears the floating bottom chrome (pill nav, plus the
                     // mini-player when a track is playing).
@@ -136,7 +245,14 @@ private fun PlaylistDetailScreenContent(
 }
 
 @Composable
-private fun PlaylistSongRow(song: Song, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun PlaylistSongRow(
+    song: Song,
+    onClick: () -> Unit,
+    onRemove: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -188,6 +304,34 @@ private fun PlaylistSongRow(song: Song, onClick: () -> Unit, modifier: Modifier 
                 color = MaterialTheme.colorScheme.outline,
             )
         }
+
+        if (onRemove != null) {
+            Box {
+                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = Icons.Outlined.MoreVert,
+                        contentDescription = "More options for ${song.title}",
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Remove from playlist") },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Outlined.DeleteOutline, contentDescription = null)
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onRemove()
+                        }
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -214,6 +358,18 @@ private fun PlaylistDetailScreenDarkPreview() {
         PlaylistDetailScreenContent(
             title = "Mellow Pop Classics",
             uiState = PlaylistDetailUiState.Success(previewSongs)
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Local playlist (removable)")
+@Composable
+private fun PlaylistDetailScreenLocalPreview() {
+    ResonaTheme {
+        PlaylistDetailScreenContent(
+            title = "My Road Trip Mix",
+            uiState = PlaylistDetailUiState.Success(previewSongs),
+            isLocalPlaylist = true
         )
     }
 }

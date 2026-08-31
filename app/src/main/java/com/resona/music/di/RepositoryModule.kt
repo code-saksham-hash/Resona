@@ -1,8 +1,10 @@
 package com.resona.music.di
 
+import com.resona.music.data.config.GitHubAppLinksRepository
 import com.resona.music.data.github.GitHubContributorsRepository
 import com.resona.music.data.repository.MusicRepositoryImpl
 import com.resona.music.data.update.GitHubAppUpdateRepository
+import com.resona.music.domain.repository.AppLinksRepository
 import com.resona.music.domain.repository.AppUpdateRepository
 import com.resona.music.domain.repository.ContributorsRepository
 import com.resona.music.domain.repository.MusicRepository
@@ -27,4 +29,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindContributorsRepository(impl: GitHubContributorsRepository): ContributorsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAppLinksRepository(impl: GitHubAppLinksRepository): AppLinksRepository
 }

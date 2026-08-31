@@ -104,6 +104,14 @@ interface MusicRepository {
      *  it's already in that playlist. */
     suspend fun addSongToPlaylist(playlistId: String, song: Song)
 
+    /** Removes the song identified by [videoId] from the playlist identified
+     *  by [playlistId]. A no-op if either doesn't match. */
+    suspend fun removeSongFromPlaylist(playlistId: String, videoId: String)
+
+    /** Deletes the on-device playlist identified by [playlistId] outright
+     *  (not just its songs). A no-op if it doesn't match. */
+    suspend fun deletePlaylist(playlistId: String)
+
     /**
      * Imports a YouTube/YouTube Music playlist from its share [url] (a
      * youtube.com/playlist, music.youtube.com/playlist, watch?v=...&list=...,

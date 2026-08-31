@@ -3,6 +3,7 @@ package com.resona.music.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resona.music.domain.model.HomeFeed
+import com.resona.music.domain.repository.AppLinksRepository
 import com.resona.music.domain.repository.AppUpdateInfo
 import com.resona.music.domain.repository.AppUpdateRepository
 import com.resona.music.domain.repository.MusicRepository
@@ -30,13 +31,17 @@ data class HomeUiState(
     val isRefreshing: Boolean = false,
     val feed: HomeFeed? = null,
     val errorMessage: String? = null,
-    val updateInfo: AppUpdateInfo? = null
+    val updateInfo: AppUpdateInfo? = null,
+    // Seeded with the bundled default so the update banner's Discord link
+    // is correct even before AppLinksRepository resolves -- see its kdoc.
+    val discordUrl: String = AppLinksRepository.DEFAULT_DISCORD_INVITE_URL
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val musicRepository: MusicRepository,
     private val appUpdateRepository: AppUpdateRepository,
+    private val appLinksRepository: AppLinksRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -45,6 +50,10 @@ class HomeViewModel @Inject constructor(
     init {
         load()
         checkForUpdate()
+        viewModelScope.launch {
+            val discordUrl = appLinksRepository.getDiscordInviteUrl()
+            _uiState.update { it.copy(discordUrl = discordUrl) }
+        }
     }
 
     fun refresh() = load()

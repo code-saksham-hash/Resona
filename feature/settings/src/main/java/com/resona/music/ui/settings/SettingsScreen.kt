@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -47,7 +48,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.resona.music.domain.model.Contributor
+import com.resona.music.domain.repository.AppLinksRepository
 import com.resona.music.domain.repository.AppUpdateInfo
+import com.resona.music.core.ui.R
 import com.resona.music.ui.theme.ResonaTheme
 
 private const val GITHUB_REPO_URL = "https://github.com/code-saksham-hash/Resona"
@@ -60,11 +63,13 @@ fun SettingsScreen(
 ) {
     val contributorsState by viewModel.contributorsState.collectAsStateWithLifecycle()
     val updateCheckState by viewModel.updateCheckState.collectAsStateWithLifecycle()
+    val discordUrl by viewModel.discordUrl.collectAsStateWithLifecycle()
 
     SettingsScreenContent(
         contributorsState = contributorsState,
         updateCheckState = updateCheckState,
         appVersion = viewModel.appVersion,
+        discordUrl = discordUrl,
         onBack = onBack,
         onCheckForUpdate = viewModel::checkForUpdate,
     )
@@ -75,6 +80,7 @@ private fun SettingsScreenContent(
     contributorsState: ContributorsUiState,
     updateCheckState: UpdateCheckState,
     appVersion: String,
+    discordUrl: String,
     onBack: () -> Unit = {},
     onCheckForUpdate: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -155,6 +161,17 @@ private fun SettingsScreenContent(
                     modifier = Modifier.padding(horizontal = 17.dp, vertical = 10.dp)
                 )
             }
+            item(key = "discord_row") {
+                SettingsRow(
+                    icon = ImageVector.vectorResource(id = R.drawable.ic_discord),
+                    title = "Discord",
+                    subtitle = "Report bugs or request features",
+                    onClick = { openUrl(discordUrl) },
+                    trailing = { ExternalLinkGlyph() },
+                    iconTile = false,
+                    modifier = Modifier.padding(start = 17.dp, top = 0.dp, end = 17.dp, bottom = 10.dp)
+                )
+            }
             item(key = "disclaimer") {
                 Text(
                     text = "Resona interfaces with YouTube Music's private, undocumented InnerTube API. " +
@@ -203,6 +220,10 @@ private fun SettingsRow(
     subtitle: String? = null,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    // False for brand marks like Discord's, which are already a
+    // recognizable, colored glyph and read as generic once tinted and
+    // boxed like the rest of these rows' monochrome outline icons.
+    iconTile: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -218,15 +239,16 @@ private fun SettingsRow(
         Box(
             modifier = Modifier
                 .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
+                .let {
+                    if (iconTile) it.clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.08f)) else it
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
+                tint = if (iconTile) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                modifier = Modifier.size(if (iconTile) 18.dp else 28.dp)
             )
         }
         Spacer(modifier = Modifier.width(14.dp))
@@ -319,7 +341,8 @@ private fun SettingsScreenPreview() {
                 )
             ),
             updateCheckState = UpdateCheckState.Idle,
-            appVersion = "1.3.1"
+            appVersion = "1.3.1",
+            discordUrl = AppLinksRepository.DEFAULT_DISCORD_INVITE_URL
         )
     }
 }
@@ -333,7 +356,8 @@ private fun SettingsScreenUpdatePreview() {
             updateCheckState = UpdateCheckState.Available(
                 AppUpdateInfo("1.4.0", "https://github.com", null)
             ),
-            appVersion = "1.3.1"
+            appVersion = "1.3.1",
+            discordUrl = AppLinksRepository.DEFAULT_DISCORD_INVITE_URL
         )
     }
 }
