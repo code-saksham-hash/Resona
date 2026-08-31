@@ -46,8 +46,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.resona.music.core.ui.R
 import com.resona.music.domain.model.ArtistSpotlight
 import com.resona.music.domain.model.HomeFeed
 import com.resona.music.domain.model.Song
@@ -154,6 +157,7 @@ private fun HomeScreenContent(
             uiState.updateInfo?.let { info ->
                 UpdateAvailableBanner(
                     info = info,
+                    discordUrl = uiState.discordUrl,
                     onDismiss = onDismissUpdate,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)
                 )
@@ -185,54 +189,87 @@ private fun HomeScreenContent(
  * Dismissible, monochrome banner for a newer release than the one running.
  * Resona isn't distributed through anything that could push an update
  * itself, so this is the entire mechanism -- a link out to the GitHub
- * release, opened in whatever browser is installed.
+ * release, opened in whatever browser is installed. Also the one place a
+ * returning user reliably sees this screen right after it reappears, so it
+ * doubles as the app's one Discord plug rather than a separate banner
+ * competing for the same space.
  */
 @Composable
 private fun UpdateAvailableBanner(
     info: AppUpdateInfo,
+    discordUrl: String,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    fun openUrl(url: String) = context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Resona ${info.versionName} is available",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NocturneOutlinedButton(
-                    text = "View release",
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl))
-                        context.startActivity(intent)
-                    },
-                    borderColor = MaterialTheme.colorScheme.onSurface
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Resona ${info.versionName} is available",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                val apkDownloadUrl = info.apkDownloadUrl
-                if (apkDownloadUrl != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     NocturneOutlinedButton(
-                        text = "Download",
-                        onClick = { downloadApk(context, apkDownloadUrl, info.versionName) },
+                        text = "View release",
+                        onClick = { openUrl(info.releaseUrl) },
                         borderColor = MaterialTheme.colorScheme.onSurface
                     )
+                    val apkDownloadUrl = info.apkDownloadUrl
+                    if (apkDownloadUrl != null) {
+                        NocturneOutlinedButton(
+                            text = "Download",
+                            onClick = { downloadApk(context, apkDownloadUrl, info.versionName) },
+                            borderColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = "Dismiss",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-        IconButton(onClick = onDismiss) {
-            Icon(
-                imageVector = Icons.Outlined.Close,
-                contentDescription = "Dismiss",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { openUrl(discordUrl) }
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF5865F2)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(id = R.drawable.ic_discord),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Join our free and open source community",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

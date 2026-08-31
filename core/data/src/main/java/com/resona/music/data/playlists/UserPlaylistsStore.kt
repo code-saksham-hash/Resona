@@ -30,6 +30,13 @@ internal interface UserPlaylistsStore {
     /** Appends [song] to [playlistId]'s song list. A no-op if it's already
      *  in that playlist, or if [playlistId] doesn't match any playlist. */
     suspend fun addSongToPlaylist(playlistId: String, song: Song)
+
+    /** Removes [videoId] from [playlistId]'s song list. A no-op if either
+     *  doesn't match. */
+    suspend fun removeSongFromPlaylist(playlistId: String, videoId: String)
+
+    /** Deletes [playlistId] outright. A no-op if it doesn't match. */
+    suspend fun deletePlaylist(playlistId: String)
 }
 
 @Singleton
@@ -68,6 +75,35 @@ internal class FileUserPlaylistsStore @Inject constructor(
             withContext(Dispatchers.IO) { writeIndex(updated) }
             _playlists.value = updated
             Log.d(TAG, "addSongToPlaylist: added '${song.title}' to '${target.name}'")
+        }
+    }
+
+    override suspend fun removeSongFromPlaylist(playlistId: String, videoId: String) {
+        mutex.withLock {
+            val target = _playlists.value.find { it.id == playlistId } ?: run {
+                Log.w(TAG, "removeSongFromPlaylist: no playlist with id=$playlistId")
+                return
+            }
+            if (target.songs.none { it.videoId == videoId }) return
+            val updated = _playlists.value.map {
+                if (it.id == playlistId) it.copy(songs = it.songs.filterNot { song -> song.videoId == videoId }) else it
+            }
+            withContext(Dispatchers.IO) { writeIndex(updated) }
+            _playlists.value = updated
+            Log.d(TAG, "removeSongFromPlaylist: removed $videoId from '${target.name}'")
+        }
+    }
+
+    override suspend fun deletePlaylist(playlistId: String) {
+        mutex.withLock {
+            val target = _playlists.value.find { it.id == playlistId } ?: run {
+                Log.w(TAG, "deletePlaylist: no playlist with id=$playlistId")
+                return
+            }
+            val updated = _playlists.value.filterNot { it.id == playlistId }
+            withContext(Dispatchers.IO) { writeIndex(updated) }
+            _playlists.value = updated
+            Log.d(TAG, "deletePlaylist: deleted '${target.name}'")
         }
     }
 

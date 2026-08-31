@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.resona.music.domain.model.Contributor
+import com.resona.music.domain.repository.AppLinksRepository
 import com.resona.music.domain.repository.AppUpdateInfo
 import com.resona.music.domain.repository.AppUpdateRepository
 import com.resona.music.domain.repository.ContributorsRepository
@@ -36,6 +37,7 @@ sealed interface ContributorsUiState {
 class SettingsViewModel @Inject constructor(
     private val appUpdateRepository: AppUpdateRepository,
     private val contributorsRepository: ContributorsRepository,
+    private val appLinksRepository: AppLinksRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -44,6 +46,12 @@ class SettingsViewModel @Inject constructor(
 
     private val _updateCheckState = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
     val updateCheckState: StateFlow<UpdateCheckState> = _updateCheckState.asStateFlow()
+
+    /** Seeded with the bundled default so the row is clickable immediately;
+     *  [AppLinksRepository.getDiscordInviteUrl] resolves to the current
+     *  value (cached or freshly fetched) once init's launch completes. */
+    private val _discordUrl = MutableStateFlow(AppLinksRepository.DEFAULT_DISCORD_INVITE_URL)
+    val discordUrl: StateFlow<String> = _discordUrl.asStateFlow()
 
     /** Resona has no update server/store of its own to ask -- this is just
      *  the version this exact build was compiled with, same lookup
@@ -56,6 +64,9 @@ class SettingsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             _contributorsState.value = ContributorsUiState.Loaded(contributorsRepository.getContributors())
+        }
+        viewModelScope.launch {
+            _discordUrl.value = appLinksRepository.getDiscordInviteUrl()
         }
     }
 

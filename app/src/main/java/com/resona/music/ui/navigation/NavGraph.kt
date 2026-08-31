@@ -3,10 +3,7 @@ package com.resona.music.ui.navigation
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -83,8 +80,20 @@ import com.resona.music.ui.settings.SettingsScreen
 
 private val navAnimSpec = tween<Float>(450)
 
-private val bottomNavEnter = slideInHorizontally { it } + fadeIn(animationSpec = navAnimSpec)
-private val bottomNavExit = slideOutHorizontally { -it } + fadeOut(animationSpec = navAnimSpec)
+// Bottom-tab switches move sideways between siblings, not deeper into a
+// stack, so they get their own quick cross-fade instead of borrowing the
+// directional slide below: a full-width slide of two heavy screens for
+// 450ms is what read as sluggish under repeated taps ("cycling" between
+// tabs), and a slide also implies a forward/back relationship that doesn't
+// exist between Home/Search/Library in the first place.
+//
+// 250ms, not shorter -- an early pass tried 200ms here (and on the pill's
+// own morph below) and it read as a hard cut rather than a fade: a spatial/
+// shape change needs enough frames for the eye to track continuous motion,
+// where a pure color or alpha fade can get away with less.
+private val bottomTabAnimSpec = tween<Float>(250)
+private val bottomNavEnter = fadeIn(animationSpec = bottomTabAnimSpec)
+private val bottomNavExit = fadeOut(animationSpec = bottomTabAnimSpec)
 
 private val slideEnter = slideInHorizontally { it } + fadeIn(animationSpec = navAnimSpec)
 private val slideExit = slideOutHorizontally { -it } + fadeOut(animationSpec = navAnimSpec)
@@ -434,13 +443,17 @@ fun ResonaNavGraph() {
     }
 }
 
-/** Spring shared by every size/position morph in the pill nav -- snappy and
- *  non-bouncy, since a visible bounce on a tab you tap constantly reads as
- *  sluggish rather than lively. Generic since it drives a Dp, an IntSize
- *  (expand/shrink, content size), and a Float (fade) at different call sites. */
-private fun <T> navMorphSpec(): androidx.compose.animation.core.FiniteAnimationSpec<T> =
-    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
-private val navColorSpec = tween<Color>(200)
+/** Shared by every size/position morph in the pill nav, and pinned to the
+ *  same 250ms as [navColorSpec] (and the bottom-tab screen fade above) so a
+ *  tap resolves as one motion instead of several pieces -- padding, color,
+ *  label reveal, screen content -- each visibly settling at a different
+ *  moment. This used to be a spring, which (being physics-driven rather
+ *  than fixed-duration) settled later than the color tween on the same
+ *  pill and never lined up with the screen transition at all. Generic since
+ *  it drives a Dp, an IntSize (expand/shrink), and a Float (fade) at
+ *  different call sites. */
+private fun <T> navMorphSpec(): androidx.compose.animation.core.FiniteAnimationSpec<T> = tween(durationMillis = 250)
+private val navColorSpec = tween<Color>(250)
 
 @Composable
 private fun ResonaBottomBar(navController: NavHostController, currentRoute: String?) {
@@ -529,9 +542,14 @@ private fun NavPillItem(
         modifier = Modifier.height(48.dp)
     ) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = horizontalPadding)
-                .animateContentSize(animationSpec = navMorphSpec()),
+            // No animateContentSize here -- the animated padding above and
+            // the label's own expandHorizontally/shrinkHorizontally below
+            // already animate this Row's width between them. Adding a third
+            // animator on top of two that already cover it doesn't smooth
+            // anything further; it layers a second easing curve onto a
+            // width that's already mid-animation, which reads as a wobble
+            // rather than one clean motion.
+            modifier = Modifier.padding(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {

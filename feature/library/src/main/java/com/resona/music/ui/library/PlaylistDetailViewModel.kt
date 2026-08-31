@@ -41,9 +41,16 @@ class PlaylistDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<PlaylistDetailUiState>(PlaylistDetailUiState.Loading)
     val uiState: StateFlow<PlaylistDetailUiState> = _uiState.asStateFlow()
 
+    // Gates the remove-song/delete-playlist UI: a Featured Playlist (real
+    // InnerTube browseId) is YouTube's own, read-only shelf, not something
+    // this app can mutate -- only an on-device Playlist.id can be.
+    private val _isLocalPlaylist = MutableStateFlow(false)
+    val isLocalPlaylist: StateFlow<Boolean> = _isLocalPlaylist.asStateFlow()
+
     init {
         viewModelScope.launch {
             val isLocalPlaylist = musicRepository.observePlaylists().first().any { it.id == id }
+            _isLocalPlaylist.value = isLocalPlaylist
             if (isLocalPlaylist) {
                 // Already fully loaded on-device -- no InnerTube round trip,
                 // and staying on observePlaylists() (rather than a one-shot
@@ -62,6 +69,19 @@ class PlaylistDetailViewModel @Inject constructor(
     }
 
     fun retry() = load()
+
+    /** No-op on a Featured Playlist -- callers only offer this when
+     *  [isLocalPlaylist] is true. */
+    fun removeSong(videoId: String) {
+        viewModelScope.launch { musicRepository.removeSongFromPlaylist(id, videoId) }
+    }
+
+    /** Fire-and-forget: the caller navigates back immediately rather than
+     *  waiting on this, since once it completes there's nothing left here
+     *  for [uiState] to reflect. */
+    fun deletePlaylist() {
+        viewModelScope.launch { musicRepository.deletePlaylist(id) }
+    }
 
     private fun load() {
         viewModelScope.launch {

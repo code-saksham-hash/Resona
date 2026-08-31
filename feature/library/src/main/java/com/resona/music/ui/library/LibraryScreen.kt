@@ -21,14 +21,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +71,10 @@ import com.resona.music.domain.model.Song
 import com.resona.music.ui.theme.ResonaTheme
 import com.resona.music.ui.theme.ResonaTopBar
 import com.resona.music.ui.theme.rememberVoiceSearchLauncher
+
+/** Keeps a manually-typed name to a couple of lines in [PlaylistCard]'s
+ *  narrow 2-up grid width without relying on ellipsis to hide the rest. */
+private const val MAX_PLAYLIST_NAME_LENGTH = 60
 
 data class QuickLink(
     val id: String,
@@ -192,8 +200,9 @@ private fun LibraryScreenContent(
             text = {
                 OutlinedTextField(
                     value = newPlaylistName,
-                    onValueChange = { newPlaylistName = it },
+                    onValueChange = { if (it.length <= MAX_PLAYLIST_NAME_LENGTH) newPlaylistName = it },
                     label = { Text("Playlist name") },
+                    supportingText = { Text("${newPlaylistName.length}/$MAX_PLAYLIST_NAME_LENGTH") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -549,8 +558,10 @@ private fun UserPlaylistsSection(
                     }
                 }
             } else {
+                // Left-aligned in the first column, same width a paired
+                // card would get -- not centered, which stranded it in the
+                // middle of the row looking like a mis-sized outlier.
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    Spacer(modifier = Modifier.weight(1f))
                     PlaylistCard(
                         playlist = row.single(),
                         onClick = { onPlaylistClick(row.single()) },
@@ -608,12 +619,19 @@ private fun PlaylistCard(
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Column {
+        // Weighted so long names wrap within the card instead of pushing it
+        // wider than its sibling -- a plain Column here measures unbounded
+        // and the name never wraps at all.
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = playlist.name,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
+                // Two lines shows most real names in full (see the input
+                // cap on the create dialog); ellipsis only backstops the
+                // rare pathological case, e.g. an imported YouTube
+                // playlist title, which isn't subject to that cap.
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
@@ -672,14 +690,15 @@ private fun LibrarySongRow(
     trailingIcon: ImageVector,
     trailingIconDescription: String,
     onClick: () -> Unit = {},
-    // Tapping the trailing status icon removes it from this list -- null
-    // when a row shouldn't be removable at all (there's no such case today,
-    // but the split keeps LibrarySongRow reusable for a future non-removable
-    // list without a nullability check bleeding into callers that always
-    // pass one).
+    // Null when a row shouldn't be removable at all (there's no such case
+    // today, but the split keeps LibrarySongRow reusable for a future
+    // non-removable list without a nullability check bleeding into callers
+    // that always pass one).
     onRemove: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -726,22 +745,43 @@ private fun LibrarySongRow(
 
         Spacer(modifier = Modifier.width(8.dp))
 
+        // Purely a status glyph now, same look either way -- it used to
+        // double as the (undiscoverable) delete button when onRemove was
+        // set, which just looked like a static "downloaded" checkmark with
+        // nothing suggesting it was tappable.
+        Icon(
+            imageVector = trailingIcon,
+            contentDescription = trailingIconDescription,
+            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            modifier = Modifier.size(20.dp)
+        )
+
         if (onRemove != null) {
-            IconButton(onClick = onRemove, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    imageVector = trailingIcon,
-                    contentDescription = "Remove from $trailingIconDescription",
-                    tint = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.size(20.dp)
-                )
+            Box {
+                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = Icons.Outlined.MoreVert,
+                        contentDescription = "More options for ${song.title}",
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Remove from $trailingIconDescription") },
+                        leadingIcon = {
+                            Icon(imageVector = Icons.Outlined.DeleteOutline, contentDescription = null)
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onRemove()
+                        }
+                    )
+                }
             }
-        } else {
-            Icon(
-                imageVector = trailingIcon,
-                contentDescription = trailingIconDescription,
-                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
