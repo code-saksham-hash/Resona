@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -100,6 +102,20 @@ class PlayerViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
+
+    /**
+     * [PlayerUiState.currentTrack] on its own flow. [uiState] re-emits
+     * every ~second while playing (the position poll below); the chrome
+     * collects these derived flows so it isn't recomposed at that cadence.
+     */
+    val currentTrack: StateFlow<Song?> = uiState.map { it.currentTrack }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, _uiState.value.currentTrack)
+
+    /** [PlayerUiState.isPlaying], deduplicated -- see [currentTrack]. */
+    val isPlaying: StateFlow<Boolean> = uiState.map { it.isPlaying }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, _uiState.value.isPlaying)
 
     /** For Now Playing's sleep timer entry -- see [SleepTimerController], which
      *  this only forwards to/from (it's a singleton attached straight to the
@@ -413,6 +429,8 @@ class PlayerViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "PlayerViewModel"
-        const val POSITION_UPDATE_MILLIS = 500L
+        // Once a second: smooth enough for a scrubber (seekTo updates
+        // optimistically), and halves recomposition of uiState collectors.
+        const val POSITION_UPDATE_MILLIS = 1_000L
     }
 }

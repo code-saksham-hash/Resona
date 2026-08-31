@@ -75,12 +75,11 @@ fun MiniPlayerBar(
     error: String? = null,
     modifier: Modifier = Modifier
 ) {
-    // Same artwork Now Playing extracts from, so the two surfaces never
-    // disagree about a track's colors -- see AlbumArtPalette.kt. The
-    // album's colors wash continuously across the whole bar; transport
-    // buttons stay theme-neutral regardless (see PlaybackControls in
-    // NowPlayingScreen.kt for the same rule).
-    val palette = rememberAlbumArtPalette(track.highResThumbnailUrl)
+    // Same artwork Now Playing extracts from, so both surfaces agree on the
+    // colors; animated (600ms) here. The app-wide theme override uses the
+    // raw palette (see NavGraph.kt). Transport buttons stay theme-neutral
+    // regardless (same rule as PlaybackControls).
+    val palette = rememberAnimatedAlbumArtPalette(track.highResThumbnailUrl)
     val pillShape = RoundedCornerShape(50.dp)
 
     // One-handed dismiss: drag the whole bar down: past dismissThresholdPx

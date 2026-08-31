@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -109,7 +110,11 @@ fun ResonaNavGraph() {
     // (not a per-destination back stack entry) and survives navigation --
     // every screen shares the same player instead of each owning its own.
     val playerViewModel: PlayerViewModel = hiltViewModel()
-    val playerUiState by playerViewModel.uiState.collectAsStateWithLifecycle()
+    // Chrome needs only these slices of uiState, which re-emits every
+    // second while playing (the position poll). Collecting it whole here
+    // would recompose this root at that cadence.
+    val currentTrack by playerViewModel.currentTrack.collectAsStateWithLifecycle()
+    val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -129,22 +134,17 @@ fun ResonaNavGraph() {
     // -- true black-on-white, guaranteed legible. Every plain
     // `MaterialTheme.colorScheme.tertiary` read below this point -- in this
     // file, in :core:ui, in the Search screen -- picks either up automatically.
-    val nowPlayingPalette = rememberAlbumArtPalette(playerUiState.currentTrack?.highResThumbnailUrl)
-    // remember, keyed on the actual colors -- not just a plain if/else --
-    // is load-bearing, not style. ColorScheme.copy() returns a new object
-    // identity every call, even when the fields are the same, and that
-    // identity is what MaterialTheme below hands to every screen in the app
-    // via CompositionLocalProvider: a *new* identity invalidates every
-    // composable anywhere that reads a theme color, app-wide, regardless of
-    // whether anything actually looks different. Recomputing this plainly
-    // on every recomposition of this composable -- which happens every
-    // ~500ms purely from the position-polling in PlayerViewModel.uiState,
-    // completely unrelated to color -- was doing exactly that continuously,
-    // for as long as anything was playing: found by tracing a reported
-    // "laggy all over the app, no specific screen" down to its cause.
-    // remember here means a new ColorScheme is only ever built when the
-    // extracted color genuinely changes (a track change settling on a new
-    // palette), which is what should have been invalidating it all along.
+    //
+    // Raw palette, not animated: animating here would rebuild the app-wide
+    // ColorScheme every frame of the fade. Playback surfaces fade their own
+    // palettes (rememberAnimatedAlbumArtPalette); this snaps once per
+    // track change.
+    val nowPlayingPalette = rememberAlbumArtPalette(currentTrack?.highResThumbnailUrl)
+    // remember keyed on the actual colors, not a plain if/else: copy()
+    // returns a new ColorScheme identity even when nothing changes, and
+    // MaterialTheme propagates that identity to every theme-reading
+    // composable in the app. Keyed remember only rebuilds the scheme when
+    // the extracted color genuinely changes.
     val baseColorScheme = MaterialTheme.colorScheme
     val dynamicColorScheme = remember(baseColorScheme, nowPlayingPalette.isAdaptive, nowPlayingPalette.accent, nowPlayingPalette.onAccent) {
         if (nowPlayingPalette.isAdaptive) {
@@ -162,23 +162,12 @@ fun ResonaNavGraph() {
         typography = MaterialTheme.typography,
         shapes = MaterialTheme.shapes,
     ) {
-        // A plain Box, not Scaffold -- the bottom chrome (mini-player + pill
-        // nav) is meant to float over the feed, not reserve fixed space for
-        // itself that every screen's content has to stop short of. Each
-        // screen scrolls full-bleed underneath it and pads its own last item
-        // clear of it instead.
-        Box(modifier = Modifier.fillMaxSize()) {
-            NavHost(
-                navController = navController,
-                startDestination = ResonaDestination.Home.route,
-                // Top only -- Scaffold used to reserve this via innerPadding
-                // (every screen's content implicitly assumed it), but the
-                // bottom is deliberately left unpadded here so content can
-                // scroll full-bleed under the floating chrome below.
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-            ) {
+        // Remembered as one stable builder lambda: NavHost keys its graph
+        // on the builder's identity, so a fresh lambda per recomposition
+        // would rebuild every destination and re-run the visible screen.
+        // All captured values here are stable.
+        val navBuilder: NavGraphBuilder.() -> Unit = remember {
+            {
             composable(
                 ResonaDestination.Home.route,
                 enterTransition = { bottomNavEnter },
@@ -263,31 +252,15 @@ fun ResonaNavGraph() {
                 popEnterTransition = { slidePopEnter },
                 popExitTransition = { slidePopExit },
             ) {
+                // Collects its own state off the shared playerViewModel;
+                // uiState re-emits every ~second while playing.
                 NowPlayingScreen(
-                    uiState = playerUiState,
-                    onTogglePlayPause = playerViewModel::togglePlayPause,
-                    onSeek = playerViewModel::seekTo,
-                    onSkipNext = playerViewModel::skipToNext,
-                    onSkipPrevious = playerViewModel::skipToPrevious,
+                    playerViewModel = playerViewModel,
                     // Collapses back to whatever tab sits under it in the
                     // top-level back stack, with the mini-player reappearing
                     // once this route is no longer current -- same idiom the
                     // bottom bar itself uses to switch tabs.
-                    onQueueClick = {},
-                    onSongClick = { song -> playerViewModel.play(song, playerUiState.queue) },
-                    onDownloadClick = playerViewModel::download,
-                    onToggleLike = playerViewModel::toggleLike,
-                    onLoadLyrics = playerViewModel::loadLyrics,
-                    onToggleShuffle = { playerViewModel.setShuffleEnabled(!playerUiState.isShuffled) },
-                    onCycleRepeat = playerViewModel::cycleRepeatMode,
-                    playlists = playerViewModel.playlists.collectAsStateWithLifecycle().value,
-                    onAddToPlaylist = playerViewModel::addCurrentTrackToPlaylist,
-                    sleepTimerState = playerViewModel.sleepTimerState.collectAsStateWithLifecycle().value,
-                    onStartSleepTimer = playerViewModel::startSleepTimer,
-                    onStartSleepTimerEndOfTrack = playerViewModel::startSleepTimerAtEndOfTrack,
-                    onCancelSleepTimer = playerViewModel::cancelSleepTimer,
                     onBack = { navController.popBackStack() },
-                    onStop = playerViewModel::stop
                 )
             }
             composable(
@@ -391,6 +364,22 @@ fun ResonaNavGraph() {
                 )
             }
             }
+        }
+
+        // A plain Box, not Scaffold: the bottom chrome floats over the feed,
+        // so screens scroll full-bleed underneath and pad their last item
+        // clear of it.
+        Box(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = ResonaDestination.Home.route,
+                // Top only -- Scaffold used to reserve this via innerPadding;
+                // the bottom stays unpadded so content scrolls under the chrome.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding(),
+                builder = navBuilder
+            )
 
             // The floating bottom chrome: mini-player above the pill nav,
             // both bottom-aligned over the NavHost content rather than
@@ -417,17 +406,17 @@ fun ResonaNavGraph() {
                         // it slides away instead of the content vanishing out
                         // from under it the instant currentTrack goes null.
                         var lastTrack by remember { mutableStateOf<Song?>(null) }
-                        playerUiState.currentTrack?.let { lastTrack = it }
+                        currentTrack?.let { lastTrack = it }
 
                         AnimatedVisibility(
-                            visible = playerUiState.currentTrack != null,
+                            visible = currentTrack != null,
                             enter = chromeEnter,
                             exit = chromeExit
                         ) {
                             lastTrack?.let { track ->
                                 MiniPlayerBar(
                                     track = track,
-                                    isPlaying = playerUiState.isPlaying,
+                                    isPlaying = isPlaying,
                                     modifier = Modifier.offset(y = (-20).dp),
                                     onTogglePlayPause = playerViewModel::togglePlayPause,
                                     onSkipToPrevious = playerViewModel::skipToPrevious,

@@ -30,10 +30,8 @@ dependencies {
     // Domain interfaces only -- never :core:data directly.
     implementation(project(":core:domain"))
     implementation(project(":core:ui"))
-    // NowPlayingScreen takes PlayerUiState directly as a parameter, and
-    // MiniPlayerBar/NowPlayingScreen are both stateless (no hiltViewModel()
-    // calls of their own -- :app owns and passes down the shared
-    // PlayerViewModel), so no Hilt dependency is needed in this module.
+    // No Hilt dependency: :app owns the shared PlayerViewModel and passes
+    // it to the stateless screens in this module.
     implementation(project(":core:player"))
 
     implementation(platform(libs.androidx.compose.bom))
