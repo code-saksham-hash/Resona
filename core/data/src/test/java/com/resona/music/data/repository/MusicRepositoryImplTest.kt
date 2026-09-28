@@ -27,6 +27,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -185,11 +186,20 @@ class MusicRepositoryImplTest {
                 headers = headersOf(HttpHeaders.ContentType, "application/json")
             )
         }
-        val httpClient = HttpClient(mockEngine) {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-        }
+        return repositoryWithHttpClient(
+            HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+            },
+            recentPlays,
+        )
+    }
+
+    /** Everything around the HTTP client is the same whichever way the
+     *  responses are canned, so both helpers above share this. */
+    private fun repositoryWithHttpClient(
+        httpClient: HttpClient,
+        recentPlays: List<Song> = emptyList()
+    ): MusicRepositoryImpl {
         // just needs to be constructible here, so a no-op JsEngine fake is
         // fine -- the real WebView-backed one needs a live Context this
         // plain JVM test doesn't have
@@ -243,6 +253,8 @@ class MusicRepositoryImplTest {
                 songs = songs
             )
             override suspend fun addSongToPlaylist(playlistId: String, song: Song) = Unit
+            override suspend fun removeSongFromPlaylist(playlistId: String, videoId: String) = Unit
+            override suspend fun deletePlaylist(playlistId: String) = Unit
         }
         val searchHistoryStore = object : SearchHistoryStore {
             override val recentSearches = MutableStateFlow(emptyList<String>())
@@ -561,5 +573,165 @@ class MusicRepositoryImplTest {
         val repository = repositoryWithMockedSearchResponse(fakeUnavailablePlaylistBrowseResponseJson)
 
         repository.importPlaylistFromUrl("https://www.youtube.com/playlist?list=PLdoesnotexist12345")
+    }
+
+    // One row of a category-filtered shelf: same renderer the live Songs and
+    // Videos filters both return, which (unlike a mixed-search row) carries
+    // no "Song"/"Video" type label. [detail] is where a song row puts its
+    // album and a video row puts its view count.
+    private fun filteredRowJson(title: String, videoId: String, artist: String, detail: String) = """
+    {
+      "musicResponsiveListItemRenderer": {
+        "thumbnail": {
+          "musicThumbnailRenderer": {
+            "thumbnail": { "thumbnails": [ { "url": "https://example.com/$videoId.jpg" } ] }
+          }
+        },
+        "flexColumns": [
+          {
+            "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+                "runs": [
+                  {
+                    "text": "$title",
+                    "navigationEndpoint": { "watchEndpoint": { "videoId": "$videoId" } }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "musicResponsiveListItemFlexColumnRenderer": {
+              "text": {
+                "runs": [
+                  { "text": "$artist" },
+                  { "text": " • " },
+                  { "text": "$detail" },
+                  { "text": " • " },
+                  { "text": "4:34" }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+    """.trimIndent()
+
+    // The nesting a real filtered search response wraps its shelf in,
+    // verified against a live one (contents/tabbedSearchResultsRenderer/
+    // tabs[0]/tabRenderer/content/sectionListRenderer/contents[0]/
+    // musicShelfRenderer/contents).
+    private fun filteredShelfJson(rows: List<String>) = """
+    {
+      "contents": {
+        "tabbedSearchResultsRenderer": {
+          "tabs": [
+            {
+              "tabRenderer": {
+                "content": {
+                  "sectionListRenderer": {
+                    "contents": [
+                      { "musicShelfRenderer": { "contents": [ ${rows.joinToString(",")} ] } }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+    """.trimIndent()
+
+    /**
+     * searchSongsPage fires a Songs-filtered and a Videos-filtered request
+     * for the same query, so unlike [repositoryWithMockedSearchResponse] (one
+     * canned body for every request) this has to answer them differently. It
+     * tells them apart by the params value in the serialized request body,
+     * which is the only thing that differs between the two.
+     */
+    private fun repositoryWithSeparateSongAndVideoShelves(
+        songsJson: String,
+        videosJson: String,
+    ): MusicRepositoryImpl {
+        val mockEngine = MockEngine { request ->
+            val body = (request.body as TextContent).text
+            respond(
+                content = if (VIDEOS_PARAMS in body) videosJson else songsJson,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        return repositoryWithHttpClient(
+            HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+            }
+        )
+    }
+
+    @Test
+    fun searchSongsPageSurfacesAVideoOnlyTrackByAnArtistTheSongShelfEstablished() = runTest {
+        // The live "asma njk" case in miniature: the artist's own upload of
+        // the requested track exists only as a video, alongside a karaoke
+        // version from an unrelated channel and a video duplicate of a track
+        // the catalog already has.
+        val repository = repositoryWithSeparateSongAndVideoShelves(
+            songsJson = filteredShelfJson(
+                listOf(
+                    filteredRowJson("Kholai Khola", "songKholai", "Neetesh Jung Kunwar", "Kholai Khola"),
+                    filteredRowJson("Flirty Maya", "songFlirty", "Neetesh Jung Kunwar", "NJK 2018"),
+                )
+            ),
+            videosJson = filteredShelfJson(
+                listOf(
+                    filteredRowJson("Ashma (A Confession)", "vidAshma", "Neetesh Jung Kunwar", "29M views"),
+                    filteredRowJson("Ashma karaoke with lyrics", "vidKaraoke", "Karaoke Nepal", "2.9K views"),
+                    filteredRowJson("Flirty Maya", "vidFlirty", "Neetesh Jung Kunwar", "38M views"),
+                )
+            ),
+        )
+
+        val page = repository.searchSongsPage("asma njk")
+
+        // The video-only track is in, at the rank its own shelf gave it
+        // rather than appended below every song. The karaoke upload is out
+        // (no song row establishes that channel as an artist) and so is the
+        // video of "Flirty Maya" (same recording as a song row already here,
+        // under a different videoId).
+        assertEquals(
+            listOf("Kholai Khola", "Ashma (A Confession)", "Flirty Maya"),
+            page.songs.map { it.title }
+        )
+        assertEquals(
+            listOf("songKholai", "vidAshma", "songFlirty"),
+            page.songs.map { it.videoId }
+        )
+    }
+
+    @Test
+    fun searchSongsPageFallsBackToVideoUploadsWhenTheCatalogHasNothingAtAll() = runTest {
+        // No song rows means no artist the query has established, so the
+        // uploader check has nothing to test against. Returning the videos
+        // anyway beats the alternative, which is an empty screen.
+        val repository = repositoryWithSeparateSongAndVideoShelves(
+            songsJson = filteredShelfJson(emptyList()),
+            videosJson = filteredShelfJson(
+                listOf(
+                    filteredRowJson("Obscure Local Track", "vidLocal", "Tiny Channel", "4K views"),
+                )
+            ),
+        )
+
+        val page = repository.searchSongsPage("obscure local track")
+
+        assertEquals(listOf("Obscure Local Track"), page.songs.map { it.title })
+        assertEquals("Tiny Channel", page.songs.single().artist)
+    }
+
+
+    private companion object {
+        // Mirrors InnerTubeApi.SEARCH_VIDEOS_PARAMS, which is private to it.
+        const val VIDEOS_PARAMS = "EgWKAQIQAWoKEAoQAxAEEAkQBQ%3D%3D"
     }
 }

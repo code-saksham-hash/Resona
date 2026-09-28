@@ -99,6 +99,31 @@ class InnerTubeApi @Inject constructor(
         return body.also { learnVisitor(it.responseContext?.visitorData) }
     }
 
+    /**
+     * A Videos-*category* search for [query], the sibling filter chip to
+     * [searchSongs].
+     *
+     * The Songs category only covers tracks that have been ingested into
+     * YouTube Music's own catalog. A great deal of regional and independent
+     * music exists on YouTube purely as an ordinary video upload, and none
+     * of it shows up under Songs at any depth of pagination, so a
+     * Songs-only search simply cannot find it. Verified live with the query
+     * "asma njk": the Songs shelf comes back with twenty of that artist's
+     * other tracks and never the one being asked for, while the first row
+     * here is the artist's own official upload of it. See
+     * MusicRepositoryImpl.searchSongsPage for how the two shelves are
+     * folded back into a single result list.
+     */
+    suspend fun searchVideos(query: String): SearchResponse {
+        val response = httpClient.post("$BASE_URL/search") {
+            applyInnerTubeDefaults()
+            setBody(SearchRequest(context = webRemixContext(), query = query, params = SEARCH_VIDEOS_PARAMS))
+        }
+        if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
+        val body: SearchResponse = response.body()
+        return body.also { learnVisitor(it.responseContext?.visitorData) }
+    }
+
     /** The next page of a [searchSongs] shelf, given the continuation token
      *  from its (or an earlier continuation's) result. */
     suspend fun searchSongsContinuation(continuation: String): SearchResponse {
@@ -184,6 +209,11 @@ class InnerTubeApi @Inject constructor(
         // web client sends when you tap that filter chip. Opaque/compiled,
         // not meant to be human-readable; verified live rather than assumed.
         const val SEARCH_SONGS_PARAMS = "EgWKAQIIAWoKEAoQAxAEEAkQBQ%3D%3D"
+
+        // Same idea for the "Videos" filter chip, also verified live rather
+        // than assumed: this is the value that turns the response above
+        // into the video-upload shelf searchVideos documents.
+        const val SEARCH_VIDEOS_PARAMS = "EgWKAQIQAWoKEAoQAxAEEAkQBQ%3D%3D"
         const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

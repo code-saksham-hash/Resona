@@ -133,9 +133,9 @@ class YouTubeStreamExtractorTest {
 
         assertEquals("https://video.google.com/stream?n=abcd1234&expire=99999", source.url)
         val posts = requestLog.filter { it.startsWith("POST-") }
-        // First pass: the whole gated chain (6 clients), then a retried chain
-        // whose first client wins with the visitor token -> 7 player posts.
-        assertEquals("gated attempt must be retried exactly once", 7, posts.size)
+        // First pass: the whole gated chain (7 clients), then a retried chain
+        // whose first client wins with the visitor token -> 8 player posts.
+        assertEquals("gated attempt must be retried exactly once", 8, posts.size)
         assertTrue(
             "retry must carry the fresh visitor token, got $requestLog",
             posts.last().endsWith("visitor=true")

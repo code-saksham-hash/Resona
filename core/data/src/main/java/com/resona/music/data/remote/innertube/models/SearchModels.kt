@@ -267,14 +267,22 @@ internal fun JsonElement.flexColumnRuns(): JsonArray? =
         ?.jsonArray
 
 /**
- * Walks a Songs-filtered search response -- an initial page via [SearchResponse.contents],
+ * Walks a category-filtered search response -- an initial page via [SearchResponse.contents],
  * a later page via [SearchResponse.continuationContents], same row shape either way -- for
- * its song rows. Unlike a mixed/unfiltered search row (see [extractSongs]), a row here
+ * its result rows. Unlike a mixed/unfiltered search row (see [extractSongs]), a row here
  * carries no "Song" type label: every row in this shelf is already known to be one, the
  * same reasoning [extractPlaylistSongs] documents for playlist tracks (an album name can
  * appear as a middle run alongside artist/duration here too, simply left unmatched by
  * either check below). Verified against a live songs-filtered search response and its
  * continuation.
+ *
+ * This also parses a *Videos*-filtered shelf (see InnerTubeApi.searchVideos), which is the
+ * identical renderer with the uploading channel where a song row carries its artist and a
+ * view count where a song row carries its album. The view count needs no handling of its
+ * own for the same reason the album name needs none: it is neither the leading run nor a
+ * duration, so both checks below skip straight past it. That keeps this working regardless
+ * of what language InnerTube renders "views" in, which matters because these requests send
+ * no hl/gl and so get whatever locale the caller's IP resolves to.
  */
 fun SearchResponse.extractFilteredSongs(): List<InnerTubeSong> {
     val results = mutableListOf<InnerTubeSong>()

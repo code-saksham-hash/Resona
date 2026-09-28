@@ -52,6 +52,21 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
+// Comparing titles and artist names across the song and video shelves has
+// to survive the cosmetic differences between them: the catalog track is
+// "Blinding Lights" where the artist's own upload of the same recording is
+// "Blinding Lights (Official Video)", with casing and punctuation drifting
+// either way. Letters are matched as \p{L} rather than a-z so this works on
+// the non-Latin scripts a lot of the affected music is titled in.
+private val PARENTHETICAL_REGEX = Regex("""[(\[][^)\]]*[)\]]""")
+private val NON_ALPHANUMERIC_REGEX = Regex("""[^\p{L}\p{N}]+""")
+
+private fun String.normalizedForMatching(): String =
+    lowercase()
+        .replace(PARENTHETICAL_REGEX, " ")
+        .replace(NON_ALPHANUMERIC_REGEX, " ")
+        .trim()
+
 class MusicRepositoryImpl @Inject internal constructor(
     private val api: InnerTubeApi,
     private val streamExtractor: YouTubeStreamExtractor,
@@ -67,18 +82,94 @@ class MusicRepositoryImpl @Inject internal constructor(
     override suspend fun search(query: String): List<Song> =
         api.search(query).extractSongs().map { it.toSong() }
 
-    override suspend fun searchSongsPage(query: String): SongSearchPage {
-        val response = api.searchSongs(query)
-        return SongSearchPage(
-            // distinctBy is defense-in-depth against a single page ever
-            // repeating a videoId internally -- not observed live, but the
-            // Search screen keys its list by videoId (see SearchResultsList),
-            // and a duplicate key there is a hard Compose crash, not just a
-            // cosmetic repeat -- worth guarding cheaply regardless.
-            songs = response.extractFilteredSongs().map { it.toSong() }.distinctBy { it.videoId },
+    override suspend fun searchSongsPage(query: String): SongSearchPage = coroutineScope {
+        // Two separate category shelves for one query, fetched concurrently
+        // rather than one after the other. The video shelf is an enrichment
+        // on top of the song shelf, so a failure there is swallowed: songs
+        // are the primary results and should still land if it goes wrong.
+        val songsDeferred = async { api.searchSongs(query) }
+        val videosDeferred = async {
+            runCatching { api.searchVideos(query).extractFilteredSongs() }.getOrDefault(emptyList())
+        }
+        val response = songsDeferred.await()
+        // distinctBy is defense-in-depth against a single page ever
+        // repeating a videoId internally -- not observed live, but the
+        // Search screen keys its list by videoId (see SearchResultsList),
+        // and a duplicate key there is a hard Compose crash, not just a
+        // cosmetic repeat -- worth guarding cheaply regardless.
+        val songs = response.extractFilteredSongs().map { it.toSong() }.distinctBy { it.videoId }
+        SongSearchPage(
+            songs = mergeInVideoUploads(songs, videosDeferred.await().map { it.toSong() }),
             continuationToken = response.extractSearchContinuation(),
         )
     }
+
+    /**
+     * Folds a query's Videos-category results into its Songs-category page.
+     *
+     * The Songs category only covers YouTube Music's own ingested catalog,
+     * so a track that exists on YouTube purely as a video upload is missing
+     * from search entirely, however far the user pages (see
+     * InnerTubeApi.searchVideos, which has the live "asma njk" case this
+     * was found through). A lot of regional and independent music is in
+     * exactly that position.
+     *
+     * The catch is that the video shelf is also where every karaoke
+     * version, guitar lesson, lyric re-upload and reaction clip lives, and
+     * merging it wholesale would wreck results for ordinary queries. What
+     * separates the real track from all of that is who uploaded it: the
+     * genuine one comes from the artist's own channel, and that artist is
+     * already all over the song shelf, while the derivatives come from
+     * channels that appear nowhere in it. So a video is kept only when its
+     * uploader is an artist this same query has already established. The
+     * exception is a query whose song shelf came back empty, where there is
+     * no such evidence to be had and the videos are all there is.
+     *
+     * Kept videos hold the rank the video shelf gave them and are
+     * interleaved with the songs rather than appended, because a
+     * video-only track is usually the strongest match for the query that
+     * went looking for it and appending would bury it under twenty weaker
+     * song rows.
+     *
+     * This runs on the first page only: [loadMoreSongResults] follows the
+     * song shelf's continuation chain alone. Paging deeper is someone
+     * working through ranked results, and the track this exists to rescue
+     * is the one they expected at the top, so it has already either shown
+     * up or turned out not to exist.
+     */
+    private fun mergeInVideoUploads(songs: List<Song>, videos: List<Song>): List<Song> {
+        if (videos.isEmpty()) return songs
+
+        val knownArtists = songs.mapTo(mutableSetOf()) { it.artist.normalizedForMatching() }
+        val songIds = songs.mapTo(mutableSetOf()) { it.videoId }
+        val seenTracks = songs.mapTo(mutableSetOf()) { it.trackKey() }
+
+        // Rank-keyed rather than a flat list so the interleave below can put
+        // each survivor back where the video shelf ranked it.
+        val keptByRank = mutableMapOf<Int, Song>()
+        videos.forEachIndexed { rank, video ->
+            val byKnownArtist = songs.isEmpty() ||
+                video.artist.normalizedForMatching() in knownArtists
+            // An official upload and its catalog counterpart are the same
+            // recording under two videoIds, so identity has to be the
+            // title/artist pair, not the id. seenTracks.add doing the
+            // checking means this also drops a video that repeats one the
+            // shelf already offered further up.
+            if (byKnownArtist && video.videoId !in songIds && seenTracks.add(video.trackKey())) {
+                keptByRank[rank] = video
+            }
+        }
+        if (keptByRank.isEmpty()) return songs
+
+        val merged = ArrayList<Song>(songs.size + keptByRank.size)
+        repeat(maxOf(songs.size, videos.size)) { rank ->
+            songs.getOrNull(rank)?.let(merged::add)
+            keptByRank[rank]?.let(merged::add)
+        }
+        return merged
+    }
+
+    private fun Song.trackKey() = "${title.normalizedForMatching()}|${artist.normalizedForMatching()}"
 
     override suspend fun loadMoreSongResults(continuationToken: String): SongSearchPage {
         val response = api.searchSongsContinuation(continuationToken)
