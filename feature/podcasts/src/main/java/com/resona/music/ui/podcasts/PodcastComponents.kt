@@ -58,10 +58,11 @@ private val GlassFill = Color.White.copy(alpha = 0.06f)
 private val GlassBorder = Color.White.copy(alpha = 0.1f)
 internal val ScreenPadding = 17.dp
 
+/** [onBack] null for the tab's own root screen, which has nothing to go back to. */
 @Composable
 internal fun PodcastTopBar(
     title: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
@@ -72,12 +73,16 @@ internal fun PodcastTopBar(
             .padding(end = ScreenPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.primary
-            )
+        if (onBack != null) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        } else {
+            Spacer(modifier = Modifier.width(ScreenPadding))
         }
         Text(
             text = title,

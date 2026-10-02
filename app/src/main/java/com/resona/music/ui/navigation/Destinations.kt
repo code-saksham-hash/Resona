@@ -57,17 +57,18 @@ sealed class ResonaDestination(
     /** Reached from an artist's Albums/Singles shelf, not the bottom bar -- its icon is unused. */
     data object AlbumDetail : ResonaDestination("album", "Album", Icons.Filled.Explore, Icons.Outlined.Explore)
 
-    // Podcasts hang off Home's chip row rather than the bottom bar, so these icons are unused too.
     data object Podcasts : ResonaDestination("podcasts", "Podcasts", Icons.Filled.Podcasts, Icons.Outlined.Podcasts)
+
+    // Show pages and podcast search live under the Podcasts tab, so their icons are unused.
     data object PodcastShow : ResonaDestination("podcast_show", "Podcast", Icons.Filled.Podcasts, Icons.Outlined.Podcasts)
     data object PodcastSearch : ResonaDestination("podcast_search", "Search podcasts", Icons.Filled.Podcasts, Icons.Outlined.Podcasts)
 }
 
-/** The 3 tabs on the floating pill nav -- Stats and History are still real
- *  routes (reached from Library's quick links instead) now that the bar
- *  itself only carries Home/Search/Library. */
+/** The tabs on the floating pill nav. Stats and History are still real
+ *  routes, reached from Library's quick links instead of the bar. */
 val bottomNavDestinations = listOf(
     ResonaDestination.Home,
     ResonaDestination.Search,
+    ResonaDestination.Podcasts,
     ResonaDestination.Library
 )

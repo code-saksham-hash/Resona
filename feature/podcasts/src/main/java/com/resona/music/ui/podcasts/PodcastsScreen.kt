@@ -33,7 +33,6 @@ import com.resona.music.ui.theme.ResonaTheme
 
 @Composable
 fun PodcastsScreen(
-    onBack: () -> Unit,
     onSearchClick: () -> Unit,
     onShowClick: (PodcastShow) -> Unit,
     onPlayEpisode: (PodcastEpisode) -> Unit,
@@ -44,7 +43,6 @@ fun PodcastsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     PodcastsScreenContent(
         uiState = uiState,
-        onBack = onBack,
         onSearchClick = onSearchClick,
         onRefresh = viewModel::refresh,
         onShowClick = onShowClick,
@@ -61,7 +59,6 @@ fun PodcastsScreen(
 @Composable
 private fun PodcastsScreenContent(
     uiState: PodcastsUiState,
-    onBack: () -> Unit,
     onSearchClick: () -> Unit,
     onRefresh: () -> Unit,
     onShowClick: (PodcastShow) -> Unit,
@@ -73,7 +70,8 @@ private fun PodcastsScreenContent(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        PodcastTopBar(title = "Podcasts", onBack = onBack) {
+        // A bottom bar tab, so no back arrow.
+        PodcastTopBar(title = "Podcasts", onBack = null) {
             GlassIconButton(icon = Icons.Outlined.Search, contentDescription = "Search podcasts", onClick = onSearchClick)
         }
 
@@ -231,7 +229,6 @@ private fun PodcastsScreenPreview() {
                 followedIds = setOf(previewShow.browseId),
                 browse = BrowseState.Loaded(shows = listOf(previewShow), episodes = listOf(previewEpisode))
             ),
-            onBack = {},
             onSearchClick = {},
             onRefresh = {},
             onShowClick = {},

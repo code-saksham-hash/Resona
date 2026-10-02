@@ -245,19 +245,18 @@ fun ResonaNavGraph() {
                         navController.selectTab(ResonaDestination.Library.route, activeTab)
                     },
                     onPodcastsClick = {
-                        navController.navigate(ResonaDestination.Podcasts.route)
+                        navController.selectTab(ResonaDestination.Podcasts.route, activeTab)
                     },
                 )
             }
             composable(
                 ResonaDestination.Podcasts.route,
-                enterTransition = { slideEnter },
-                exitTransition = { slideExit },
-                popEnterTransition = { slidePopEnter },
-                popExitTransition = { slidePopExit },
+                enterTransition = { bottomNavEnter },
+                exitTransition = { bottomNavExit },
+                popEnterTransition = { bottomNavEnter },
+                popExitTransition = { bottomNavExit },
             ) {
                 PodcastsScreen(
-                    onBack = { navController.popBackStack() },
                     onSearchClick = { navController.navigate(ResonaDestination.PodcastSearch.route) },
                     onShowClick = { show -> navController.navigate(podcastShowRoute(show.browseId)) },
                     onPlayEpisode = { episode -> playerViewModel.play(episode.toSong()) },

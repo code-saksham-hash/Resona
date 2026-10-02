@@ -52,7 +52,7 @@ another `:feature:*` module or on `:core:data` directly.
 | `:feature:search` | Android library (Compose) | `:core:domain`, `:core:ui`, `:core:player` | `SearchScreen`, `SearchViewModel` |
 | `:feature:player` | Android library (Compose) | `:core:domain`, `:core:ui`, `:core:player` | `NowPlayingScreen`, `MiniPlayerBar` |
 | `:feature:library` | Android library (Compose) | `:core:domain`, `:core:ui` | `LibraryScreen`, `LibraryViewModel` |
-| `:feature:podcasts` | Android library (Compose) | `:core:domain`, `:core:ui` | `PodcastsScreen` (the hub Home's Podcasts chip opens), `PodcastShowScreen`, `PodcastSearchScreen` and their ViewModels |
+| `:feature:podcasts` | Android library (Compose) | `:core:domain`, `:core:ui` | `PodcastsScreen` (the Podcasts tab), `PodcastShowScreen`, `PodcastSearchScreen` and their ViewModels |
 
 `:core:domain` is a plain `kotlin("jvm")` module, not an Android library,
 so it cannot reference `android.*` or `androidx.*` at all. That's what
