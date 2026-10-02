@@ -24,8 +24,10 @@ app-release-signed.apk.idsig
 README-CONTEXT.md
 
 # Signing material -- never commit the keystore or its credentials.
+*keystore
 keystore/
 keystore.properties
+
 
 # Kotlin build-script classpath cache -- occasionally written into the project
 # root by a Gradle/KLS invocation instead of .gradle/.
