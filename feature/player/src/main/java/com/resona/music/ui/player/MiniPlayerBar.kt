@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -72,6 +74,9 @@ fun MiniPlayerBar(
     onSkipToNext: () -> Unit,
     onClick: () -> Unit,
     onDismiss: () -> Unit = {},
+    // Episodes swap prev/next for these.
+    onSeekBack: () -> Unit = {},
+    onSeekForward: () -> Unit = {},
     error: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -251,10 +256,11 @@ fun MiniPlayerBar(
                 }
             }
 
-            IconButton(onClick = onSkipToPrevious, modifier = Modifier.size(40.dp)) {
+            val isEpisode = track.isPodcastEpisode
+            IconButton(onClick = if (isEpisode) onSeekBack else onSkipToPrevious, modifier = Modifier.size(40.dp)) {
                 Icon(
-                    imageVector = Icons.Filled.SkipPrevious,
-                    contentDescription = "Previous",
+                    imageVector = if (isEpisode) Icons.Filled.Replay10 else Icons.Filled.SkipPrevious,
+                    contentDescription = if (isEpisode) "Back 10 seconds" else "Previous",
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(26.dp)
                 )
@@ -278,10 +284,10 @@ fun MiniPlayerBar(
                 }
             }
 
-            IconButton(onClick = onSkipToNext, modifier = Modifier.size(40.dp)) {
+            IconButton(onClick = if (isEpisode) onSeekForward else onSkipToNext, modifier = Modifier.size(40.dp)) {
                 Icon(
-                    imageVector = Icons.Filled.SkipNext,
-                    contentDescription = "Next",
+                    imageVector = if (isEpisode) Icons.Filled.Forward30 else Icons.Filled.SkipNext,
+                    contentDescription = if (isEpisode) "Forward 30 seconds" else "Next",
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(26.dp)
                 )

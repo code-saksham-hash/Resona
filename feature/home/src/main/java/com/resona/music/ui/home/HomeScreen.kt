@@ -7,6 +7,7 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Environment
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Podcasts
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -107,6 +109,7 @@ fun HomeScreen(
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
     onTrackClick: (HomeTrack) -> Unit = {},
+    onPodcastsClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -122,6 +125,7 @@ fun HomeScreen(
         onAlbumClick = onAlbumClick,
         onArtistClick = onArtistClick,
         onTrackClick = onTrackClick,
+        onPodcastsClick = onPodcastsClick,
         modifier = modifier
     )
 }
@@ -139,6 +143,7 @@ private fun HomeScreenContent(
     onAlbumClick: (HomeAlbum) -> Unit = {},
     onArtistClick: (HomeArtist) -> Unit = {},
     onTrackClick: (HomeTrack) -> Unit = {},
+    onPodcastsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     PullToRefreshBox(
@@ -178,6 +183,7 @@ private fun HomeScreenContent(
                     onAlbumClick = onAlbumClick,
                     onArtistClick = onArtistClick,
                     onTrackClick = onTrackClick,
+                    onPodcastsClick = onPodcastsClick,
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 )
             }
@@ -334,6 +340,7 @@ private fun HomeFeedList(
     onAlbumClick: (HomeAlbum) -> Unit,
     onArtistClick: (HomeArtist) -> Unit,
     onTrackClick: (HomeTrack) -> Unit,
+    onPodcastsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val recommended = feed.songsFor("recommended")
@@ -342,7 +349,7 @@ private fun HomeFeedList(
 
     LazyColumn(modifier = modifier) {
         item { Spacer(modifier = Modifier.height(7.dp)) }
-        item { QuickPicksRow(onGenreClick = onGenreClick) }
+        item { QuickPicksRow(onGenreClick = onGenreClick, onPodcastsClick = onPodcastsClick) }
         if (recommended.isNotEmpty()) {
             item { Spacer(modifier = Modifier.height(20.dp)) }
             item {
@@ -460,7 +467,11 @@ private fun ArtistSpotlight.toHomeArtist(index: Int) = HomeArtist(
 )
 
 @Composable
-private fun QuickPicksRow(onGenreClick: (String) -> Unit = {}, modifier: Modifier = Modifier) {
+private fun QuickPicksRow(
+    onGenreClick: (String) -> Unit = {},
+    onPodcastsClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val scrollState = rememberScrollState()
 
     Row(
@@ -470,6 +481,29 @@ private fun QuickPicksRow(onGenreClick: (String) -> Unit = {}, modifier: Modifie
             .padding(horizontal = 17.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Opens a whole section rather than searching a genre, so it's
+        // outlined and carries an icon to read as a different kind of chip.
+        Row(
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.extraLarge)
+                .border(1.dp, MaterialTheme.colorScheme.onSurface, MaterialTheme.shapes.extraLarge)
+                .clickable(onClick = onPodcastsClick)
+                .padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Podcasts,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Podcasts",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
         quickPickGenres.forEach { genre ->
             Box(
                 modifier = Modifier

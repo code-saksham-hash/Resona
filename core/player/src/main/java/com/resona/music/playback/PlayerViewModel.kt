@@ -367,6 +367,18 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    /** Relative seek for the episode skip buttons, clamped to the track. */
+    fun seekBy(deltaMs: Long) {
+        viewModelScope.launch {
+            val controller = controllerReady.await()
+            val duration = controller.duration
+            var target = (controller.currentPosition + deltaMs).coerceAtLeast(0L)
+            if (duration > 0L) target = target.coerceAtMost(duration)
+            controller.seekTo(target)
+            _uiState.update { it.copy(position = target) }
+        }
+    }
+
     fun togglePlayPause() {
         Log.d(TAG, "togglePlayPause() called, controllerReady.isCompleted=${controllerReady.isCompleted}")
         viewModelScope.launch {

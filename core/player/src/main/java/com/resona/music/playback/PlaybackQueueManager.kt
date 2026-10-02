@@ -16,6 +16,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.repository.MusicRepository
+import com.resona.music.domain.repository.PodcastRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -80,6 +81,7 @@ data class QueueState(
 @OptIn(markerClass = [UnstableApi::class])
 class PlaybackQueueManager @Inject constructor(
     private val musicRepository: MusicRepository,
+    private val podcastRepository: PodcastRepository,
     private val httpDataSourceFactory: DefaultHttpDataSource.Factory,
     @ApplicationContext private val context: Context,
 ) {
@@ -121,6 +123,14 @@ class PlaybackQueueManager @Inject constructor(
                 }
             }
 
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (!isPlaying) saveEpisodeProgress()
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) saveEpisodeProgress(ended = true)
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 Log.d(
                     TAG,
@@ -153,12 +163,24 @@ class PlaybackQueueManager @Inject constructor(
                 _state.update { it.copy(isResolving = false, error = error.message ?: "Playback error") }
             }
         })
+
+        // Pausing and track changes save too, this just covers a long
+        // uninterrupted listen (or the process dying mid-episode).
+        scope.launch {
+            while (true) {
+                delay(EPISODE_PROGRESS_SAVE_MILLIS)
+                if (player.isPlaying) saveEpisodeProgress()
+            }
+        }
     }
 
     /** Starts a brand-new queue context (user tapped a song from a playlist,
      *  search result, etc). Resets shuffle -- for advancing within the *same*
      *  queue, see [skipToNext]/[skipToPrevious], which don't. */
     fun playSong(song: Song, queue: List<Song> = emptyList()) {
+        // An episode on its own shouldn't roll into a radio of songs.
+        @Suppress("NAME_SHADOWING")
+        val queue = if (queue.isEmpty() && song.isPodcastEpisode) listOf(song) else queue
         this.queue = queue
         currentQueueIndex = if (queue.isNotEmpty()) {
             queue.indexOfFirst { it.videoId == song.videoId }.coerceAtLeast(0)
@@ -247,6 +269,8 @@ class PlaybackQueueManager @Inject constructor(
     }
 
     fun reset() {
+        // Before the state below forgets which episode this was.
+        saveEpisodeProgress()
         radioGeneration++
         radioQueueJob?.cancel()
         radioQueueJob = null
@@ -274,6 +298,9 @@ class PlaybackQueueManager @Inject constructor(
 
     private fun resolveAndPlay(song: Song) {
         if (song.videoId != _state.value.currentSong?.videoId) {
+            // Still pointing at the outgoing track here, so this saves where
+            // you left the episode you're switching away from.
+            saveEpisodeProgress()
             streamRetryCount = 0
             excludedClients.clear()
         }
@@ -322,11 +349,13 @@ class PlaybackQueueManager @Inject constructor(
                     httpDataSourceFactory.setUserAgent(streamSource.userAgent)
                     streamSource.url.toUri()
                 }
-                player.setMediaItem(buildRealMediaItem(song, mediaUri))
+                val startPositionMs = if (song.isPodcastEpisode) resumePositionFor(song) else 0L
+                player.setMediaItem(buildRealMediaItem(song, mediaUri), startPositionMs)
                 player.prepare()
                 player.play()
                 _state.update { it.copy(isResolving = false) }
-                musicRepository.recordPlay(song)
+                // Play history feeds music stats and recommendations, episodes stay out of it.
+                if (!song.isPodcastEpisode) musicRepository.recordPlay(song)
                 rebuildPlaceholders(mediaUri)
             } catch (e: CancellationException) {
                 _state.update { it.copy(isResolving = false) }
@@ -356,6 +385,39 @@ class PlaybackQueueManager @Inject constructor(
                 player.stop()
                 player.clearMediaItems()
                 _state.update { it.copy(isResolving = false, error = e.message ?: "Unable to play this track") }
+            }
+        }
+    }
+
+    /** Where to pick an episode back up: a few seconds before you stopped, or the start if it's done. */
+    private suspend fun resumePositionFor(song: Song): Long {
+        val progress = try {
+            podcastRepository.getEpisodeProgress(song.videoId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } ?: return 0L
+        if (progress.finished || progress.positionMillis < MIN_RESUME_MILLIS) return 0L
+        return (progress.positionMillis - RESUME_REWIND_MILLIS).coerceAtLeast(0L)
+    }
+
+    /** Snapshots the playing episode's position now and writes it in the background. */
+    private fun saveEpisodeProgress(ended: Boolean = false) {
+        if (!::player.isInitialized) return
+        val song = _state.value.currentSong ?: return
+        if (!song.isPodcastEpisode || player.currentMediaItem?.mediaId != song.videoId) return
+        val duration = player.duration
+        // C.TIME_UNSET is negative, i.e. nothing loaded yet.
+        if (duration <= 0L) return
+        val position = if (ended) duration else player.currentPosition
+        scope.launch {
+            try {
+                podcastRepository.saveEpisodeProgress(song, position, duration)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "saveEpisodeProgress: failed for ${song.videoId}", e)
             }
         }
     }
@@ -482,6 +544,9 @@ class PlaybackQueueManager @Inject constructor(
                     .setTitle(song.title)
                     .setArtist(song.artist)
                     .setArtworkUri(song.highResThumbnailUrl.toUri())
+                    .setMediaType(
+                        if (song.isPodcastEpisode) MediaMetadata.MEDIA_TYPE_PODCAST_EPISODE else MediaMetadata.MEDIA_TYPE_MUSIC
+                    )
                     .build()
             )
             .build()
@@ -514,6 +579,12 @@ class PlaybackQueueManager @Inject constructor(
         // STREAM_RETRY_DELAY_MILLIS is just pacing between attempts.
         const val MAX_STREAM_RETRIES = 4
         const val STREAM_RETRY_DELAY_MILLIS = 600L
+
+        const val EPISODE_PROGRESS_SAVE_MILLIS = 15_000L
+        // Under this, starting over beats resuming.
+        const val MIN_RESUME_MILLIS = 10_000L
+        // Back up a little so you get a few seconds of context on resume.
+        const val RESUME_REWIND_MILLIS = 3_000L
 
         // The whole ERROR_CODE_IO_* family (2000-2008) -- a gated/rejected
         // request doesn't always fail as a clean "403 status" IOException. Media3

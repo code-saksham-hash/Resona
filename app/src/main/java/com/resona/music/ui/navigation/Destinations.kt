@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Explore
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.PlayCircleOutline
+import androidx.compose.material.icons.outlined.Podcasts
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Explore
@@ -54,6 +56,11 @@ sealed class ResonaDestination(
 
     /** Reached from an artist's Albums/Singles shelf, not the bottom bar -- its icon is unused. */
     data object AlbumDetail : ResonaDestination("album", "Album", Icons.Filled.Explore, Icons.Outlined.Explore)
+
+    // Podcasts hang off Home's chip row rather than the bottom bar, so these icons are unused too.
+    data object Podcasts : ResonaDestination("podcasts", "Podcasts", Icons.Filled.Podcasts, Icons.Outlined.Podcasts)
+    data object PodcastShow : ResonaDestination("podcast_show", "Podcast", Icons.Filled.Podcasts, Icons.Outlined.Podcasts)
+    data object PodcastSearch : ResonaDestination("podcast_search", "Search podcasts", Icons.Filled.Podcasts, Icons.Outlined.Podcasts)
 }
 
 /** The 3 tabs on the floating pill nav -- Stats and History are still real

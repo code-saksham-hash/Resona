@@ -10,7 +10,11 @@ data class Song(
     val artist: String,
     val thumbnailUrl: String,
     // "" when InnerTube didn't report a duration for this row.
-    val duration: String = ""
+    val duration: String = "",
+    // Podcast episodes ride the same player as songs, but skip radio and
+    // play history, resume where you left off, and get skip back/forward
+    // controls instead of prev/next.
+    val isPodcastEpisode: Boolean = false
 ) {
     val highResThumbnailUrl: String
         get() {
