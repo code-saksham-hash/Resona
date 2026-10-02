@@ -2,10 +2,12 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.hilt.android)
 }
 
 android {
-    namespace = "com.resona.music.feature.player"
+    namespace = "com.resona.music.feature.podcasts"
     compileSdk = 34
 
     defaultConfig {
@@ -27,30 +29,27 @@ android {
 }
 
 dependencies {
-    // Domain interfaces only -- never :core:data directly.
+    // Domain interfaces only, never :core:data directly.
     implementation(project(":core:domain"))
     implementation(project(":core:ui"))
-    // No Hilt dependency: :app owns the shared PlayerViewModel and passes
-    // it to the stateless screens in this module.
-    implementation(project(":core:player"))
+
+    // Hilt: the podcast ViewModels are @HiltViewModel
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.core)
     implementation(libs.androidx.material.icons.extended)
-    // BackHandler, so Back closes Now Playing's Queue/Lyrics panes first.
-    implementation(libs.androidx.activity.compose)
 
-    // Image loading (album art / thumbnails)
+    // Lifecycle-aware Compose state collection (collectAsStateWithLifecycle)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+
     implementation(libs.coil.compose)
-
-    // Dominant-color extraction for the mini-player/Now Playing glass tint
-    // (see AlbumArtPalette.kt) -- the one deliberate exception to :core:ui's
-    // monochrome-only rule, scoped to this module.
-    implementation(libs.androidx.palette)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

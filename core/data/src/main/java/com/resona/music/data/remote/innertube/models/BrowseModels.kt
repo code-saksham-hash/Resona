@@ -28,5 +28,13 @@ data class BrowseRequest(
 data class BrowseResponse(
     val contents: JsonElement? = null,
     val header: JsonElement? = null,
+    // Only set on a continuation response (see InnerTubeApi.browseContinuation).
+    val continuationContents: JsonElement? = null,
     val responseContext: ResponseContext? = null
+)
+
+/** A browse continuation carries everything in its token, so the body is just the context. */
+@Serializable
+data class BrowseContinuationRequest(
+    val context: InnerTubeContext
 )

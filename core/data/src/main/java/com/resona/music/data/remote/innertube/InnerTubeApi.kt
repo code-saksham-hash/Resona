@@ -1,5 +1,6 @@
 package com.resona.music.data.remote.innertube
 
+import com.resona.music.data.remote.innertube.models.BrowseContinuationRequest
 import com.resona.music.data.remote.innertube.models.BrowseRequest
 import com.resona.music.data.remote.innertube.models.BrowseResponse
 import com.resona.music.data.remote.innertube.models.ClientInfo
@@ -124,6 +125,23 @@ class InnerTubeApi @Inject constructor(
         return body.also { learnVisitor(it.responseContext?.visitorData) }
     }
 
+    /** Podcasts-filtered search: shows only, each linking to an "MPSP..." show page. */
+    suspend fun searchPodcasts(query: String): SearchResponse = filteredSearch(query, SEARCH_PODCASTS_PARAMS)
+
+    /** Episodes-filtered search. Ranked by popularity and recency, unlike the
+     *  podcasts filter, which mostly matches titles. */
+    suspend fun searchEpisodes(query: String): SearchResponse = filteredSearch(query, SEARCH_EPISODES_PARAMS)
+
+    private suspend fun filteredSearch(query: String, params: String): SearchResponse {
+        val response = httpClient.post("$BASE_URL/search") {
+            applyInnerTubeDefaults()
+            setBody(SearchRequest(context = webRemixContext(), query = query, params = params))
+        }
+        if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
+        val body: SearchResponse = response.body()
+        return body.also { learnVisitor(it.responseContext?.visitorData) }
+    }
+
     /** The next page of a [searchSongs] shelf, given the continuation token
      *  from its (or an earlier continuation's) result. */
     suspend fun searchSongsContinuation(continuation: String): SearchResponse {
@@ -153,6 +171,23 @@ class InnerTubeApi @Inject constructor(
         val response = httpClient.post("$BASE_URL/browse") {
             applyInnerTubeDefaults()
             setBody(BrowseRequest(context = webRemixContext(), browseId = browseId))
+        }
+        if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
+        val body: BrowseResponse = response.body()
+        return body.also { learnVisitor(it.responseContext?.visitorData) }
+    }
+
+    /** The next page of a browse shelf, e.g. a podcast's older episodes.
+     *  Comes back under [BrowseResponse.continuationContents]. */
+    suspend fun browseContinuation(continuation: String): BrowseResponse {
+        val response = httpClient.post("$BASE_URL/browse") {
+            applyInnerTubeDefaults()
+            url {
+                parameters.append("ctoken", continuation)
+                parameters.append("continuation", continuation)
+                parameters.append("type", "next")
+            }
+            setBody(BrowseContinuationRequest(context = webRemixContext()))
         }
         if (!response.status.isSuccess()) throw InnerTubeHttpException(response.status.value)
         val body: BrowseResponse = response.body()
@@ -214,6 +249,11 @@ class InnerTubeApi @Inject constructor(
         // than assumed: this is the value that turns the response above
         // into the video-upload shelf searchVideos documents.
         const val SEARCH_VIDEOS_PARAMS = "EgWKAQIQAWoKEAoQAxAEEAkQBQ%3D%3D"
+
+        // Podcasts and Episodes filter chips, same family as the two above.
+        // Both checked against live responses.
+        const val SEARCH_PODCASTS_PARAMS = "EgWKAQJQAWoKEAoQAxAEEAkQBQ%3D%3D"
+        const val SEARCH_EPISODES_PARAMS = "EgWKAQJIAWoKEAoQAxAEEAkQBQ%3D%3D"
         const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

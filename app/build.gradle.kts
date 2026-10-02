@@ -84,6 +84,7 @@ dependencies {
     implementation(project(":feature:search"))
     implementation(project(":feature:player"))
     implementation(project(":feature:library"))
+    implementation(project(":feature:podcasts"))
     implementation(project(":feature:settings"))
 
     // Core / lifecycle

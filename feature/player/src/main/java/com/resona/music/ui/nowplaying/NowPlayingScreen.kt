@@ -1,5 +1,6 @@
 package com.resona.music.ui.nowplaying
 
+import androidx.activity.compose.BackHandler
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
@@ -57,6 +58,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Forward30
+import androidx.compose.material.icons.outlined.Replay10
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -139,6 +142,8 @@ fun NowPlayingScreen(
         onSeek = playerViewModel::seekTo,
         onSkipNext = playerViewModel::skipToNext,
         onSkipPrevious = playerViewModel::skipToPrevious,
+        onSeekBack = { playerViewModel.seekBy(-EPISODE_SKIP_BACK_MS) },
+        onSeekForward = { playerViewModel.seekBy(EPISODE_SKIP_FORWARD_MS) },
         onQueueClick = {},
         onSongClick = { song -> playerViewModel.play(song, uiState.queue) },
         onDownloadClick = playerViewModel::download,
@@ -167,6 +172,8 @@ fun NowPlayingContent(
     onSkipPrevious: () -> Unit,
     onQueueClick: () -> Unit,
     onSongClick: (Song) -> Unit,
+    onSeekBack: () -> Unit = {},
+    onSeekForward: () -> Unit = {},
     onDownloadClick: () -> Unit = {},
     onToggleLike: () -> Unit = {},
     onLoadLyrics: () -> Unit = {},
@@ -186,9 +193,15 @@ fun NowPlayingContent(
     val context = LocalContext.current
 
     val track = uiState.currentTrack
+    // Episodes get skip buttons and no queue, lyrics, likes or playlists.
+    val isEpisode = track?.isPodcastEpisode == true
     // Animated (see AlbumArtPalette.kt): track colors fade in here.
     val palette = rememberAnimatedAlbumArtPalette(track?.highResThumbnailUrl)
+    // Back closes an open Queue or Lyrics pane before it leaves the player.
+    BackHandler(enabled = activeTab != null && !isEpisode) { activeTab = null }
+
     val pane = when {
+        isEpisode && track != null -> NowPlayingPane.Player
         activeTab == BottomTab.Queue -> NowPlayingPane.Queue
         activeTab == BottomTab.Lyrics -> NowPlayingPane.Lyrics
         track == null -> NowPlayingPane.Empty
@@ -215,6 +228,7 @@ fun NowPlayingContent(
                     BottomTab.Lyrics -> "Lyrics"
                     null -> null
                 },
+                isEpisode = isEpisode,
                 downloadState = uiState.downloadState,
                 onDownloadClick = onDownloadClick,
                 playlists = playlists,
@@ -286,25 +300,32 @@ fun NowPlayingContent(
                             onDownloadClick = onDownloadClick,
                             onToggleShuffle = onToggleShuffle,
                             onCycleRepeat = onCycleRepeat,
-                            onSwipeDismiss = onBack
+                            onSwipeDismiss = onBack,
+                            isEpisode = isEpisode,
+                            onSeekBack = onSeekBack,
+                            onSeekForward = onSeekForward
                         )
                     }
                 }
             }
 
-            BottomActionRow(
-                activeTab = activeTab,
-                queueSize = uiState.queue.size,
-                palette = palette,
-                onQueueClick = {
-                    activeTab = if (activeTab == BottomTab.Queue) null else BottomTab.Queue
-                    onQueueClick()
-                },
-                onLyricsClick = {
-                    activeTab = if (activeTab == BottomTab.Lyrics) null else BottomTab.Lyrics
-                    if (activeTab == BottomTab.Lyrics) onLoadLyrics()
-                }
-            )
+            if (isEpisode) {
+                Spacer(modifier = Modifier.height(48.dp))
+            } else {
+                BottomActionRow(
+                    activeTab = activeTab,
+                    queueSize = uiState.queue.size,
+                    palette = palette,
+                    onQueueClick = {
+                        activeTab = if (activeTab == BottomTab.Queue) null else BottomTab.Queue
+                        onQueueClick()
+                    },
+                    onLyricsClick = {
+                        activeTab = if (activeTab == BottomTab.Lyrics) null else BottomTab.Lyrics
+                        if (activeTab == BottomTab.Lyrics) onLoadLyrics()
+                    }
+                )
+            }
         }
     }
 }
@@ -331,6 +352,9 @@ private fun PlayerContent(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onSwipeDismiss: () -> Unit = {},
+    isEpisode: Boolean = false,
+    onSeekBack: () -> Unit = {},
+    onSeekForward: () -> Unit = {},
 ) {
     // One-handed dismiss: dragging this pane down collapses back to the
     // mini-player (same as tapping the back arrow), matching the reference
@@ -449,13 +473,17 @@ private fun PlayerContent(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        ShuffleRepeatRow(
-            isShuffled = isShuffled,
-            repeatMode = repeatMode,
-            palette = palette,
-            onToggleShuffle = onToggleShuffle,
-            onCycleRepeat = onCycleRepeat
-        )
+        if (isEpisode) {
+            Spacer(modifier = Modifier.height(16.dp))
+        } else {
+            ShuffleRepeatRow(
+                isShuffled = isShuffled,
+                repeatMode = repeatMode,
+                palette = palette,
+                onToggleShuffle = onToggleShuffle,
+                onCycleRepeat = onCycleRepeat
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -467,7 +495,10 @@ private fun PlayerContent(
             isLiked = isLiked,
             onToggleLike = onToggleLike,
             downloadState = downloadState,
-            onDownloadClick = onDownloadClick
+            onDownloadClick = onDownloadClick,
+            isEpisode = isEpisode,
+            onSeekBack = onSeekBack,
+            onSeekForward = onSeekForward
         )
 
         if (error != null) {
@@ -910,6 +941,7 @@ private fun NowPlayingTopBar(
     onQueueClick: () -> Unit,
     palette: AlbumArtPalette,
     headerTitle: String? = null,
+    isEpisode: Boolean = false,
     downloadState: DownloadState = DownloadState.Idle,
     onDownloadClick: () -> Unit = {},
     playlists: List<Playlist> = emptyList(),
@@ -951,12 +983,14 @@ private fun NowPlayingTopBar(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        IconButton(onClick = onQueueClick) {
-            Icon(
-                painter = painterResource(R.drawable.ic_queue),
-                contentDescription = "Queue",
-                tint = palette.onBackground
-            )
+        if (!isEpisode) {
+            IconButton(onClick = onQueueClick) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_queue),
+                    contentDescription = "Queue",
+                    tint = palette.onBackground
+                )
+            }
         }
 
         Box {
@@ -971,29 +1005,32 @@ private fun NowPlayingTopBar(
                 expanded = overflowExpanded,
                 onDismissRequest = { overflowExpanded = false }
             ) {
-                DropdownMenuItem(
-                    text = { Text("Add to playlist") },
-                    onClick = {
-                        overflowExpanded = false
-                        showPlaylistPicker = true
-                    }
-                )
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            when (downloadState) {
-                                is DownloadState.Downloading -> "Downloading…"
-                                DownloadState.Downloaded -> "Downloaded"
-                                else -> "Download"
-                            }
-                        )
-                    },
-                    enabled = downloadState !is DownloadState.Downloading && downloadState !is DownloadState.Downloaded,
-                    onClick = {
-                        onDownloadClick()
-                        overflowExpanded = false
-                    }
-                )
+                // Playlists and downloads are music only for now.
+                if (!isEpisode) {
+                    DropdownMenuItem(
+                        text = { Text("Add to playlist") },
+                        onClick = {
+                            overflowExpanded = false
+                            showPlaylistPicker = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                when (downloadState) {
+                                    is DownloadState.Downloading -> "Downloading…"
+                                    DownloadState.Downloaded -> "Downloaded"
+                                    else -> "Download"
+                                }
+                            )
+                        },
+                        enabled = downloadState !is DownloadState.Downloading && downloadState !is DownloadState.Downloaded,
+                        onClick = {
+                            onDownloadClick()
+                            overflowExpanded = false
+                        }
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Share") },
                     onClick = {
@@ -1325,8 +1362,21 @@ private fun PlaybackControls(
     onToggleLike: () -> Unit = {},
     downloadState: DownloadState = DownloadState.Idle,
     onDownloadClick: () -> Unit = {},
+    isEpisode: Boolean = false,
+    onSeekBack: () -> Unit = {},
+    onSeekForward: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    if (isEpisode) {
+        EpisodeControls(
+            isPlaying = isPlaying,
+            onTogglePlayPause = onTogglePlayPause,
+            onSeekBack = onSeekBack,
+            onSeekForward = onSeekForward,
+            modifier = modifier
+        )
+        return
+    }
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1410,11 +1460,75 @@ private fun PlaybackControls(
     }
 }
 
+/** Skip back, play/pause, skip forward: the whole transport for a podcast episode. */
+@Composable
+private fun EpisodeControls(
+    isPlaying: Boolean,
+    onTogglePlayPause: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onSeekBack, modifier = Modifier.size(56.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.Replay10,
+                contentDescription = "Back 10 seconds",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable(onClick = onTogglePlayPause),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isPlaying) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_pause),
+                    contentDescription = "Pause",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.PlayArrow,
+                    contentDescription = "Play",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+
+        IconButton(onClick = onSeekForward, modifier = Modifier.size(56.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.Forward30,
+                contentDescription = "Forward 30 seconds",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+    }
+}
+
+private const val EPISODE_SKIP_BACK_MS = 10_000L
+private const val EPISODE_SKIP_FORWARD_MS = 30_000L
+
+// Episodes run past an hour all the time, so this needs the h: part.
 private fun formatDuration(millis: Long): String {
     val totalSeconds = (millis / 1000).coerceAtLeast(0)
-    val minutes = totalSeconds / 60
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-    return "%d:%02d".format(minutes, seconds)
+    return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
 }
 
 @Composable

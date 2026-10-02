@@ -1,6 +1,6 @@
 # Resona module architecture
 
-Resona is split into nine Gradle modules so that frontend work (feature
+Resona is split into Gradle modules so that frontend work (feature
 screens, design system) can happen without touching or understanding the
 backend (networking, database, playback engine).
 
@@ -16,6 +16,7 @@ graph TD
     app --> feature_search[":feature:search"]
     app --> feature_player[":feature:player"]
     app --> feature_library[":feature:library"]
+    app --> feature_podcasts[":feature:podcasts"]
 
     core_data --> core_domain
     core_player --> core_domain
@@ -24,6 +25,8 @@ graph TD
     feature_home --> core_ui
     feature_library --> core_domain
     feature_library --> core_ui
+    feature_podcasts --> core_domain
+    feature_podcasts --> core_ui
     feature_search --> core_domain
     feature_search --> core_ui
     feature_search --> core_player
@@ -41,14 +44,15 @@ another `:feature:*` module or on `:core:data` directly.
 | Module | Type | Depends on | Contains |
 |---|---|---|---|
 | `:app` | Android application | everything | `MainActivity`, `ResonaApplication`, `NavGraph`/`Destinations`, the three Hilt `@Module`s (`AppModule`, `NetworkModule`, `RepositoryModule`) |
-| `:core:domain` | Kotlin/JVM (no Android) | — | `Song`, `HomeFeed`/`HomeFeedSection`/`ArtistSpotlight`, `DownloadedSong`, `MusicRepository`/`AppUpdateRepository` interfaces, `StreamSource`, `PlaybackUnavailableException`/`StreamCipherRequiredException` |
-| `:core:data` | Android library | `:core:domain` | InnerTube/Ktor networking (`InnerTubeApi`, response models), `MusicRepositoryImpl`, `extractor/` (stream URL resolution, see `NOTICE.md`), `download/` (`SongDownloader`, `DownloadedSongsStore`, which fetch and persist offline copies of a resolved stream), and `update/` (`GitHubAppUpdateRepository`, checks GitHub's releases API for a newer version). Room would live here too if or when it's added. |
+| `:core:domain` | Kotlin/JVM (no Android) | — | `Song`, `HomeFeed`/`HomeFeedSection`/`ArtistSpotlight`, `DownloadedSong`, `MusicRepository`/`PodcastRepository`/`AppUpdateRepository` interfaces, the podcast models (`PodcastShow`, `PodcastEpisode`, `EpisodeProgress`...), `StreamSource`, `PlaybackUnavailableException`/`StreamCipherRequiredException` |
+| `:core:data` | Android library | `:core:domain` | InnerTube/Ktor networking (`InnerTubeApi`, response models), `MusicRepositoryImpl`, `PodcastRepositoryImpl` plus `podcasts/` (followed shows and episode progress, stored as small JSON files), `extractor/` (stream URL resolution, see `NOTICE.md`), `download/` (`SongDownloader`, `DownloadedSongsStore`, which fetch and persist offline copies of a resolved stream), and `update/` (`GitHubAppUpdateRepository`, checks GitHub's releases API for a newer version). Room would live here too if or when it's added. |
 | `:core:player` | Android library | `:core:domain` | `PlayerService` (ExoPlayer + MediaSession foreground service), `PlayerViewModel`/`PlayerUiState`/`DownloadState`, `PlaybackDataSourceModule` |
 | `:core:ui` | Android library (Compose) | — | Theme, colors, typography, shapes, shared composables (`ResonaFilledButton`, `ResonaOutlinedButton`, `ResonaPlaceholderScreenContent`) |
 | `:feature:home` | Android library (Compose) | `:core:domain`, `:core:ui` | `HomeScreen`, `HomeViewModel` |
 | `:feature:search` | Android library (Compose) | `:core:domain`, `:core:ui`, `:core:player` | `SearchScreen`, `SearchViewModel` |
 | `:feature:player` | Android library (Compose) | `:core:domain`, `:core:ui`, `:core:player` | `NowPlayingScreen`, `MiniPlayerBar` |
 | `:feature:library` | Android library (Compose) | `:core:domain`, `:core:ui` | `LibraryScreen`, `LibraryViewModel` |
+| `:feature:podcasts` | Android library (Compose) | `:core:domain`, `:core:ui` | `PodcastsScreen` (the hub Home's Podcasts chip opens), `PodcastShowScreen`, `PodcastSearchScreen` and their ViewModels |
 
 `:core:domain` is a plain `kotlin("jvm")` module, not an Android library,
 so it cannot reference `android.*` or `androidx.*` at all. That's what

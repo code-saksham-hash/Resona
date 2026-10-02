@@ -1,0 +1,181 @@
+{
+ "contents": {
+  "tabbedSearchResultsRenderer": {
+   "tabs": [
+    {
+     "tabRenderer": {
+      "title": "YT Music",
+      "selected": true,
+      "content": {
+       "sectionListRenderer": {
+        "contents": [
+         {
+          "musicShelfRenderer": {
+           "title": {
+            "runs": [
+             {
+              "text": "Episodes"
+             }
+            ]
+           },
+           "contents": [
+            {
+             "musicResponsiveListItemRenderer": {
+              "thumbnail": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://i.ytimg.com/vi/4I5uY_V4ATo/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3lKnOy2MdWMeJ4eLQacPxvZKc2S1g",
+                   "width": 400,
+                   "height": 225
+                  }
+                 ]
+                }
+               }
+              },
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Reacting To Crazy Science Experiments",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "MPED4I5uY_V4ATo",
+                      "browseEndpointContextSupportedConfigs": {
+                       "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                       }
+                      }
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Nov 30, 2021"
+                   },
+                   {
+                    "text": " • "
+                   },
+                   {
+                    "text": "Good Mythical Morning with Rhett & Link",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "MPSPPLJ49NV73ttrvdqf3b1icOXusZabXitci9",
+                      "browseEndpointContextSupportedConfigs": {
+                       "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE"
+                       }
+                      }
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "playlistItemData": {
+               "videoId": "4I5uY_V4ATo"
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemRenderer": {
+              "thumbnail": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://i.ytimg.com/vi/F9ws7cOrWbE/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3mhSFbzbH6lDhtegvaorAfFlvuJSA",
+                   "width": 400,
+                   "height": 225
+                  }
+                 ]
+                }
+               }
+              },
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Science of Math: The movement everyone's talking about with Sarah Powell (Ep.65)",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "MPEDF9ws7cOrWbE",
+                      "browseEndpointContextSupportedConfigs": {
+                       "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                       }
+                      }
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Feb 20"
+                   },
+                   {
+                    "text": " • "
+                   },
+                   {
+                    "text": "Chalk & Talk",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "MPSPPL3RPFDAmIdu0ggz76jeNaf3ePKNIs3yFM",
+                      "browseEndpointContextSupportedConfigs": {
+                       "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE"
+                       }
+                      }
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "playlistItemData": {
+               "videoId": "F9ws7cOrWbE"
+              }
+             }
+            }
+           ],
+           "continuations": [
+            {
+             "nextContinuationData": {
+              "continuation": "EicSB3NjaWVuY2UaHEVnV0tBUUpJQVVnVWFnb1FDaEFERUFRUUNSQUYY8erQLg%3D%3D"
+             }
+            }
+           ]
+          }
+         }
+        ]
+       }
+      },
+      "tabIdentifier": "music_search_catalog"
+     }
+    }
+   ]
+  }
+ }
+}

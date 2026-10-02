@@ -1,0 +1,387 @@
+{
+ "contents": {
+  "twoColumnBrowseResultsRenderer": {
+   "secondaryContents": {
+    "sectionListRenderer": {
+     "contents": [
+      {
+       "musicShelfRenderer": {
+        "contents": [
+         {
+          "musicMultiRowListItemRenderer": {
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://i.ytimg.com/vi/7sJLgNxGWu8/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3n5sgqI9Ki-4-AN1BZm6eOsdczo7g",
+                "width": 800,
+                "height": 450
+               },
+               {
+                "url": "https://i.ytimg.com/vi/7sJLgNxGWu8/hq720.jpg?sqp=-oaymwEKCNUGEN8DIABIWg&rs=AMzJL3ngEhrEvSz-ev4KGlLd0l29-o064Q",
+                "width": 853,
+                "height": 479
+               }
+              ]
+             }
+            }
+           },
+           "onTap": {
+            "watchEndpoint": {
+             "videoId": "7sJLgNxGWu8",
+             "params": "8gEDmAEI",
+             "playerParams": "0gcJCagBs75h_Tjp",
+             "watchEndpointMusicSupportedConfigs": {
+              "watchEndpointMusicConfig": {
+               "musicVideoType": "MUSIC_VIDEO_TYPE_PODCAST_EPISODE"
+              }
+             }
+            }
+           },
+           "subtitle": {
+            "runs": [
+             {
+              "text": "964K views"
+             },
+             {
+              "text": " • "
+             },
+             {
+              "text": "4d ago"
+             }
+            ]
+           },
+           "playbackProgress": {
+            "musicPlaybackProgressRenderer": {
+             "playbackProgressPercentage": 0,
+             "playbackProgressText": {
+              "runs": [
+               {
+                "text": " • "
+               },
+               {
+                "text": "55 min"
+               }
+              ]
+             },
+             "durationText": {
+              "runs": [
+               {
+                "text": " • "
+               },
+               {
+                "text": "55 min"
+               }
+              ]
+             }
+            }
+           },
+           "title": {
+            "runs": [
+             {
+              "text": "The Importance Of \"Soft Fascination\"",
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "MPED7sJLgNxGWu8",
+                "browseEndpointContextSupportedConfigs": {
+                 "browseEndpointContextMusicConfig": {
+                  "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                 }
+                }
+               }
+              }
+             }
+            ]
+           },
+           "description": {
+            "runs": [
+             {
+              "text": "What is fire, and why does watching it hold our attention in a different way from scrolling on your phone?\n\nHannah Fry and Michael Stevens start with the scienc"
+             }
+            ]
+           },
+           "displayStyle": "MUSIC_MULTI_ROW_LIST_ITEM_DISPLAY_STYLE_DETAILED"
+          }
+         },
+         {
+          "musicMultiRowListItemRenderer": {
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://i.ytimg.com/vi/pV6MWmXo_Ss/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3kJD1dEGMdx5BjBgp6HpEkwEwnGSQ",
+                "width": 800,
+                "height": 450
+               },
+               {
+                "url": "https://i.ytimg.com/vi/pV6MWmXo_Ss/hq720.jpg?sqp=-oaymwEKCNUGEN8DIABIWg&rs=AMzJL3ktpDcVrFM33Dft3L7v3HUua-eaAA",
+                "width": 853,
+                "height": 479
+               }
+              ]
+             }
+            }
+           },
+           "onTap": {
+            "watchEndpoint": {
+             "videoId": "pV6MWmXo_Ss",
+             "params": "8gEDmAEI",
+             "watchEndpointMusicSupportedConfigs": {
+              "watchEndpointMusicConfig": {
+               "musicVideoType": "MUSIC_VIDEO_TYPE_PODCAST_EPISODE"
+              }
+             }
+            }
+           },
+           "subtitle": {
+            "runs": [
+             {
+              "text": "476K views"
+             },
+             {
+              "text": " • "
+             },
+             {
+              "text": "Sep 23"
+             }
+            ]
+           },
+           "playbackProgress": {
+            "musicPlaybackProgressRenderer": {
+             "playbackProgressPercentage": 0,
+             "playbackProgressText": {
+              "runs": [
+               {
+                "text": " • "
+               },
+               {
+                "text": "1 hr 1 min"
+               }
+              ]
+             },
+             "durationText": {
+              "runs": [
+               {
+                "text": " • "
+               },
+               {
+                "text": "1 hr 1 min"
+               }
+              ]
+             }
+            }
+           },
+           "title": {
+            "runs": [
+             {
+              "text": "Hannah's Favorite Fountain Pens",
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "MPEDpV6MWmXo_Ss",
+                "browseEndpointContextSupportedConfigs": {
+                 "browseEndpointContextMusicConfig": {
+                  "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                 }
+                }
+               }
+              }
+             }
+            ]
+           },
+           "description": {
+            "runs": [
+             {
+              "text": "The wait is finally over: Hannah Fry introduces Michael Stevens to her beloved fountain pen collection and the beautiful physics behind how fountain pens work.\n"
+             }
+            ]
+           },
+           "displayStyle": "MUSIC_MULTI_ROW_LIST_ITEM_DISPLAY_STYLE_DETAILED"
+          }
+         },
+         {
+          "musicMultiRowListItemRenderer": {
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://i.ytimg.com/vi/7R06bDgZLCQ/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3l1Ni1i_4Bc1Xk3FJlPvGVGtI2Q-g",
+                "width": 800,
+                "height": 450
+               },
+               {
+                "url": "https://i.ytimg.com/vi/7R06bDgZLCQ/hq720.jpg?sqp=-oaymwEKCNUGEN8DIABIWg&rs=AMzJL3lopWLJZXcWbjYxiS5qxSQIHtkzjQ",
+                "width": 853,
+                "height": 479
+               }
+              ]
+             }
+            }
+           },
+           "onTap": {
+            "watchEndpoint": {
+             "videoId": "7R06bDgZLCQ",
+             "params": "8gEDmAEI",
+             "watchEndpointMusicSupportedConfigs": {
+              "watchEndpointMusicConfig": {
+               "musicVideoType": "MUSIC_VIDEO_TYPE_PODCAST_EPISODE"
+              }
+             }
+            }
+           },
+           "subtitle": {
+            "runs": [
+             {
+              "text": "448K views"
+             },
+             {
+              "text": " • "
+             },
+             {
+              "text": "Sep 20"
+             }
+            ]
+           },
+           "playbackProgress": {
+            "musicPlaybackProgressRenderer": {
+             "playbackProgressPercentage": 0,
+             "playbackProgressText": {
+              "runs": [
+               {
+                "text": " • "
+               },
+               {
+                "text": "46 min"
+               }
+              ]
+             },
+             "durationText": {
+              "runs": [
+               {
+                "text": " • "
+               },
+               {
+                "text": "46 min"
+               }
+              ]
+             }
+            }
+           },
+           "title": {
+            "runs": [
+             {
+              "text": "Earth Is A Cradle But Not A Grave",
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "MPED7R06bDgZLCQ",
+                "browseEndpointContextSupportedConfigs": {
+                 "browseEndpointContextMusicConfig": {
+                  "pageType": "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
+                 }
+                }
+               }
+              }
+             }
+            ]
+           },
+           "description": {
+            "runs": [
+             {
+              "text": "Almost every human who has ever lived has one thing in common: they were born and died on Earth. Except for three people.\n\nHannah Fry and Michael Stevens uncove"
+             }
+            ]
+           },
+           "displayStyle": "MUSIC_MULTI_ROW_LIST_ITEM_DISPLAY_STYLE_DETAILED"
+          }
+         }
+        ],
+        "continuations": [
+         {
+          "nextContinuationData": {
+           "continuation": "4qmFsgJREhFNUFNQUExkZ0NRd21wVklXQRo8ZWg1UVZEcERRbEZwUlVSYVJrMHdTVFJSZWtaRlVXcGtSRkpWVFhsT1ZGbVNBUU1JMlFqYUNBUUlBaEFC"
+          }
+         }
+        ]
+       }
+      }
+     ],
+     "targetId": "browse-feedMPSPPLdgCQwmpVIWA"
+    }
+   },
+   "tabs": [
+    {
+     "tabRenderer": {
+      "content": {
+       "sectionListRenderer": {
+        "contents": [
+         {
+          "musicResponsiveHeaderRenderer": {
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://i.ytimg.com/pl_c/PLdgCQwmpVIWA/studio_square_thumbnail.jpg?sqp=CKeE_9UG-oaymwEKCOIBEOIBIABIWqLzl_8DBgixhZnSBg&rs=AMzJL3n1U-KLyFe6cXFV-IxzBhOty_MCSQ",
+                "width": 226,
+                "height": 226
+               },
+               {
+                "url": "https://i.ytimg.com/pl_c/PLdgCQwmpVIWA/studio_square_thumbnail.jpg?sqp=CKeE_9UG-oaymwEKCKAEEKAEIABIWqLzl_8DBgixhZnSBg&rs=AMzJL3kTBRm-AqbPLjRYBlMXqPn98-1KzA",
+                "width": 544,
+                "height": 544
+               }
+              ]
+             }
+            }
+           },
+           "title": {
+            "runs": [
+             {
+              "text": "The Rest Is Science"
+             }
+            ]
+           },
+           "subtitle": {},
+           "straplineTextOne": {
+            "runs": [
+             {
+              "text": "The Rest Is Science",
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "UCThg2IH7bNbIQF0hmXA9ECw",
+                "browseEndpointContextSupportedConfigs": {
+                 "browseEndpointContextMusicConfig": {
+                  "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                 }
+                }
+               }
+              }
+             }
+            ]
+           },
+           "description": {
+            "musicDescriptionShelfRenderer": {
+             "description": {
+              "runs": [
+               {
+                "text": "Whether you’re a lifelong science fan or just naturally curious, join mathematician Professor Hannah Fry and science creator Michael Stevens (Vsauce) as they di"
+               }
+              ]
+             },
+             "shelfStyle": "MUSIC_SHELF_STYLE_OPEN_DIALOG_ON_CLICK"
+            }
+           }
+          }
+         }
+        ],
+        "targetId": "browse-feedMPSPPLdgCQwmpVIWA_header"
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}

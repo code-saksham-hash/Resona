@@ -37,9 +37,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +51,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -75,6 +79,10 @@ import com.resona.music.ui.library.PlaylistDetailViewModel
 import com.resona.music.ui.nowplaying.NowPlayingScreen
 import com.resona.music.ui.player.MiniPlayerBar
 import com.resona.music.ui.player.rememberAlbumArtPalette
+import com.resona.music.ui.podcasts.PodcastSearchScreen
+import com.resona.music.ui.podcasts.PodcastShowScreen
+import com.resona.music.ui.podcasts.PodcastShowViewModel
+import com.resona.music.ui.podcasts.PodcastsScreen
 import com.resona.music.ui.search.SearchPage
 import com.resona.music.ui.settings.SettingsScreen
 
@@ -114,6 +122,19 @@ private val chromeExit = fadeOut(animationSpec = chromeAnimSpec) +
 @Composable
 fun ResonaNavGraph() {
     val navController = rememberNavController()
+
+    // The bottom tab the current screen belongs to. Sub-screens (Podcasts,
+    // an artist, a playlist) aren't tabs themselves, so this keeps the last
+    // tab root that was shown rather than reading the current route.
+    val activeTab = rememberSaveable { mutableStateOf(ResonaDestination.Home.route) }
+    DisposableEffect(navController) {
+        val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+            val base = destination.route?.substringBefore("?")
+            if (base != null && bottomNavDestinations.any { it.route == base }) activeTab.value = base
+        }
+        navController.addOnDestinationChangedListener(listener)
+        onDispose { navController.removeOnDestinationChangedListener(listener) }
+    }
 
     // Obtained here, above the NavHost, so it resolves against the Activity
     // (not a per-destination back stack entry) and survives navigation --
@@ -221,8 +242,52 @@ fun ResonaNavGraph() {
                         navController.navigate(ResonaDestination.Settings.route)
                     },
                     onDownloadsClick = {
-                        navController.navigateToTopLevel(ResonaDestination.Library.route)
+                        navController.selectTab(ResonaDestination.Library.route, activeTab)
                     },
+                    onPodcastsClick = {
+                        navController.navigate(ResonaDestination.Podcasts.route)
+                    },
+                )
+            }
+            composable(
+                ResonaDestination.Podcasts.route,
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
+            ) {
+                PodcastsScreen(
+                    onBack = { navController.popBackStack() },
+                    onSearchClick = { navController.navigate(ResonaDestination.PodcastSearch.route) },
+                    onShowClick = { show -> navController.navigate(podcastShowRoute(show.browseId)) },
+                    onPlayEpisode = { episode -> playerViewModel.play(episode.toSong()) },
+                    onResume = playerViewModel::play,
+                )
+            }
+            composable(
+                route = "${ResonaDestination.PodcastShow.route}/{${PodcastShowViewModel.ARG_BROWSE_ID}}",
+                arguments = listOf(navArgument(PodcastShowViewModel.ARG_BROWSE_ID) { type = NavType.StringType }),
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
+            ) {
+                PodcastShowScreen(
+                    onBack = { navController.popBackStack() },
+                    onPlayEpisode = { episode -> playerViewModel.play(episode.toSong()) },
+                )
+            }
+            composable(
+                ResonaDestination.PodcastSearch.route,
+                enterTransition = { slideEnter },
+                exitTransition = { slideExit },
+                popEnterTransition = { slidePopEnter },
+                popExitTransition = { slidePopExit },
+            ) {
+                PodcastSearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onShowClick = { show -> navController.navigate(podcastShowRoute(show.browseId)) },
+                    onPlayEpisode = { episode -> playerViewModel.play(episode.toSong()) },
                 )
             }
             composable(
@@ -239,7 +304,7 @@ fun ResonaNavGraph() {
                 )
             }
             composable(
-                route = "${ResonaDestination.Search.route}?query={query}",
+                route = SEARCH_ROUTE_PATTERN,
                 arguments = listOf(navArgument("query") { type = NavType.StringType; defaultValue = "" }),
                 enterTransition = { bottomNavEnter },
                 exitTransition = { bottomNavExit },
@@ -265,10 +330,8 @@ fun ResonaNavGraph() {
                 // uiState re-emits every ~second while playing.
                 NowPlayingScreen(
                     playerViewModel = playerViewModel,
-                    // Collapses back to whatever tab sits under it in the
-                    // top-level back stack, with the mini-player reappearing
-                    // once this route is no longer current -- same idiom the
-                    // bottom bar itself uses to switch tabs.
+                    // Now Playing sits on top of whatever screen opened it, so
+                    // this lands right back there, mini-player and all.
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -430,12 +493,18 @@ fun ResonaNavGraph() {
                                     onTogglePlayPause = playerViewModel::togglePlayPause,
                                     onSkipToPrevious = playerViewModel::skipToPrevious,
                                     onSkipToNext = playerViewModel::skipToNext,
-                                    onClick = { navController.navigateToTopLevel(ResonaDestination.NowPlaying.route) },
-                                    onDismiss = playerViewModel::stop
+                                    // Pushed, not swapped in as a tab, so Back returns to the screen you were on.
+                                    onClick = { navController.navigate(ResonaDestination.NowPlaying.route) { launchSingleTop = true } },
+                                    onDismiss = playerViewModel::stop,
+                                    onSeekBack = { playerViewModel.seekBy(-10_000L) },
+                                    onSeekForward = { playerViewModel.seekBy(30_000L) }
                                 )
                             }
                         }
-                        ResonaBottomBar(navController, currentRoute)
+                        ResonaBottomBar(
+                            activeTab = activeTab.value,
+                            onTabClick = { route -> navController.selectTab(route, activeTab) }
+                        )
                     }
                 }
             }
@@ -456,7 +525,7 @@ private fun <T> navMorphSpec(): androidx.compose.animation.core.FiniteAnimationS
 private val navColorSpec = tween<Color>(250)
 
 @Composable
-private fun ResonaBottomBar(navController: NavHostController, currentRoute: String?) {
+private fun ResonaBottomBar(activeTab: String, onTabClick: (route: String) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -474,19 +543,13 @@ private fun ResonaBottomBar(navController: NavHostController, currentRoute: Stri
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Search's registered route carries an optional "?query=..."
-                // suffix (see the Search composable() below) -- currentRoute
-                // reflects that full pattern while on the screen, so a bare
-                // equality check against destination.route would never match
-                // and the pill would never show selected.
-                val currentBaseRoute = currentRoute?.substringBefore("?")
                 bottomNavDestinations.forEach { destination ->
-                    val selected = currentBaseRoute == destination.route
+                    val selected = activeTab == destination.route
                     NavPillItem(
                         label = destination.label,
                         icon = if (selected) destination.selectedIcon else destination.unselectedIcon,
                         selected = selected,
-                        onClick = { navController.navigateToTopLevel(destination.route) }
+                        onClick = { onTabClick(destination.route) }
                     )
                 }
             }
@@ -574,10 +637,23 @@ private fun NavPillItem(
 }
 
 /**
- * Shared by the bottom bar and the mini-player's tap-through to Now Playing
- * -- both land on a top-level destination, so both need the same "avoid
- * piling up copies, keep tab state when switching back and forth" options.
+ * A bottom bar tap (or Home's downloads shortcut into Library). Tapping the
+ * tab you're already in goes back to its root, the way most apps behave;
+ * without this it just restored the same sub-screen and seemed to do nothing.
  */
+private fun NavHostController.selectTab(route: String, activeTab: MutableState<String>) {
+    if (route == activeTab.value) {
+        val root = if (route == ResonaDestination.Search.route) SEARCH_ROUTE_PATTERN else route
+        if (runCatching { getBackStackEntry(root) }.isSuccess) {
+            popBackStack(root, inclusive = false)
+            return
+        }
+    }
+    activeTab.value = route
+    navigateToTopLevel(route)
+}
+
+/** Switches tabs while keeping each tab's own back stack, so coming back to one picks up where you left it. */
 private fun NavHostController.navigateToTopLevel(route: String) {
     navigate(route) {
         popUpTo(graph.findStartDestination().id) {
@@ -587,6 +663,9 @@ private fun NavHostController.navigateToTopLevel(route: String) {
         restoreState = true
     }
 }
+
+// Search registers with an optional query arg, so this is the pattern its back stack entry carries.
+private val SEARCH_ROUTE_PATTERN = "${ResonaDestination.Search.route}?query={query}"
 
 /** [ResonaDestination.Search]'s route, optionally pre-filled (e.g. tapping a genre chip on Home). */
 private fun searchRoute(query: String): String =
@@ -610,3 +689,6 @@ private fun artistDetailRoute(name: String, browseId: String? = null): String {
 /** [ResonaDestination.AlbumDetail]'s route for one specific album. */
 private fun albumDetailRoute(browseId: String): String =
     "${ResonaDestination.AlbumDetail.route}/${Uri.encode(browseId)}"
+
+private fun podcastShowRoute(browseId: String): String =
+    "${ResonaDestination.PodcastShow.route}/${Uri.encode(browseId)}"

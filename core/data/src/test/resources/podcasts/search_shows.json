@@ -1,0 +1,173 @@
+{
+ "contents": {
+  "tabbedSearchResultsRenderer": {
+   "tabs": [
+    {
+     "tabRenderer": {
+      "title": "YT Music",
+      "selected": true,
+      "content": {
+       "sectionListRenderer": {
+        "contents": [
+         {
+          "musicShelfRenderer": {
+           "title": {
+            "runs": [
+             {
+              "text": "Podcasts"
+             }
+            ]
+           },
+           "contents": [
+            {
+             "musicResponsiveListItemRenderer": {
+              "thumbnail": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://i.ytimg.com/pl_c/PLdgCQwmpVIWA/studio_square_thumbnail.jpg?sqp=CPqD_9UG-oaymwEKCOIBEOIBIABIWqLzl_8DBgixhZnSBg&rs=AMzJL3kJdyEwfjknqhizBM8qMJNsf5sJdw",
+                   "width": 226,
+                   "height": 226
+                  },
+                  {
+                   "url": "https://i.ytimg.com/pl_c/PLdgCQwmpVIWA/studio_square_thumbnail.jpg?sqp=CPqD_9UG-oaymwEKCKAEEKAEIABIWqLzl_8DBgixhZnSBg&rs=AMzJL3lrWSGpcuDrCdpoF47UwWJE1aFecQ",
+                   "width": 544,
+                   "height": 544
+                  }
+                 ]
+                }
+               }
+              },
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "The Rest Is Science"
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "The Rest Is Science",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "UCThg2IH7bNbIQF0hmXA9ECw",
+                      "browseEndpointContextSupportedConfigs": {
+                       "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                       }
+                      }
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "MPSPPLdgCQwmpVIWA",
+                "browseEndpointContextSupportedConfigs": {
+                 "browseEndpointContextMusicConfig": {
+                  "pageType": "MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE"
+                 }
+                }
+               }
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemRenderer": {
+              "thumbnail": {
+               "musicThumbnailRenderer": {
+                "thumbnail": {
+                 "thumbnails": [
+                  {
+                   "url": "https://i.ytimg.com/pl_c/PLlV4hNSbZRvvDxgMqa3X1H9exMuv6xZYA/studio_square_thumbnail.jpg?sqp=CPqD_9UG-oaymwEKCOIBEOIBIABIWqLzl_8DBgjh9N3NBg&rs=AMzJL3ntXOgkUW9Nad_cwR5ZrkOUtrKkiw",
+                   "width": 226,
+                   "height": 226
+                  },
+                  {
+                   "url": "https://i.ytimg.com/pl_c/PLlV4hNSbZRvvDxgMqa3X1H9exMuv6xZYA/studio_square_thumbnail.jpg?sqp=CPqD_9UG-oaymwEKCKAEEKAEIABIWqLzl_8DBgjh9N3NBg&rs=AMzJL3mcSTjQNWJixRPz6EBENFNBFEcwPQ",
+                   "width": 544,
+                   "height": 544
+                  }
+                 ]
+                }
+               }
+              },
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Science for Sleep"
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Science for Sleep",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "UCThgqr-GruvkahKZAwDpvKw",
+                      "browseEndpointContextSupportedConfigs": {
+                       "browseEndpointContextMusicConfig": {
+                        "pageType": "MUSIC_PAGE_TYPE_USER_CHANNEL"
+                       }
+                      }
+                     }
+                    }
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "MPSPPLlV4hNSbZRvvDxgMqa3X1H9exMuv6xZYA",
+                "browseEndpointContextSupportedConfigs": {
+                 "browseEndpointContextMusicConfig": {
+                  "pageType": "MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE"
+                 }
+                }
+               }
+              }
+             }
+            }
+           ],
+           "continuations": [
+            {
+             "nextContinuationData": {
+              "continuation": "EicSB3NjaWVuY2UaHEVnV0tBUUpRQVVnVWFnb1FDaEFERUFRUUNSQUYY8erQLg%3D%3D"
+             }
+            }
+           ]
+          }
+         }
+        ]
+       }
+      },
+      "tabIdentifier": "music_search_catalog"
+     }
+    }
+   ]
+  }
+ }
+}
