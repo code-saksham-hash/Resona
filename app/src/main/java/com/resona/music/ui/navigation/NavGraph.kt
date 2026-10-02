@@ -298,6 +298,8 @@ fun ResonaNavGraph() {
                 popExitTransition = { slidePopExit },
             ) {
                 StatsScreen(
+                    onBack = { navController.popBackStack() },
+                    onTrackClick = playerViewModel::play,
                     onArtistClick = { artist ->
                         navController.navigate(artistDetailRoute(artist))
                     }
@@ -342,7 +344,10 @@ fun ResonaNavGraph() {
                 popEnterTransition = { slidePopEnter },
                 popExitTransition = { slidePopExit },
             ) {
-                HistoryScreen(onSongClick = playerViewModel::play)
+                HistoryScreen(
+                    onBack = { navController.popBackStack() },
+                    onSongClick = playerViewModel::play
+                )
             }
             composable(
                 ResonaDestination.Library.route,

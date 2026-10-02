@@ -1,12 +1,11 @@
 package com.resona.music.ui.home
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -16,21 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DateRange
-import androidx.compose.material.icons.outlined.LocalFireDepartment
-import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,223 +30,419 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.resona.music.domain.model.Song
 import com.resona.music.domain.stats.ArtistStat
+import com.resona.music.domain.stats.PlayStats
 import com.resona.music.domain.stats.formatListeningTime
-
-private val cardShape = RoundedCornerShape(16.dp)
-private val cardColor = Color.White.copy(alpha = 0.06f)
-private val cardBorder = Color.White.copy(alpha = 0.1f)
+import com.resona.music.ui.theme.ResonaTheme
+import com.resona.music.ui.theme.SectionHeaderTextStyle
 
 @Composable
 fun StatsScreen(
     modifier: Modifier = Modifier,
+    onBack: () -> Unit = {},
+    onTrackClick: (Song) -> Unit = {},
     onArtistClick: (String) -> Unit = {},
     viewModel: StatsViewModel = hiltViewModel()
 ) {
     val stats by viewModel.stats.collectAsStateWithLifecycle()
 
+    StatsScreenContent(
+        stats = stats,
+        onBack = onBack,
+        onTrackClick = onTrackClick,
+        onArtistClick = onArtistClick,
+        modifier = modifier
+    )
+}
+
+/**
+ * Your charts: a centered hero with the all-time totals, a recent-activity
+ * strip, a spotlight poster for the No. 1 track, then Billboard-style
+ * ranked charts for the rest. Rank numerals are oversized on purpose --
+ * they're the visual voice of the screen, the way artwork is on Home.
+ *
+ * Stateless so it's directly previewable without standing up Hilt --
+ * [StatsScreen] above owns the [StatsViewModel] and threads its state
+ * through, the same split Search and the detail screens use.
+ */
+@Composable
+private fun StatsScreenContent(
+    stats: PlayStats,
+    onBack: () -> Unit = {},
+    onTrackClick: (Song) -> Unit = {},
+    onArtistClick: (String) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .padding(top = 28.dp)
     ) {
-        Text(
-            text = "Stats",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
-        Spacer(modifier = Modifier.height(24.dp))
+        StatsTopBar(onBack = onBack)
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            HeroStat(
-                value = stats.totalPlays.toString(),
-                label = "Total Plays",
-                icon = Icons.Outlined.PlayCircle,
-                modifier = Modifier.weight(1f)
-            )
-            HeroStat(
-                value = formatListeningTime(stats.listeningSecondsAllTime),
-                label = "Listening Time",
-                icon = Icons.Outlined.Schedule,
-                modifier = Modifier.weight(1.2f)
-            )
-        }
-
-        if (stats.totalPlays > 0) {
-            Spacer(modifier = Modifier.height(28.dp))
-            SectionHeader("Top Tracks")
-            Spacer(modifier = Modifier.height(14.dp))
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+        if (stats.totalPlays == 0) {
+            StatsEmptyState(modifier = Modifier.weight(1f).fillMaxWidth())
+        } else {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
             ) {
-                itemsIndexed(stats.topTracks, key = { _, pair -> pair.first.videoId }) { index, (song, plays) ->
-                    TopTrackCard(
-                        song = song,
-                        rank = index + 1,
-                        plays = plays
+                Spacer(modifier = Modifier.height(8.dp))
+                TotalsHero(stats = stats)
+                Spacer(modifier = Modifier.height(12.dp))
+                ActivityStrip(stats = stats)
+
+                if (stats.topTracks.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(28.dp))
+                    StatsSectionHeader("Top Tracks")
+                    Spacer(modifier = Modifier.height(14.dp))
+                    TopTrackSpotlight(
+                        song = stats.topTracks.first().first,
+                        plays = stats.topTracks.first().second,
+                        onClick = { onTrackClick(stats.topTracks.first().first) }
                     )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-            SectionHeader("Top Artists")
-            Spacer(modifier = Modifier.height(6.dp))
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                stats.topArtists.take(4).chunked(2).forEach { rowArtists ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        rowArtists.forEach { (artist, plays) ->
-                            TopArtistCell(
-                                artist = artist,
-                                plays = plays,
-                                onClick = { onArtistClick(artist.name) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        if (rowArtists.size == 1) Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-            SectionHeader("This Period")
-            Spacer(modifier = Modifier.height(10.dp))
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                val periodStats = listOf(
-                    PeriodStat("Today", formatListeningTime(stats.listeningSecondsToday), Icons.Outlined.Today),
-                    PeriodStat("This Week", formatListeningTime(stats.listeningSecondsThisWeek), Icons.Outlined.DateRange),
-                    PeriodStat("Day Streak", "${stats.streakDays} days", Icons.Outlined.LocalFireDepartment),
-                    PeriodStat("Unique Tracks", stats.uniqueTracks.toString(), Icons.Outlined.MusicNote),
-                    PeriodStat("Unique Artists", stats.uniqueArtists.toString(), Icons.Outlined.Person),
-                )
-                periodStats.chunked(2).forEach { rowStats ->
-                    if (rowStats.size == 2) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            rowStats.forEach { stat ->
-                                PeriodStatTile(
-                                    stat = stat,
-                                    modifier = Modifier.weight(1f)
+                    if (stats.topTracks.size > 1) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ChartCard {
+                            stats.topTracks.drop(1).forEachIndexed { index, (song, plays) ->
+                                TrackRankRow(
+                                    rank = index + 2,
+                                    song = song,
+                                    plays = plays,
+                                    onClick = { onTrackClick(song) }
                                 )
                             }
                         }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            PeriodStatTile(stat = rowStats.single())
+                    }
+                }
+
+                if (stats.topArtists.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(28.dp))
+                    StatsSectionHeader("Top Artists")
+                    Spacer(modifier = Modifier.height(14.dp))
+                    ChartCard {
+                        stats.topArtists.forEachIndexed { index, (artist, plays) ->
+                            ArtistRankRow(
+                                rank = index + 1,
+                                artist = artist,
+                                plays = plays,
+                                onClick = { onArtistClick(artist.name) }
+                            )
                         }
                     }
                 }
-            }
-        } else {
-            Spacer(modifier = Modifier.height(28.dp))
-            EmptyStateCard()
-        }
 
-        // Clears the floating bottom chrome (pill nav, plus the mini-player
-        // when a track is playing).
-        Spacer(modifier = Modifier.height(160.dp))
+                // Clears the floating bottom chrome (pill nav, plus the
+                // mini-player when a track is playing).
+                Spacer(modifier = Modifier.height(160.dp))
+            }
+        }
+    }
+}
+
+/**
+ * Back + title bar, the same 61dp pattern Settings and the detail screens
+ * use.
+ */
+@Composable
+private fun StatsTopBar(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(end = 17.dp)
+            .height(61.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            text = "Stats",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/** Section titles read exactly like Home/Search section headers. */
+@Composable
+private fun StatsSectionHeader(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        style = SectionHeaderTextStyle,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(horizontal = 17.dp)
+    )
+}
+
+/**
+ * The all-time totals as one centered hero: the play count set big in the
+ * display voice, everything else collapsed into a single summary line
+ * underneath. Centered against the left-aligned charts below it so the
+ * top of the screen feels like a masthead, not another tile.
+ */
+@Composable
+private fun TotalsHero(
+    stats: PlayStats,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 17.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stats.totalPlays.toString(),
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "TOTAL PLAYS",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "${formatListeningTime(stats.listeningSecondsAllTime)} listening · " +
+                "${plural(stats.uniqueTracks, "track")} · ${plural(stats.uniqueArtists, "artist")}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/**
+ * The recent window -- today, this week, day streak -- as three centered
+ * stats in the same card the hero uses, so the top of the screen reads as
+ * one totals block.
+ */
+@Composable
+private fun ActivityStrip(
+    stats: PlayStats,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 17.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .padding(horizontal = 12.dp, vertical = 16.dp)
+    ) {
+        ActivityStat(
+            value = formatListeningTime(stats.listeningSecondsToday),
+            label = "Today",
+            modifier = Modifier.weight(1f)
+        )
+        ActivityStat(
+            value = formatListeningTime(stats.listeningSecondsThisWeek),
+            label = "This Week",
+            modifier = Modifier.weight(1f)
+        )
+        ActivityStat(
+            value = "${stats.streakDays}d",
+            label = "Day Streak",
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
 @Composable
-private fun SectionHeader(title: String, modifier: Modifier = Modifier) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onBackground,
-        modifier = modifier.padding(horizontal = 20.dp)
-    )
-}
-
-@Composable
-private fun HeroStat(
+private fun ActivityStat(
     value: String,
     label: String,
-    icon: ImageVector,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.displayMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
             maxLines = 1
         )
     }
 }
 
+/**
+ * The No. 1 track as a poster: full-bleed 16:9 artwork (which is the
+ * thumbnail's native shape, so nothing is cropped away) with a scrim and
+ * overlay type, the same overlay treatment Home's Recommended cards use.
+ * Tapping it plays the track.
+ */
 @Composable
-private fun TopTrackCard(
+private fun TopTrackSpotlight(
     song: Song,
-    rank: Int,
     plays: Int,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.width(148.dp)) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 17.dp)
+            .aspectRatio(16f / 9f)
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick)
+    ) {
+        AsyncImage(
+            model = song.highResThumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier.fillMaxSize()
+        )
+        // Scrim, not a theme surface: it sits on artwork, where a
+        // monochrome surface fill would wash out either mode.
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(14.dp))
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.85f)
+                        )
+                    )
+                )
+        )
+        Text(
+            text = "Your top track".uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.85f),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(14.dp)
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(14.dp)
+                .padding(end = 100.dp)
+        ) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = song.displayArtist,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.75f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(14.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.6f))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(
+                text = playCount(plays),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White
+            )
+        }
+    }
+}
+
+/**
+ * The container both charts share: one surfaceContainerLowest card holding
+ * plain rows, exactly like Home's New For You section.
+ */
+@Composable
+private fun ChartCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 17.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .padding(vertical = 6.dp),
+        content = { content() }
+    )
+}
+
+@Composable
+private fun TrackRankRow(
+    rank: Int,
+    song: Song,
+    plays: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = rank.toString().padStart(2, '0'),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.width(44.dp)
+        )
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             AsyncImage(
@@ -265,74 +453,58 @@ private fun TopTrackCard(
                 error = ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 modifier = Modifier.fillMaxSize()
             )
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .size(26.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = rank.toString(),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .padding(horizontal = 9.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = playCount(plays),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White
-                )
-            }
         }
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = song.displayArtist,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = song.title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            minLines = 2
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = song.artist,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            text = playCount(plays),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline
         )
     }
 }
 
 @Composable
-private fun TopArtistCell(
+private fun ArtistRankRow(
+    rank: Int,
     artist: ArtistStat,
     plays: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier
-            .clip(cardShape)
+            .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Text(
+            text = rank.toString().padStart(2, '0'),
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.width(44.dp)
+        )
         Box(
             modifier = Modifier
-                .size(104.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
@@ -341,7 +513,6 @@ private fun TopArtistCell(
                 Text(
                     text = artist.name.take(1).uppercase(),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
@@ -355,94 +526,124 @@ private fun TopArtistCell(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = artist.name,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 10.dp)
+            modifier = Modifier.weight(1f)
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = playCount(plays),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline
         )
     }
 }
 
-private data class PeriodStat(
-    val label: String,
-    val value: String,
-    val icon: ImageVector,
-)
-
 @Composable
-private fun PeriodStatTile(
-    stat: PeriodStat,
-    modifier: Modifier = Modifier
-) {
+private fun StatsEmptyState(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier,
+        modifier = modifier.padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = stat.icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(34.dp)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Leaderboard,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = stat.value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1
+            text = "No stats yet",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = stat.label,
+            text = "Play something and your stats will appear here.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
+            color = MaterialTheme.colorScheme.outline,
             textAlign = TextAlign.Center
         )
     }
 }
 
+private fun plural(count: Int, singular: String): String =
+    "$count $singular" + if (count == 1) "" else "s"
+
+private fun playCount(count: Int): String = plural(count, "play")
+
+private val previewSongs = listOf(
+    Song(videoId = "1", title = "Midnight City", artist = "M83", thumbnailUrl = "", duration = "4:04"),
+    Song(videoId = "2", title = "Nightcall", artist = "Kavinsky", thumbnailUrl = "", duration = "4:18"),
+    Song(videoId = "3", title = "Instant Crush", artist = "Daft Punk", thumbnailUrl = "", duration = "3:44"),
+    Song(videoId = "4", title = "Ether Drift", artist = "Vanish In Dust", thumbnailUrl = "", duration = "3:42"),
+    Song(videoId = "5", title = "Neon Dusk", artist = "Night Drive", thumbnailUrl = "", duration = "4:01"),
+)
+
+private val previewStats = PlayStats(
+    totalPlays = 47,
+    listeningSecondsToday = 3_600L,
+    listeningSecondsThisWeek = 12_340L,
+    listeningSecondsAllTime = 200_000L,
+    uniqueTracks = 18,
+    uniqueArtists = 9,
+    topArtists = listOf(
+        ArtistStat("Daft Punk", "") to 14,
+        ArtistStat("M83", "") to 9,
+        ArtistStat("Kavinsky", "") to 6,
+        ArtistStat("Night Drive", "") to 4,
+        ArtistStat("Vanish In Dust", "") to 3,
+    ),
+    topTracks = previewSongs.mapIndexed { index, song -> song to (12 - index * 2) },
+    streakDays = 6
+)
+
+@Preview(showBackground = true, name = "Populated")
 @Composable
-private fun EmptyStateCard(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(cardColor)
-            .border(0.5.dp, cardBorder, RoundedCornerShape(20.dp))
-            .padding(vertical = 36.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "No plays yet",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Play something and your stats will appear here.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 24.dp)
-        )
+private fun StatsScreenPopulatedPreview() {
+    ResonaTheme(darkTheme = true) {
+        StatsScreenContent(stats = previewStats)
     }
 }
 
-private fun playCount(count: Int): String = "$count play" + if (count == 1) "" else "s"
+@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO, name = "Populated Light")
+@Composable
+private fun StatsScreenPopulatedLightPreview() {
+    ResonaTheme(darkTheme = false) {
+        StatsScreenContent(stats = previewStats)
+    }
+}
+
+@Preview(showBackground = true, name = "Empty")
+@Composable
+private fun StatsScreenEmptyPreview() {
+    ResonaTheme(darkTheme = true) {
+        StatsScreenContent(
+            stats = PlayStats(
+                totalPlays = 0,
+                listeningSecondsToday = 0L,
+                listeningSecondsThisWeek = 0L,
+                listeningSecondsAllTime = 0L,
+                uniqueTracks = 0,
+                uniqueArtists = 0,
+                topArtists = emptyList(),
+                topTracks = emptyList(),
+                streakDays = 0
+            )
+        )
+    }
+}
